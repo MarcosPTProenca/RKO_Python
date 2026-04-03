@@ -13,6 +13,7 @@
 - Keep Ruff configured and mandatory in the pre-commit workflow for automatic validation before each commit.
 - For a single logical responsibility, centralize the implementation in one cohesive class, avoiding fragmentation into multiple loose functions.
 - The agent output must be entirely in English (responses, explanations, summaries, and generated text).
+- This project uses `uv` as the environment/package runner; always execute tooling through `uv run ...`.
 
 ### Mandatory module docstring template (header)
 
@@ -82,6 +83,7 @@ Additional rules for function/method docstrings:
 ```bash
 uv run ruff check .
 uv run ruff format --check .
+uv run pytest src/rko/tests -q
 ```
 
 ## DON'T
