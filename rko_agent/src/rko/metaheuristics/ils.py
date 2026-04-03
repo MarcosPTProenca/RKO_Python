@@ -1,59 +1,178 @@
-"""ILS metaheuristic (skeleton).
+"""Metaheuristic Iterated Local Search (ILS) for random-key optimisation.
 
 Objective:
-- Define the base structure for Iterated Local Search.
+- Escape local optima through repeated perturbation and local refinement,
+  retaining only improvements over the incumbent best.
 
 Technical approach:
-- Expose initialization and execution contracts for concrete implementations.
+- Apply RVND after the initial solution construction.
+- Each iteration perturbs the best solution with a random shake, decodes the
+  result, and refines it with RVND.
+- Q-Learning (control=1) adapts beta_min/beta_max online via an epsilon-greedy
+  policy over a discrete state space.
 
 Flow (pseudocode):
-1. Initialize instance.
-2. Run `solve` with a time limit.
-3. Return the best solution when implemented.
+1. Build initial solution, decode, apply RVND, insert into pool.
+2. While time budget not exhausted:
+   a. [Q-Learning] choose action, update parameters.
+   b. shake(best, beta_min, beta_max) -> sLine
+   c. decode sLine; apply RVND.
+   d. If improved: update best, insert into pool.
+   e. [Q-Learning] compute reward, update Q-table.
 
 Important criteria:
-- Compatibility with the base-class contract.
+- Acceptance criterion is improvement-only (no Metropolis).
+- RVND cycles randomly through swap, mirror, Nelder-Mead, and Farey LS.
 
 Inputs/Outputs:
-- Input: solution pool and time limit.
-- Output: tuple with extra data, vector, and cost.
+- Input: solution pool, decoder, cost, solution size, perturbation bounds,
+  control mode, and optional Q-Learning parameter grid.
+- Output: tuple with empty extras, best key vector, and best cost.
 """
 
+import numpy as np
+import random
+from ..components.adaptive_control.q_learning import QLearningController
+from ..components.local_search.rvnd import rvnd
+from ..components.shaking.random import shake
 from .base import MetaheuristicBase
+from collections.abc import Callable
+from typing import Any
+from typing import override
 
 
 class ILS(MetaheuristicBase):
-    """Represents the skeleton of the ILS metaheuristic.
+    """Iterated Local Search over a random-key vector.
 
     Responsibilities:
-    - Define construction signature.
-    - Reserve extension entry point for search.
+    - Perform repeated shake-and-RVND iterations starting from the best
+      known solution.
+    - Optionally adapt perturbation parameters via Q-Learning.
+
+    Attributes:
+      decoder (Callable[[np.ndarray], Any]): Solution decoding function.
+      cost (Callable[[Any], float]): Objective function over decoded solutions.
+      tam_solution (int): Length of the random-key vector.
+      beta_min (float): Minimum relative perturbation intensity.
+      beta_max (float): Maximum relative perturbation intensity.
+      control (int): 0 = offline (fixed params); 1 = online (Q-Learning).
+      parameters (list[list[float]]): Discrete Q-Learning parameter grid
+        ``[[beta_min values], [beta_max values]]``.
     """
 
-    def __init__(self, solution_pool: object, name: str = "ILS") -> None:
-        """Initializes a metaheuristic ILS.
+    def __init__(
+        self,
+        solution_pool: object,
+        decoder: Callable[[np.ndarray], Any],
+        cost: Callable[[Any], float],
+        tam_solution: int,
+        *,
+        beta_min: float = 0.10,
+        beta_max: float = 0.40,
+        control: int = 0,
+        parameters: list[list[float]] | None = None,
+        name: str = "ILS",
+    ) -> None:
+        """Initialises the ILS metaheuristic.
 
         Args:
-          solution_pool: Shared solution pool.
-          name: Name identifier of algorithm.
+          solution_pool: Shared pool for exchanging elite solutions.
+          decoder: Function that converts a key vector into a problem solution.
+          cost: Objective function applied to a decoded solution.
+          tam_solution: Length of the random-key vector.
+          beta_min: Minimum perturbation intensity (offline mode).
+          beta_max: Maximum perturbation intensity (offline mode).
+          control: 0 for offline fixed parameters, 1 for Q-Learning.
+          parameters: Discrete grid for Q-Learning ``[[bmin...], [bmax...]]``.
+          name: Human-readable identifier for logging.
 
         Returns:
-          None: Initializes instance state.
+          None: Initialises instance state.
 
         Raises:
           ValueError: When required by external domain validation.
         """
         super().__init__(solution_pool=solution_pool, name=name)
+        self.decoder = decoder
+        self.cost = cost
+        self.tam_solution = tam_solution
+        self.beta_min = beta_min
+        self.beta_max = beta_max
+        self.control = control
+        self.parameters: list[list[float]] = parameters or [
+            [0.05, 0.10, 0.20, 0.30],
+            [0.10, 0.20, 0.30, 0.40],
+        ]
 
+    @override
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:
-        """Runs ILS for up to `limit_time` seconds.
+        """Runs ILS for at most *limit_time* seconds.
 
         Args:
-          limit_time: Time limit in seconds.
+          limit_time (float): Maximum wall-clock time in seconds.
+
+        Returns:
+          tuple[list[object], list[float], float]: Empty extras, best key
+            vector, and best objective value found.
 
         Raises:
-          NotImplementedError: When the search flow has not been implemented yet.
           ValueError: When required by external domain validation.
         """
         self._start_timer()
-        raise NotImplementedError("ILS.solve has not been implemented yet.")
+        n = self.tam_solution
+        beta_min = self.beta_min
+        beta_max = self.beta_max
+
+        ql: QLearningController | None = None
+        st = 0
+        at = 0
+        lf = 1.0
+        df = 0.8
+        if self.control == 1:
+            ql = QLearningController(
+                self.parameters,
+                epsilon_max=1.0,
+                epsilon_min=0.1,
+                restart_epsilon=1,
+                max_time=limit_time,
+            )
+            st = random.randint(0, max(0, len(ql.states) - 1))
+            beta_min = ql.states[st].par[0] if ql.states else beta_min
+            beta_max = ql.states[st].par[1] if ql.states else beta_max
+
+        keys: np.ndarray = np.random.random(n)
+        keys, current_cost = rvnd(keys, self.decoder, self.cost, pool=self.solution_pool)
+
+        best_keys: np.ndarray = keys.copy()
+        best_cost: float = current_cost
+        self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
+
+        while not self.time_limit_reached(limit_time):
+            if ql is not None:
+                epsilon, lf, df, _, _, _ = ql.set_parameters(self.elapsed())
+                at = ql.choose_action(st, epsilon)
+                i_curr = ql.states[st].Ai[at]
+                beta_min = ql.states[i_curr].par[0]
+                beta_max = ql.states[i_curr].par[1]
+
+            s_line = shake(best_keys.copy(), beta_min, beta_max)
+            s_line, s_line_cost = rvnd(s_line, self.decoder, self.cost, pool=self.solution_pool)
+
+            improv = 0
+            if s_line_cost < best_cost:
+                best_cost = s_line_cost
+                best_keys = s_line.copy()
+                improv = 1
+                self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
+
+            if ql is not None:
+                reward = (
+                    1.0
+                    if improv
+                    else ((best_cost - s_line_cost) / s_line_cost if s_line_cost != 0 else 0.0)
+                )
+                st_next = ql.states[st].Ai[at]
+                ql.update_q_value(st, at, reward, lf, df)
+                st = st_next
+
+        return [], best_keys.tolist(), best_cost

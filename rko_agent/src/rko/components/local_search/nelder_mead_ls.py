@@ -6,18 +6,22 @@ Objective:
 Technical approach:
 - Maintain a three-point simplex with objective evaluation over decoded solutions.
 - Apply reflection, expansion, contraction, and shrink steps until stabilization.
+- When an elite pool is available, use its top-2 solutions as the other two
+  simplex vertices, matching the C++ RKO reference implementation.
 
 Flow (pseudocode):
-1. Initialize the simplex and an auxiliary centroid point.
+1. Initialize the simplex: x1 from the provided keys; x2 and x3 from the pool
+   elite (if available) or random otherwise.
 2. Iterate Nelder-Mead operators according to cost ordering.
 3. Return the best point found or the original solution.
 
 Important criteria:
 - Reset the stagnation counter when improvement occurs.
 - Use a minimum iteration limit based on problem dimension.
+- Pool is optional; behaviour degrades gracefully to random simplex when absent.
 
 Inputs/Outputs:
-- Input: key vector, decoder, and objective function.
+- Input: key vector, decoder, objective function, and optional elite pool.
 - Output: best random-key vector and associated cost.
 """
 
@@ -97,13 +101,21 @@ def nelder_mead_search(
     keys: np.ndarray,
     decoder: Callable[[np.ndarray], Any],
     cost: Callable[[Any], float],
+    pool: object = None,
 ) -> tuple[np.ndarray, float]:
     """Runs Nelder-Mead local search on a random-key vector.
+
+    When *pool* is provided and contains at least two elite solutions, its
+    top-2 entries are used as the second and third simplex vertices, matching
+    the C++ RKO reference implementation. Otherwise two random vectors are
+    generated instead.
 
     Args:
         keys (np.ndarray): Key vector of the initial solution.
         decoder (Callable[[np.ndarray], Any]): Solution decoding function.
         cost (Callable[[Any], float]): Objective function over the decoded solution.
+        pool (object | None): Optional elite solution pool with a
+          ``get_elite(k)`` method returning ``(cost, keys_list)`` pairs.
 
     Returns:
         tuple[np.ndarray, float]: Best found vector and corresponding cost.
@@ -118,8 +130,22 @@ def nelder_mead_search(
     x1_origin = keys.copy()
     x1 = _Point(keys.copy(), _evaluate(keys, decoder, cost))
 
-    x2_keys = np.random.random(n)
-    x3_keys = np.random.random(n)
+    elite = pool.get_elite(2) if pool is not None and hasattr(pool, "get_elite") else []
+    if len(elite) >= 2:
+        x2_keys = np.array(elite[0][1], dtype=float)
+        x3_keys = np.array(elite[1][1], dtype=float)
+        if len(x2_keys) != n:
+            x2_keys = np.random.random(n)
+        if len(x3_keys) != n:
+            x3_keys = np.random.random(n)
+    elif len(elite) == 1:
+        x2_keys = np.array(elite[0][1], dtype=float)
+        if len(x2_keys) != n:
+            x2_keys = np.random.random(n)
+        x3_keys = np.random.random(n)
+    else:
+        x2_keys = np.random.random(n)
+        x3_keys = np.random.random(n)
 
     x2 = _Point(x2_keys, _evaluate(x2_keys, decoder, cost))
     x3 = _Point(x3_keys, _evaluate(x3_keys, decoder, cost))

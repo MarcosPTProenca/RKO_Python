@@ -162,7 +162,9 @@ class SA(MetaheuristicBase):
                             keys = viz_keys
                             current_cost = viz_cost
                 T *= self.alpha
-                ls_keys, ls_cost = nelder_mead_search(keys.copy(), self.decoder, self.cost)
+                ls_keys, ls_cost = nelder_mead_search(
+                    keys.copy(), self.decoder, self.cost, pool=self.solution_pool
+                )
                 if ls_cost < best_cost:
                     best_cost = ls_cost
                     best_keys = ls_keys.copy()
