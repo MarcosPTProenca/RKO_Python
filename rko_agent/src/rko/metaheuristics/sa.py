@@ -21,6 +21,8 @@ Inputs/Outputs:
 - Output: best random-key vector e best value objective.
 """
 
+from __future__ import annotations
+
 import math
 import numpy as np
 import random

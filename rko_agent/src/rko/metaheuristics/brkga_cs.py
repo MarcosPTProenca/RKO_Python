@@ -37,6 +37,8 @@ Inputs/Outputs:
 - Output: tuple with empty extras, best key vector, and best cost.
 """
 
+from __future__ import annotations
+
 import numpy as np
 import random
 from ..components.adaptive_control.q_learning import QLearningController

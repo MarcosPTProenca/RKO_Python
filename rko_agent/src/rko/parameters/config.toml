@@ -1,0 +1,36 @@
+# Global RKO execution configuration.
+# Edit this file to change run-time behaviour without touching source code.
+
+[run]
+# 0 = offline mode (use single values from each MH's [offline] section)
+# 1 = online mode  (use Q-Learning with lists from each MH's [online] section)
+control = 1
+
+# Local-search strategy passed to RVND and other operators
+# 1 = first improvement   2 = best improvement
+strategy = 2
+
+# Number of elite solutions retained in the shared pool
+pool_size = 10
+
+# How many independent runs to execute
+max_runs = 1
+
+# Print extra diagnostic information during execution
+debug = false
+
+[active_metaheuristics]
+# List every metaheuristic that should run (each in its own thread).
+# Remove or comment out entries to disable individual algorithms.
+list = [
+    "SA",
+    "ILS",
+    "VNS",
+    "LNS",
+    "BRKGA",
+    "BRKGA_CS",
+    "PSO",
+    "GA",
+    "GRASP",
+    "IPR",
+]

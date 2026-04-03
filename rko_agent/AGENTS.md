@@ -8,7 +8,7 @@
 - Follow the fixed module docstring template below.
 - Follow the fixed class and function/method docstring templates below.
 - Always use complete type hints: inputs and outputs must be typed in functions, methods, and public signatures.
-- Organize imports at the top of the file, one import per line, with no blank lines between imports.
+- Organize imports at the top of the file, one import per line, in this exact order: external libraries first, then internal imports, with no blank lines between them.
 - After completing any implementation, run Ruff and only consider the task complete when lint passes with no errors.
 - Keep Ruff configured and mandatory in the pre-commit workflow for automatic validation before each commit.
 - For a single logical responsibility, centralize the implementation in one cohesive class, avoiding fragmentation into multiple loose functions.

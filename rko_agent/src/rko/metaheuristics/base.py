@@ -1,5 +1,7 @@
 """Foundation of the RKO package metaheuristics."""
 
+from __future__ import annotations
+
 import time
 from abc import ABC
 from abc import abstractmethod

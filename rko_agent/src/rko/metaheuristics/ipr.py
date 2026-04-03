@@ -36,6 +36,8 @@ Inputs/Outputs:
   and its cost.
 """
 
+from __future__ import annotations
+
 import math
 import numpy as np
 import random

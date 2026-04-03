@@ -24,6 +24,8 @@ Inputs/Outputs:
 - Output: tuple with empty extras, best key vector, and best cost.
 """
 
+from __future__ import annotations
+
 import numpy as np
 from .base import MetaheuristicBase
 from collections.abc import Callable

@@ -21,6 +21,8 @@ Inputs/Outputs:
 - Output: best random-key vector found and associated objective value.
 """
 
+from __future__ import annotations
+
 from .base import MetaheuristicBase
 from .brkga import BRKGA
 from .brkga_cs import BRKGA_CS

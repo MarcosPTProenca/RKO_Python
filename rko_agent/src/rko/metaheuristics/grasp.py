@@ -38,6 +38,8 @@ Inputs/Outputs:
 - Output: tuple with empty extras, best key vector, and best cost.
 """
 
+from __future__ import annotations
+
 import math
 import numpy as np
 import random
