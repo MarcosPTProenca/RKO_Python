@@ -46,6 +46,7 @@ class TSPProblem(RKOEnvAbstract):
         self.PSO_parameters = {'PSize': [100, 50], 'c1': [2.05], 'c2': [2.05], 'w': [0.73]}
         self.GA_parameters = {'sizePop': [100, 50], 'probCros': [0.98], 'probMut': [0.005, 0.01]}
         self.LNS_parameters = {'betaMin': [0.10], 'betaMax': [0.30], 'TO': [100], 'alphaLNS': [0.95, 0.9]}
+        self.GRASP_parameters = {'alphaGrasp': [0.10, 0.30], 'hs': [0.125], 'he': [0.00098]}
 
     def _generate_cities(self, num_cities: int) -> np.ndarray:
         """Generates random (x, y) coordinates for each city in a 100x100 grid."""

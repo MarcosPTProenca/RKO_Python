@@ -43,6 +43,7 @@ class KnapsackProblem(RKOEnvAbstract):
         self.PSO_parameters = {'PSize': [100, 50], 'c1': [2.05], 'c2': [2.05], 'w': [0.73]}
         self.GA_parameters = {'sizePop': [100, 50], 'probCros': [0.98], 'probMut': [0.005, 0.01]}
         self.LNS_parameters = {'betaMin': [0.10], 'betaMax': [0.30], 'TO': [100], 'alphaLNS': [0.95, 0.9]}
+        self.GRASP_parameters = {'alphaGrasp': [0.10, 0.30], 'hs': [0.125], 'he': [0.00098]}
 
     def _load_data(self, instance_path: str):
         """
@@ -119,7 +120,7 @@ if __name__ == "__main__":
     solver = RKO(env, logger=logger)
     
     # 4. Solves with all heuristics combined over 30s limit overall
-    solver.solve(time_total=30, brkga=1, lns=1, vns=1, ils=1, sa=1, pso=1, ga=1, runs=2)
+    solver.solve(time_total=30, brkga=1, lns=1, vns=1, ils=1, sa=1, pso=1, ga=1, grasp=1, runs=2)
     
     # 5. Output Graphics
     HistoryPlotter.plot_convergence(os.path.join(current_directory, 'results.txt'), run_number=1).show()
