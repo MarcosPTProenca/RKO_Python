@@ -2,7 +2,7 @@
 Utility functions for RKO Environment validation.
 """
 
-def check_env(env_instance, silent=False, time_total=None, brkga=0, ms=0, sa=0, vns=0, ils=0, lns=0, pso=0, ga=0, restart=1, runs=1):
+def check_env(env_instance, silent=False, time_total=None, brkga=0, ms=0, sa=0, vns=0, ils=0, lns=0, pso=0, ga=0, grasp=0, restart=1, runs=1):
     """
     Verifies that a given environment instance correctly implements the RKO environment interface.
     If the verification passes and silent is False, it prints a beautifully formatted summary of the test configuration.
@@ -20,6 +20,7 @@ def check_env(env_instance, silent=False, time_total=None, brkga=0, ms=0, sa=0, 
         lns (int): Number of parallel LNS instances requested.
         pso (int): Number of parallel PSO instances requested.
         ga (int): Number of parallel GA instances requested.
+        grasp (int): Number of parallel GRASP instances requested.
         restart (float): Fraction of total time for each restart cycle.
         runs (int): Number of times to repeat the experiment.
 
@@ -55,6 +56,7 @@ def check_env(env_instance, silent=False, time_total=None, brkga=0, ms=0, sa=0, 
     requested_solvers = {
         'BRKGA': (brkga, 'BRKGA_parameters'),
         'SA': (sa, 'SA_parameters'),
+        'GRASP': (grasp, 'GRASP_parameters'),
         'ILS': (ils, 'ILS_parameters'),
         'VNS': (vns, 'VNS_parameters'),
         'PSO': (pso, 'PSO_parameters'),

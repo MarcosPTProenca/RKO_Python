@@ -82,6 +82,12 @@ class TSPProblem:
             'alphaLNS': [0.95,0.9] 
         }
 
+        self.GRASP_parameters = {
+            'alphaGrasp': [0.10, 0.30],
+            'hs': [0.125],
+            'he': [0.00098]
+        }
+
     def _generate_cities(self, num_cities: int) -> np.ndarray:
         """Generates random (x, y) coordinates for each city."""
         return np.random.rand(num_cities, 2) * 100 # Cities in a 100x100 grid

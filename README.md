@@ -5,13 +5,13 @@
 
 The **Random-Key Optimizer (RKO)** is a high-performance, parallel metaheuristic framework designed for combinatorial optimization problems. By mapping discrete, high-dimensional search spaces onto a continuous unit hypercube $[0, 1)^n$, RKO detaches optimization algorithms from problem-specific logic.
 
-RKO orchestrates up to **8 parallel metaheuristic workers** using Python's native multiprocessing. Workers cooperate in real time by feeding and pulling elite solutions from a thread-safe, shared **Solution Pool**, accelerating convergence and improving optimization robustness.
+RKO orchestrates up to **9 parallel metaheuristic workers** using Python's native multiprocessing. Workers cooperate in real time by feeding and pulling elite solutions from a thread-safe, shared **Solution Pool**, accelerating convergence and improving optimization robustness.
 
 ---
 
 ## 💎 Core Features
 
-- **8 Concurrent Metaheuristics:** Run **BRKGA, Multi-Start, SA, VNS, ILS, LNS, PSO, and GA** concurrently.
+- **9 Concurrent Metaheuristics:** Run **BRKGA, Multi-Start, SA, VNS, ILS, LNS, PSO, GA, and GRASP** concurrently.
 - **Online hyperparameters tuning via Q-learning**
 - **Collaborative Search:** Thread-safe `SolutionPool` sharing elite solutions to pull workers out of local minima.
 - **Automatic Result Structuring:** Automatically groups execution runs, creating a dedicated timestamped folder (`results_{instance}_{timestamp}/`) containing:
@@ -57,6 +57,7 @@ final_cost, final_solution, time_to_best = rko_solver.solve(
     lns=1,              # Number of parallel LNS instances
     pso=1,              # Number of parallel PSO instances
     ga=1,               # Number of parallel GA instances
+    grasp=1,            # Number of parallel GRASP instances
     restart=1.0,        # Fraction of total time for each restart cycle
     runs=10,            # Number of independent trials
     plot=True           # Enable automatic convergence plotting (generates .png charts)
@@ -116,6 +117,7 @@ class RKOEnv():
         self.LNS_parameters = {'betaMin': [0.1], 'betaMax': [0.3], 'TO': [1000], 'alphaLNS': [0.99, 0.95, 0.9]}
         self.PSO_parameters = {'PSize': [1000], 'c1': [2.05], 'c2': [2.05], 'w': [0.73]}
         self.GA_parameters = {'sizePop': [1000], 'probCros': [0.98], 'probMut': [0.005]}
+        self.GRASP_parameters = {'alphaGrasp': [0.1, 0.3], 'hs': [0.125], 'he': [0.00098]}
 
   
     def decoder(self, keys: np.ndarray):

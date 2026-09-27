@@ -1312,6 +1312,163 @@ class RKO:
         final_cost_value = self.env.cost(final_cost_solution)
         return [], best_keys_overall, final_cost_value
 
+    def LineSearch(self, keys, h, i):
+        """
+        Performs a discrete line search along the direction of the i-th key. Candidate values are taken from the grid keys[i] + k*h (k = 0, 1, -1, 2, -2, ...) inside [0, 1), and only a random sample of them is evaluated (sample greedy).
+
+        Args:
+            keys (list or numpy.ndarray): The current solution.
+            h (float): Grid density used to generate the candidate values.
+            i (int): Index of the key to be searched.
+
+        Returns:
+            tuple: The best value found for the i-th key and the cost of the solution using it.
+        """
+        new_keys = copy.deepcopy(keys)
+        best_value = 0
+        best_cost = float('inf')
+
+        tau = 0
+        candidates = [keys[i] + tau * h]
+        for _ in range(0, int(1.0 / h) + 1, 2):
+            tau += 1
+
+            if 0 <= keys[i] + tau * h < 1:
+                candidates.append(keys[i] + tau * h)
+
+            if 0 <= keys[i] - tau * h < 1:
+                candidates.append(keys[i] - tau * h)
+
+        q = min(math.ceil(math.log2(int(1.0 / h))) + 1, len(candidates))
+        random.shuffle(candidates)
+
+        for value in candidates[:q]:
+            new_keys[i] = value
+            new_cost = self.env.cost(self.env.decoder(new_keys))
+
+            if new_cost < best_cost:
+                best_value = value
+                best_cost = new_cost
+        return best_value, best_cost
+
+    def ConstructiveGreedyRandomized(self, keys, h, alpha, metaheuristic_name="ConstructiveGreedyRandomized"):
+        """
+        Builds a new solution by fixing one key at a time. In each step a line search is applied to a sample of the unfixed keys and the key that reaches the best cost is fixed.
+
+        Args:
+            keys (list or numpy.ndarray): The starting solution.
+            h (float): Grid density used by the line search.
+            alpha (float): Greedy rate of GRASP. As in the C++ version, it is not used by the construction.
+            metaheuristic_name (str): The name of the calling metaheuristic (for logging).
+
+        Returns:
+            list: The constructed solution keys.
+        """
+        new_keys = copy.deepcopy(keys)
+        new_cost = self.env.cost(self.env.decoder(new_keys))
+        unfixed = list(range(self.__MAX_KEYS))
+        intensity = random.uniform(0.3, 0.7)
+
+        for _ in range(math.ceil(self.__MAX_KEYS * intensity)):
+            k_max = int(len(unfixed) * 0.1)
+            if k_max < 2:
+                k_max = len(unfixed)
+
+            z = {}
+            g = {}
+            for i in random.sample(unfixed, k_max):
+                if self.stop_condition(new_cost, metaheuristic_name, -1):
+                    return new_keys
+                z[i], g[i] = self.LineSearch(new_keys, h, i)
+
+            k_best = min(g, key=g.get)
+
+            new_keys[k_best] = z[k_best]
+            new_cost = g[k_best]
+            unfixed.remove(k_best)
+        return new_keys
+
+    def GRASP(self, tag, pool):
+        """
+        Executes the Greedy Randomized Adaptive Search Procedure (GRASP). Each iteration builds a solution with ConstructiveGreedyRandomized and improves it with RVND. The grid density starts at hs and is halved whenever the best solution is not improved, until it reache he.
+
+        Args:
+            tag (int): An identifier for this metaheuristic instance.
+            pool (SolutionPool): The shared solution pool.
+
+        Returns:
+            tuple: An empty list, the best keys found, and their final cost.
+        """
+        metaheuristic_name = f"GRASP {tag}"
+        limit_time = self.max_time
+        q_manager, params = self._setup_parameters(metaheuristic_name, self.env.GRASP_parameters)
+
+        alpha = params['alphaGrasp']
+        hs = params['hs']
+        he = params['he']
+
+        start_time = time.time()
+        s = self.random_keys()
+        s_cost = self.env.cost(self.env.decoder(s))
+        best_keys = s
+        best_cost = s_cost
+
+        pool.insert((best_cost, list(best_keys)), metaheuristic_name, tag)
+        if self.stop_condition(best_cost, metaheuristic_name, tag, pool=pool):
+            return [], best_keys, best_cost
+
+        current_time = 0
+        improvement_flag = 0
+        s_line_best_cost = s_cost
+
+        while current_time < limit_time:
+            if q_manager:
+                new_params = q_manager.select_action(current_time)
+                alpha = new_params['alphaGrasp']
+                hs = new_params['hs']
+                he = new_params['he']
+
+            h = hs
+            while h >= he and current_time < limit_time:
+                if self.stop_condition(best_cost, metaheuristic_name, tag, pool=pool):
+                    return [], best_keys, best_cost
+
+                s_line = self.ConstructiveGreedyRandomized(s, h, alpha, metaheuristic_name=metaheuristic_name)
+                s_line_best = self.RVND(metaheuristic_name=metaheuristic_name, pool=pool, keys=s_line)
+                s_line_best_cost = self.env.cost(self.env.decoder(s_line_best))
+
+                if s_line_best_cost < best_cost:
+                    best_cost = s_line_best_cost
+                    best_keys = s_line_best
+                    improvement_flag = 1
+                    pool.insert((best_cost, list(best_keys)), metaheuristic_name, tag)
+                else:
+                    h = h / 2
+
+                if s_line_best_cost < s_cost:
+                    s = s_line_best
+                    s_cost = s_line_best_cost
+                # Metropolis criterion
+                elif random.random() < math.exp(-(s_line_best_cost - s_cost) / (100 - 100 * (current_time / limit_time))):
+                    s = s_line_best
+                    s_cost = s_line_best_cost
+
+                current_time = time.time() - start_time
+
+            if q_manager:
+                if improvement_flag:
+                    reward = 1.0
+                    improvement_flag = 0
+                else:
+                    reward = (best_cost - s_line_best_cost) / s_line_best_cost if s_line_best_cost != 0 else 0
+                q_manager.update_q_value(reward, current_time)
+
+            current_time = time.time() - start_time
+
+        final_cost_solution = self.env.decoder(best_keys)
+        final_cost_value = self.env.cost(final_cost_solution)
+        return [], best_keys, final_cost_value
+
     def stop_condition(self, best_cost, metaheuristic_name, tag, pool=None):
         """
         Checks if the termination condition for the search has been met.
@@ -1371,7 +1528,7 @@ class RKO:
 
         return False
 
-    def solve(self, time_total: float, brkga: int = 0, ms: int = 0, sa: int = 0, vns: int = 0, ils: int = 0, lns: int = 0, pso: int = 0, ga: int = 0, restart: float = 1.0, runs: int = 1, plot: bool = False) -> tuple[float, list[float], float]:
+    def solve(self, time_total: float, brkga: int = 0, ms: int = 0, sa: int = 0, vns: int = 0, ils: int = 0, lns: int = 0, pso: int = 0, ga: int = 0, grasp: int = 0, restart: float = 1.0, runs: int = 1, plot: bool = False) -> tuple[float, list[float], float]:
         """
         Main execution method to run the RKO framework with parallel metaheuristics.
 
@@ -1385,6 +1542,7 @@ class RKO:
             lns (int): Number of parallel LNS instances.
             pso (int): Number of parallel PSO instances.
             ga (int): Number of parallel GA instances.
+            grasp (int): Number of parallel GRASP instances.
             restart (float): Fraction of total time for each restart cycle.
             runs (int): Number of times to repeat the entire experiment.
             plot (bool): If True, plots convergence history for each run and saves it as an image.
@@ -1426,7 +1584,7 @@ class RKO:
             elif isinstance(self.logger, TerminalLogger):
                 self.logger = TerminalLogger(logs_filepath, reset=True)
 
-        check_env(self.env, time_total=time_total, brkga=brkga, ms=ms, sa=sa, vns=vns, ils=ils, lns=lns, pso=pso, ga=ga, restart=restart, runs=runs)
+        check_env(self.env, time_total=time_total, brkga=brkga, ms=ms, sa=sa, vns=vns, ils=ils, lns=lns, pso=pso, ga=ga, grasp=grasp, restart=restart, runs=runs)
 
         solutions = []
         times = []
@@ -1559,6 +1717,15 @@ class RKO:
                         processes.append(p)
                         p.start()
 
+                    for _ in range(grasp):
+                        p = Process(
+                            target=_GRASP_worker,
+                            args=(self.env, self.max_time, pool, tag, worker_logger)
+                        )
+                        tag += 1
+                        processes.append(p)
+                        p.start()
+
                     # Monitor processes and check for early termination via stop_event
                     start_wait = time.time()
                     while time.time() - start_wait < self.max_time:
@@ -1634,7 +1801,7 @@ def _MS_worker(env, limit_time, pool, tag, logger):
 def _GRASP_worker(env, limit_time, pool, tag, logger):
     runner = RKO(env, logger)
     runner.max_time = limit_time
-    _, local_keys, local_best = runner.MultiStart(pool)
+    _, local_keys, local_best = runner.GRASP(tag, pool)
     
 def _VNS_worker(env, limit_time, pool, tag, logger):
     runner = RKO(env, logger)

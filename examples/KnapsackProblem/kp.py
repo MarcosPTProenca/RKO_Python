@@ -70,6 +70,12 @@ class KnapsackProblem:
             'alphaLNS': [0.95,0.9] 
         }
 
+        self.GRASP_parameters = {
+            'alphaGrasp': [0.10, 0.30],
+            'hs': [0.125],
+            'he': [0.00098]
+        }
+
     def _load_data(self, instance_path: str):
         """
         Loads the knapsack problem data from a text file.
