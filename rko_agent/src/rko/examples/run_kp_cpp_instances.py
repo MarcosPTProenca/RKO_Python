@@ -1,0 +1,401 @@
+"""Run RKO on C++ KP benchmark instances using a Python reader/decoder.
+
+Objective:
+- Execute the Python RKO implementation on Knapsack Problem instances from
+  `RKO_Cpp_v2.0/Instances/KP`.
+
+Technical approach:
+- Parse the C++ KP text format (`n_items`, `capacity`, then `benefit weight`).
+- Decode random keys with the same C++ threshold rule (`rk > 0.5`).
+- Evaluate cost exactly like `Problem.h` and persist execution summaries to CSV.
+
+Flow (pseudocode):
+1. Resolve instance files from CLI path or default C++ folder.
+2. Read each instance and build decoder/cost closures.
+3. Run `rko_main.run` with `tam_solution = n_items`.
+4. Decode best keys, print summary, and save rows to CSV.
+
+Important criteria:
+- Cost mirrors C++ sign convention and penalty magnitude.
+- Decoder and reader are standalone and reusable.
+
+Inputs/Outputs:
+- Input: KP `.txt` files, time limit, and optional params directory.
+- Output: console summary plus CSV with objective metrics per instance.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from rko import rko_main
+
+
+@dataclass(slots=True)
+class KpInstance:
+    """Stores a single knapsack benchmark instance.
+
+    Responsibilities:
+    - Keep all numeric data required by decoder and objective evaluation.
+
+    Attributes:
+      n_items (int): Number of items.
+      capacity (int): Maximum knapsack capacity.
+      benefits (list[int]): Item profit values.
+      weights (list[int]): Item weight values.
+      name (str): Human-readable instance name.
+    """
+
+    n_items: int
+    capacity: int
+    benefits: list[int]
+    weights: list[int]
+    name: str
+
+
+@dataclass(slots=True)
+class KpRunResult:
+    """Stores one execution summary row for reporting/export.
+
+    Responsibilities:
+    - Keep normalized values that are printed and persisted to CSV.
+
+    Attributes:
+      instance (str): Instance file name.
+      n_items (int): Number of items.
+      capacity (int): Knapsack capacity.
+      cost (float): Best minimization cost returned by RKO.
+      profit (int): Decoded total profit of the best solution.
+      weight (int): Decoded total weight of the best solution.
+      feasible (bool): Feasibility flag relative to capacity.
+    """
+
+    instance: str
+    n_items: int
+    capacity: int
+    cost: float
+    profit: int
+    weight: int
+    feasible: bool
+
+
+def read_kp_instance(path: Path) -> KpInstance:
+    """Parse a KP instance from the C++ benchmark text format.
+
+    Args:
+      path (Path): Path to an instance file like `kp10.txt`.
+
+    Returns:
+      KpInstance: Parsed data object.
+
+    Raises:
+      ValueError: If the file has insufficient or inconsistent numeric fields.
+    """
+    tokens = path.read_text(encoding="utf-8").split()
+    if len(tokens) < 2:
+        raise ValueError(f"Invalid instance file '{path}': missing header values.")
+
+    n_items = int(tokens[0])
+    capacity = int(tokens[1])
+    if n_items <= 0 or capacity < 0:
+        raise ValueError("Item count must be positive and capacity must be nonnegative.")
+    expected = 2 + 2 * n_items
+    if len(tokens) != expected:
+        raise ValueError(
+            "Invalid instance file "
+            f"'{path}': expected {expected} numeric values, got {len(tokens)}."
+        )
+
+    benefits: list[int] = []
+    weights: list[int] = []
+    cursor = 2
+    for _ in range(n_items):
+        benefits.append(int(tokens[cursor]))
+        weights.append(int(tokens[cursor + 1]))
+        cursor += 2
+
+    if any(benefit < 0 for benefit in benefits) or any(weight <= 0 for weight in weights):
+        raise ValueError("Benefits must be nonnegative and weights must be positive.")
+
+    return KpInstance(
+        n_items=n_items,
+        capacity=capacity,
+        benefits=benefits,
+        weights=weights,
+        name=path.name,
+    )
+
+
+def decode_knapsack(keys: list[float]) -> list[int]:
+    """Decode a random-key vector into a binary knapsack decision vector.
+
+    Args:
+      keys (list[float]): Random-key chromosome.
+
+    Returns:
+      list[int]: Binary vector where 1 means selected item.
+
+    Raises:
+      ValueError: When required by external domain validation.
+    """
+    return [1 if key > 0.5 else 0 for key in keys]
+
+
+@dataclass(slots=True)
+class KnapsackCost:
+    """Evaluate the C++ Knapsack objective with pickleable instance state.
+
+    Responsibilities:
+    - Apply the reference penalty without a nested function closure.
+
+    Attributes:
+        instance (KpInstance): Parsed problem data.
+    """
+
+    instance: KpInstance
+
+    def __call__(self, solution: list[int]) -> float:
+        """Compute penalized negative profit for a binary decision vector.
+
+        Args:
+            solution (list[int]): One binary decision per item.
+
+        Returns:
+            float: Minimization objective including excess-weight penalty.
+
+        Raises:
+            ValueError: If the decisions have invalid dimensions or values.
+        """
+        profit, weight, _ = evaluate_solution(solution, self.instance)
+        return float(100000 * max(0, weight - self.instance.capacity) - profit)
+
+
+def make_cost(instance: KpInstance) -> Callable[[list[int]], float]:
+    """Build a cost callback equivalent to the C++ `Problem.h` objective.
+
+    Args:
+      instance (KpInstance): Parsed benchmark data.
+
+    Returns:
+      callable: Function that maps a decoded binary solution to minimization cost.
+
+    Raises:
+      ValueError: When required by external domain validation.
+    """
+    return KnapsackCost(instance)
+
+
+def evaluate_solution(sol: list[int], instance: KpInstance) -> tuple[int, int, bool]:
+    """Compute total profit, weight, and feasibility of a decoded solution.
+
+    Args:
+      sol (list[int]): Binary decision vector.
+      instance (KpInstance): Parsed benchmark data.
+
+    Returns:
+      tuple[int, int, bool]: Total profit, total weight, and feasibility flag.
+
+    Raises:
+      ValueError: When required by external domain validation.
+    """
+    if len(sol) != instance.n_items or any(chosen not in (0, 1) for chosen in sol):
+        raise ValueError("Solution must contain exactly one binary decision per item.")
+    total_profit = 0
+    total_weight = 0
+    for i, chosen in enumerate(sol):
+        if chosen == 1:
+            total_profit += instance.benefits[i]
+            total_weight += instance.weights[i]
+    return total_profit, total_weight, total_weight <= instance.capacity
+
+
+def default_instances_dir() -> Path:
+    """Return the default C++ KP instances directory.
+
+    Args:
+      None
+
+    Returns:
+      Path: Absolute path to `RKO_Cpp_v2.0/Instances/KP`.
+
+    Raises:
+      ValueError: When required by external domain validation.
+    """
+    project_root = Path(__file__).resolve().parents[4]
+    return project_root / "RKO_Cpp_v2.0" / "Instances" / "KP"
+
+
+def default_output_csv() -> Path:
+    """Return default CSV output path for benchmark summaries.
+
+    Args:
+      None
+
+    Returns:
+      Path: Absolute path to `rko_agent/results/kp_results.csv`.
+
+    Raises:
+      ValueError: When required by external domain validation.
+    """
+    project_root = Path(__file__).resolve().parents[4]
+    return project_root / "rko_agent" / "results" / "kp_results.csv"
+
+
+def run_single_instance(
+    instance_path: Path, limit_time: float, params_dir: Path | None
+) -> KpRunResult:
+    """Execute one KP instance and print a concise summary line.
+
+    Args:
+      instance_path (Path): Path to a `.txt` benchmark file.
+      limit_time (float): Time limit in seconds for one RKO run.
+      params_dir (Path | None): Optional override for RKO parameter TOMLs.
+
+    Returns:
+      KpRunResult: Normalized result row.
+
+    Raises:
+      ValueError: When required by external domain validation.
+    """
+    instance = read_kp_instance(instance_path)
+    best_keys, best_cost = rko_main.run(
+        decoder=decode_knapsack,
+        cost=make_cost(instance),
+        tam_solution=instance.n_items,
+        limit_time=limit_time,
+        params_dir=params_dir,
+    )
+    best_sol = decode_knapsack(best_keys)
+    profit, weight, feasible = evaluate_solution(best_sol, instance)
+
+    result = KpRunResult(
+        instance=instance.name,
+        n_items=instance.n_items,
+        capacity=instance.capacity,
+        cost=best_cost,
+        profit=profit,
+        weight=weight,
+        feasible=feasible,
+    )
+    print(
+        f"{result.instance:10s} | n={result.n_items:3d} | cap={result.capacity:4d} | "
+        f"cost={result.cost:12.1f} | profit={result.profit:6d} | "
+        f"weight={result.weight:6d} | feasible={result.feasible}"
+    )
+    return result
+
+
+def write_results_csv(output_path: Path, rows: list[KpRunResult]) -> None:
+    """Write benchmark execution rows to a CSV file.
+
+    Args:
+      output_path (Path): Destination CSV path.
+      rows (list[KpRunResult]): Execution rows to persist.
+
+    Returns:
+      None: Writes file contents to disk.
+
+    Raises:
+      ValueError: When required by external domain validation.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["instance", "n_items", "capacity", "cost", "profit", "weight", "feasible"])
+        for row in rows:
+            writer.writerow(
+                [
+                    row.instance,
+                    row.n_items,
+                    row.capacity,
+                    row.cost,
+                    row.profit,
+                    row.weight,
+                    row.feasible,
+                ]
+            )
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command-line options for benchmark execution.
+
+    Args:
+      None
+
+    Returns:
+      argparse.Namespace: Parsed CLI arguments.
+
+    Raises:
+      ValueError: When required by external domain validation.
+    """
+    parser = argparse.ArgumentParser(
+        description="Run Python RKO on C++ KP benchmark instances.",
+    )
+    parser.add_argument(
+        "--instances-dir",
+        type=Path,
+        default=default_instances_dir(),
+        help="Directory containing KP instance files (default: RKO_Cpp_v2.0/Instances/KP).",
+    )
+    parser.add_argument(
+        "--pattern",
+        default="kp*.txt",
+        help="Glob pattern used to select instances within --instances-dir.",
+    )
+    parser.add_argument(
+        "--limit-time",
+        type=float,
+        default=3.0,
+        help="Time limit in seconds per instance.",
+    )
+    parser.add_argument(
+        "--params-dir",
+        type=Path,
+        default=None,
+        help="Optional custom directory containing RKO TOML parameter files.",
+    )
+    parser.add_argument(
+        "--output-csv",
+        type=Path,
+        default=default_output_csv(),
+        help="Destination CSV path for execution results.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    """Run selected KP instances and print one summary line per instance.
+
+    Args:
+      None
+
+    Returns:
+      None: Executes benchmark runs.
+
+    Raises:
+      FileNotFoundError: If no instance file matches the selected criteria.
+    """
+    args = parse_args()
+    instances = sorted(args.instances_dir.glob(args.pattern))
+    if not instances:
+        raise FileNotFoundError(
+            f"No instances found in '{args.instances_dir}' with pattern '{args.pattern}'."
+        )
+
+    print("instance    | n   | cap  | cost         | profit | weight | feasible")
+    print("-" * 74)
+    results: list[KpRunResult] = []
+    for path in instances:
+        results.append(
+            run_single_instance(path, limit_time=args.limit_time, params_dir=args.params_dir)
+        )
+
+    write_results_csv(args.output_csv, results)
+    print(f"CSV saved to: {args.output_csv}")
+
+
+if __name__ == "__main__":
+    main()
