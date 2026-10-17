@@ -4,6 +4,7 @@ RKO_Cpp_v2.0/
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
 
 # Test and tooling caches
 .pytest_cache/
