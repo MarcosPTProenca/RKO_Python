@@ -40,6 +40,17 @@ def test_run_rejects_invalid_limit_time() -> None:
         rko_main.run(lambda x: x, lambda x: 0.0, tam_solution=3, limit_time=0.0)
 
 
+@pytest.mark.parametrize("limit_time", [float("nan"), float("inf"), True, "1", -1])
+def test_run_rejects_nonfinite_or_nonnumeric_time(limit_time: object) -> None:
+    """Reject invalid time budgets before configuration or child startup.
+
+    Args:
+        limit_time (object): Invalid public time-budget input.
+    """
+    with pytest.raises(ValueError, match="limit_time"):
+        rko_main.run(lambda keys: keys, lambda keys: 0.0, 3, limit_time)
+
+
 def test_run_executes_orchestration_flow(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure orchestration collaborators are called and best result is returned."""
     captured: dict[str, object] = {}
@@ -71,6 +82,7 @@ def test_run_executes_orchestration_flow(monkeypatch: pytest.MonkeyPatch) -> Non
         cost=lambda decoded: float(sum(decoded)),
         tam_solution=2,
         limit_time=5.0,
+        backend="thread",
     )
 
     assert best_keys == [0.2, 0.3]

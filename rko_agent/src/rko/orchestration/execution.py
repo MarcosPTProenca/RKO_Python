@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from ..components.solution_pool import SolutionPool
+from ..components.solution_pool import ElitePool
 from ..metaheuristics.base import MetaheuristicBase
 from .types import RunResult
 
@@ -45,7 +45,7 @@ def run_metaheuristics_parallel(
 
 def select_best_result(
     results: list[RunResult],
-    pool: SolutionPool,
+    pool: ElitePool,
 ) -> tuple[list[float], float]:
     """Return the best (keys, cost) considering thread results and shared pool."""
     best_keys: list[float] = []
@@ -56,8 +56,9 @@ def select_best_result(
             best_cost = cost
             best_keys = list(keys)
 
-    if pool.size > 0:
-        pool_cost, pool_keys = pool.best
+    best = pool.best
+    if best is not None:
+        pool_cost, pool_keys = best
         if pool_cost < best_cost:
             best_cost = pool_cost
             best_keys = list(pool_keys)

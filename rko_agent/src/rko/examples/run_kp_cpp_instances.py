@@ -11,7 +11,7 @@ Technical approach:
 
 Flow (pseudocode):
 1. Resolve instance files from CLI path or default C++ folder.
-2. Read each instance and build decoder/cost closures.
+2. Read each instance and build pickleable decoder/cost callbacks.
 3. Run `rko_main.run` with `tam_solution = n_items`.
 4. Decode best keys, print summary, and save rows to CSV.
 
@@ -28,10 +28,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from rko import rko_main
+from typing import Literal
 
 
 @dataclass(slots=True)
@@ -71,6 +73,10 @@ class KpRunResult:
       profit (int): Decoded total profit of the best solution.
       weight (int): Decoded total weight of the best solution.
       feasible (bool): Feasibility flag relative to capacity.
+      backend (str): Selected execution backend.
+      n_jobs (int | None): Requested process budget, or default portfolio size.
+      random_state (int | None): Requested worker-seed source.
+      elapsed_seconds (float): End-to-end solver time including process startup.
     """
 
     instance: str
@@ -80,6 +86,10 @@ class KpRunResult:
     profit: int
     weight: int
     feasible: bool
+    backend: str
+    n_jobs: int | None
+    random_state: int | None
+    elapsed_seconds: float
 
 
 def read_kp_instance(path: Path) -> KpInstance:
@@ -245,7 +255,13 @@ def default_output_csv() -> Path:
 
 
 def run_single_instance(
-    instance_path: Path, limit_time: float, params_dir: Path | None
+    instance_path: Path,
+    limit_time: float,
+    params_dir: Path | None,
+    *,
+    backend: Literal["process", "thread", "serial"] = "process",
+    n_jobs: int | None = None,
+    random_state: int | None = None,
 ) -> KpRunResult:
     """Execute one KP instance and print a concise summary line.
 
@@ -253,21 +269,29 @@ def run_single_instance(
       instance_path (Path): Path to a `.txt` benchmark file.
       limit_time (float): Time limit in seconds for one RKO run.
       params_dir (Path | None): Optional override for RKO parameter TOMLs.
+      backend (Literal): Process, thread or serial execution mode.
+      n_jobs (int | None): Optional process budget.
+      random_state (int | None): Optional worker-seed source.
 
     Returns:
-      KpRunResult: Normalized result row.
+      KpRunResult: Normalized result row including end-to-end elapsed time.
 
     Raises:
       ValueError: When required by external domain validation.
     """
     instance = read_kp_instance(instance_path)
+    started = time.perf_counter()
     best_keys, best_cost = rko_main.run(
         decoder=decode_knapsack,
         cost=make_cost(instance),
         tam_solution=instance.n_items,
         limit_time=limit_time,
         params_dir=params_dir,
+        backend=backend,
+        n_jobs=n_jobs,
+        random_state=random_state,
     )
+    elapsed = time.perf_counter() - started
     best_sol = decode_knapsack(best_keys)
     profit, weight, feasible = evaluate_solution(best_sol, instance)
 
@@ -279,6 +303,10 @@ def run_single_instance(
         profit=profit,
         weight=weight,
         feasible=feasible,
+        backend=backend,
+        n_jobs=n_jobs,
+        random_state=random_state,
+        elapsed_seconds=elapsed,
     )
     print(
         f"{result.instance:10s} | n={result.n_items:3d} | cap={result.capacity:4d} | "
@@ -304,7 +332,21 @@ def write_results_csv(output_path: Path, rows: list[KpRunResult]) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8", newline="") as csv_file:
         writer = csv.writer(csv_file)
-        writer.writerow(["instance", "n_items", "capacity", "cost", "profit", "weight", "feasible"])
+        writer.writerow(
+            [
+                "instance",
+                "n_items",
+                "capacity",
+                "cost",
+                "profit",
+                "weight",
+                "feasible",
+                "backend",
+                "worker_budget",
+                "seed",
+                "elapsed_seconds",
+            ]
+        )
         for row in rows:
             writer.writerow(
                 [
@@ -315,6 +357,10 @@ def write_results_csv(output_path: Path, rows: list[KpRunResult]) -> None:
                     row.profit,
                     row.weight,
                     row.feasible,
+                    row.backend,
+                    row.n_jobs,
+                    row.random_state,
+                    row.elapsed_seconds,
                 ]
             )
 
@@ -363,6 +409,9 @@ def parse_args() -> argparse.Namespace:
         default=default_output_csv(),
         help="Destination CSV path for execution results.",
     )
+    parser.add_argument("--backend", choices=("process", "thread", "serial"), default="process")
+    parser.add_argument("--n-jobs", type=int, default=None, help="Maximum process worker budget.")
+    parser.add_argument("--random-state", type=int, default=None, help="Worker seed source.")
     return parser.parse_args()
 
 
@@ -390,7 +439,14 @@ def main() -> None:
     results: list[KpRunResult] = []
     for path in instances:
         results.append(
-            run_single_instance(path, limit_time=args.limit_time, params_dir=args.params_dir)
+            run_single_instance(
+                path,
+                limit_time=args.limit_time,
+                params_dir=args.params_dir,
+                backend=args.backend,
+                n_jobs=args.n_jobs,
+                random_state=args.random_state,
+            )
         )
 
     write_results_csv(args.output_csv, results)

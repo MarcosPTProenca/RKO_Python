@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..components.solution_pool import SolutionPool
+from ..components.solution_pool import ElitePool
 from ..metaheuristics.base import MetaheuristicBase
 from ..parameters.loader import load_offline
 from ..parameters.loader import load_online_grid
@@ -30,7 +30,7 @@ def _as_float(params: dict[str, Any], key: str, mh_name: str) -> float:
 
 def build_metaheuristic(
     mh_name: str,
-    pool: SolutionPool,
+    pool: ElitePool,
     decoder: DecoderFn,
     cost: CostFn,
     tam_solution: int,

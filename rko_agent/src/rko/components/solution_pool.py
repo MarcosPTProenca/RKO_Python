@@ -28,6 +28,60 @@ Inputs/Outputs:
 
 import math
 import threading
+from typing import Protocol
+
+
+class ElitePool(Protocol):
+    """Describe local and process-shared elite-pool access.
+
+    Responsibilities:
+    - Keep search code independent of the pool transport mechanism.
+
+    Attributes:
+        size (int): Current number of entries.
+        best (tuple[float, list[float]] | None): Best detached entry.
+    """
+
+    def insert(self, entry: tuple[float, list[float]], source: str = "") -> None:
+        """Insert an objective/key pair.
+
+        Args:
+            entry (tuple[float, list[float]]): Candidate objective and vector.
+            source (str): Producing algorithm label.
+
+        Raises:
+            ValueError: If the candidate is invalid.
+        """
+        ...
+
+    def get_elite(self, k: int = 1) -> list[tuple[float, list[float]]]:
+        """Read detached elite entries.
+
+        Args:
+            k (int): Maximum requested count.
+
+        Returns:
+            list[tuple[float, list[float]]]: Sorted entries.
+        """
+        ...
+
+    @property
+    def size(self) -> int:
+        """Return current occupancy.
+
+        Returns:
+            int: Stored entry count.
+        """
+        ...
+
+    @property
+    def best(self) -> tuple[float, list[float]] | None:
+        """Return the best entry if populated.
+
+        Returns:
+            tuple[float, list[float]] | None: Best entry or None.
+        """
+        ...
 
 
 class SolutionPool:
