@@ -80,8 +80,10 @@ PYTHONPATH=src uv run --locked python -m rko.examples.run_kp_cpp_instances \
 ```
 
 In PowerShell, set `$env:PYTHONPATH = "src"` before the same `uv run` command and
-choose a Windows output path. The default instances come from the sibling
-`../RKO_Cpp_v2.0/Instances/KP` directory in this repository.
+choose a Windows output path. The two default reference instances are bundled
+in `src/rko/examples/instances/`, with upstream revision and MIT license. No
+separate C++ checkout is required. Omit `--output-csv` to save under the caller's
+`results/` directory.
 
 The decoder uses `key > 0.5`. Cost is negative profit with a penalty of 100000
 per excess unit of weight, matching the reference example. Independently

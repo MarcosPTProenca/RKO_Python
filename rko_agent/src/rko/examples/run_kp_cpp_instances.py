@@ -223,19 +223,18 @@ def evaluate_solution(sol: list[int], instance: KpInstance) -> tuple[int, int, b
 
 
 def default_instances_dir() -> Path:
-    """Return the default C++ KP instances directory.
+    """Return the bundled reference KP instances directory.
 
     Args:
       None
 
     Returns:
-      Path: Absolute path to `RKO_Cpp_v2.0/Instances/KP`.
+      Path: Absolute path to the packaged `examples/instances` directory.
 
     Raises:
       ValueError: When required by external domain validation.
     """
-    project_root = Path(__file__).resolve().parents[4]
-    return project_root / "RKO_Cpp_v2.0" / "Instances" / "KP"
+    return Path(__file__).resolve().parent / "instances"
 
 
 def default_output_csv() -> Path:
@@ -245,13 +244,12 @@ def default_output_csv() -> Path:
       None
 
     Returns:
-      Path: Absolute path to `rko_agent/results/kp_results.csv`.
+      Path: Absolute results path under the caller's working directory.
 
     Raises:
       ValueError: When required by external domain validation.
     """
-    project_root = Path(__file__).resolve().parents[4]
-    return project_root / "rko_agent" / "results" / "kp_results.csv"
+    return Path.cwd() / "results" / "kp_results.csv"
 
 
 def run_single_instance(
@@ -384,7 +382,7 @@ def parse_args() -> argparse.Namespace:
         "--instances-dir",
         type=Path,
         default=default_instances_dir(),
-        help="Directory containing KP instance files (default: RKO_Cpp_v2.0/Instances/KP).",
+        help="Directory containing KP instance files (default: bundled reference instances).",
     )
     parser.add_argument(
         "--pattern",

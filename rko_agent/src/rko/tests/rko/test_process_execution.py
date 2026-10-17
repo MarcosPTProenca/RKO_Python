@@ -32,6 +32,11 @@ from dataclasses import dataclass
 from multiprocessing.connection import Connection
 from pathlib import Path
 from rko import run
+from rko.examples.run_kp_cpp_instances import decode_knapsack
+from rko.examples.run_kp_cpp_instances import default_instances_dir
+from rko.examples.run_kp_cpp_instances import evaluate_solution
+from rko.examples.run_kp_cpp_instances import make_cost
+from rko.examples.run_kp_cpp_instances import read_kp_instance
 from rko.orchestration import processes
 from rko.orchestration.configuration import MH_SPECS
 from rko.orchestration.processes import PoolManager
@@ -176,6 +181,33 @@ def test_process_backend_runs_distinct_children(params_dir: Path, tmp_path: Path
     assert all(0 <= key < 1 for key in keys)
     assert cost == pytest.approx(sphere(np.array(keys)))
     assert {child.pid for child in mp.active_children()} == before
+
+
+@pytest.mark.parametrize("filename, optimum", [("kp10.txt", 31), ("kp50.txt", 149)])
+def test_knapsack_process_solution_is_feasible(
+    params_dir: Path, filename: str, optimum: int
+) -> None:
+    """Validate actual benchmark decisions and costs through the public process solver.
+
+    Args:
+        params_dir (Path): Two-algorithm test configuration.
+        filename (str): Bundled Knapsack reference instance.
+        optimum (int): Known exact objective upper bound.
+    """
+    instance = read_kp_instance(default_instances_dir() / filename)
+    keys, cost = run(
+        decode_knapsack,
+        make_cost(instance),
+        instance.n_items,
+        0.5,
+        params_dir=params_dir,
+        random_state=42,
+    )
+    profit, weight, feasible = evaluate_solution(decode_knapsack(keys), instance)
+    assert feasible
+    assert weight <= instance.capacity
+    assert 0 <= profit <= optimum
+    assert cost == -profit
 
 
 @pytest.mark.parametrize("backend", ["serial", "thread"])

@@ -23,9 +23,48 @@ import pickle
 import pytest
 from pathlib import Path
 from rko.examples.run_kp_cpp_instances import decode_knapsack
+from rko.examples.run_kp_cpp_instances import default_instances_dir
+from rko.examples.run_kp_cpp_instances import default_output_csv
 from rko.examples.run_kp_cpp_instances import evaluate_solution
 from rko.examples.run_kp_cpp_instances import make_cost
 from rko.examples.run_kp_cpp_instances import read_kp_instance
+
+
+def test_default_instances_ship_inside_the_python_package() -> None:
+    """Keep the benchmark runnable without a separately cloned C++ directory."""
+    directory = default_instances_dir()
+    assert directory.is_relative_to(Path(__file__).resolve().parents[2])
+    assert read_kp_instance(directory / "kp10.txt").n_items == 10
+    assert read_kp_instance(directory / "kp50.txt").n_items == 50
+
+
+@pytest.mark.parametrize("filename, optimum", [("kp10.txt", 31), ("kp50.txt", 149)])
+def test_bundled_instances_match_exact_reference(filename: str, optimum: int) -> None:
+    """Verify reference objectives independently of stochastic solver behavior.
+
+    Args:
+        filename (str): Bundled reference instance filename.
+        optimum (int): Known optimal profit for the instance.
+    """
+    instance = read_kp_instance(default_instances_dir() / filename)
+    values = [0] * (instance.capacity + 1)
+    for profit, weight in zip(instance.benefits, instance.weights, strict=True):
+        for capacity in range(instance.capacity, weight - 1, -1):
+            values[capacity] = max(values[capacity], values[capacity - weight] + profit)
+    assert values[-1] == optimum
+
+
+def test_default_output_uses_the_callers_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Avoid writing benchmark results into an installed package directory.
+
+    Args:
+        tmp_path (Path): Caller-selected working directory.
+        monkeypatch (pytest.MonkeyPatch): Change the working directory temporarily.
+    """
+    monkeypatch.chdir(tmp_path)
+    assert default_output_csv() == tmp_path / "results" / "kp_results.csv"
 
 
 def test_objective_survives_pickle_round_trip(tmp_path: Path) -> None:
