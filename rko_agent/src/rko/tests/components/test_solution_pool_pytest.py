@@ -54,3 +54,32 @@ def test_get_elite_and_best_with_empty_pool() -> None:
     assert pool.get_elite(5) == []
     assert pool.best is None
     assert "capacity=3" in repr(pool)
+
+
+def test_elite_queries_return_detached_snapshots() -> None:
+    """Prevent callers from corrupting stored vectors through query results."""
+    pool = SolutionPool(capacity=2)
+    keys = [0.1, 0.2]
+    pool.insert((1.0, keys))
+    keys[0] = 0.9
+    best = pool.best
+    assert best is not None
+    best[1][0] = 0.8
+    pool.get_elite(1)[0][1][1] = 0.7
+    assert pool.best == (1.0, [0.1, 0.2])
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [(float("nan"), [0.1]), (float("inf"), [0.1]), (1.0, []), (1.0, [float("nan")])],
+)
+def test_pool_rejects_invalid_entries(entry: tuple[float, list[float]]) -> None:
+    """Reject values that would poison elite ordering or vector operations.
+
+    Args:
+        entry (tuple[float, list[float]]): Invalid objective/vector pair.
+    """
+    pool = SolutionPool(capacity=2)
+    with pytest.raises(ValueError):
+        pool.insert(entry)
+    assert pool.size == 0

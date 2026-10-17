@@ -14,7 +14,7 @@ Flow (pseudocode):
 1. Initialise an empty pool with a fixed capacity.
 2. On insert: acquire lock; if pool not full or candidate beats worst, add and
    re-sort; release lock.
-3. On get_elite: acquire lock; return shallow copy of the top-k entries.
+3. On get_elite: acquire lock; return detached copies of the top-k entries.
 
 Important criteria:
 - Pool capacity is fixed at construction time and never exceeded.
@@ -26,6 +26,7 @@ Inputs/Outputs:
 - Output: sorted list of top-k entries on get_elite; best entry on best property.
 """
 
+import math
 import threading
 
 
@@ -76,9 +77,12 @@ class SolutionPool:
           None: Mutates the pool in-place when the candidate is accepted.
 
         Raises:
-          ValueError: When required by external domain validation.
+          ValueError: If the cost or keys are nonfinite, or the vector is empty.
         """
         cost, keys = entry
+        keys = list(keys)
+        if not math.isfinite(cost) or not keys or not all(math.isfinite(key) for key in keys):
+            raise ValueError("Pool entries require a finite cost and a nonempty finite key vector.")
         with self._lock:
             if len(self._pool) < self.capacity or cost < self._pool[-1][0]:
                 self._pool.append((cost, list(keys)))
@@ -94,7 +98,7 @@ class SolutionPool:
             size if larger.
 
         Returns:
-          list[tuple[float, list[float]]]: Shallow copy of the top-k entries
+          list[tuple[float, list[float]]]: Detached copies of the top-k entries
             as ``(cost, keys_list)`` pairs.
 
         Raises:
@@ -102,7 +106,7 @@ class SolutionPool:
         """
         with self._lock:
             limit = min(k, len(self._pool))
-            return list(self._pool[:limit])
+            return [(cost, keys.copy()) for cost, keys in self._pool[:limit]]
 
     @property
     def size(self) -> int:
@@ -125,7 +129,8 @@ class SolutionPool:
         with self._lock:
             if not self._pool:
                 return None
-            return self._pool[0]
+            cost, keys = self._pool[0]
+            return cost, keys.copy()
 
     def __repr__(self) -> str:
         """Return a short debug representation of the pool.
