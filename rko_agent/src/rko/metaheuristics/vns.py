@@ -179,7 +179,7 @@ class VNS(MetaheuristicBase):
                     k += 1
 
             if ql is not None:
-                reward = 1.0 if improv else (best_cost - s_cost) / s_cost if s_cost != 0 else 0.0
+                reward = 1.0 if improv else ql.relative_reward(best_cost, s_cost)
                 st_next = ql.states[st].Ai[at]
                 ql.update_q_value(st, at, reward, lf, df)
                 st = st_next

@@ -226,13 +226,7 @@ class GeneticAlgorithm(MetaheuristicBase):
                 self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
 
             if ql is not None:
-                reward = (
-                    1.0
-                    if improv
-                    else (
-                        (best_cost - best_off_cost) / best_off_cost if best_off_cost != 0 else 0.0
-                    )
-                )
+                reward = 1.0 if improv else ql.relative_reward(best_cost, best_off_cost)
                 st_next = ql.states[st].Ai[at]
                 ql.update_q_value(st, at, reward, lf, df)
                 st = st_next

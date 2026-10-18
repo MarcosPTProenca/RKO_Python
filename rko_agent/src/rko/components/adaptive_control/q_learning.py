@@ -209,6 +209,27 @@ class QLearningController:
         df = 0.8
         return epsilon, lf, df, self.restart_epsilon, self.epsilon_max, self.ti
 
+    @staticmethod
+    def relative_reward(previous_best: float, candidate: float) -> float:
+        """Reward strict minimization improvement and normalize deterioration safely.
+
+        Args:
+            previous_best (float): Finite incumbent before the transition.
+            candidate (float): Finite objective produced by the transition.
+
+        Returns:
+            float: One for improvement, zero for equality, or a penalty in [-1, 0].
+
+        Raises:
+            ValueError: If either objective is nonfinite.
+        """
+        if not math.isfinite(previous_best) or not math.isfinite(candidate):
+            raise ValueError("Adaptive rewards require finite objective values.")
+        if candidate < previous_best:
+            return 1.0
+        scale = max(abs(previous_best), abs(candidate), 1.0)
+        return max(-1.0, previous_best / scale - candidate / scale)
+
     def update_q_value(self, st: int, at: int, reward: float, lf: float, df: float) -> None:
         """Updates a Q-value using the Bellman equation.
 

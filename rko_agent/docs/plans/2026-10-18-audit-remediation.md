@@ -56,6 +56,19 @@ the entire audit resolved after delivering only its API or packaging portion.
   uses the actual current maximum after every update. Five deterministic cases
   failed before the changes, and all114 tests passed afterward (88.04s).
 
+- `73c82e2`: canonical named online axes, finite/nonempty grid validation,
+  scalar-preserving atomic TOML replacement and visible watcher failures;
+  five regressions failed first, all120 tests passed (108.15s).
+- Adaptive rewards now share a sign-safe bounded policy: strict improvements
+  receive1, equality0, deterioration a normalized penalty in[-1,0]. The previous
+  population-size bonuses are removed. LNS/GRASP retain pre-update incumbent
+  context; deterministic reward tests cover positive/zero/negative objectives,
+  extreme finite costs, and actual ILS/LNS/GRASP transitions. All135 tests passed
+  (94.74s); larger benchmark quality has not yet been remeasured.
+
+Linux/Windows CI succeeded for class API (`39134476139`), packaging including both
+installed artifact checks (`39134774674`), and scientific state fixes (`39135014525`).
+
 The Q-learning choice intentionally follows current-action Bellman semantics,
 not the reference C++ historical-maximum cache. IPR preserves the pre-guide
 stopping policy for multiple blocks, but no longer drops final genes. These are

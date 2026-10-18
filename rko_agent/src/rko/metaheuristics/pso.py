@@ -237,15 +237,7 @@ class PSO(MetaheuristicBase):
                 self.solution_pool.insert((gbest_cost, gbest.tolist()), self.name)
 
             if ql is not None:
-                reward = (
-                    1.0
-                    if improv
-                    else (
-                        (gbest_cost - best_of_current) / best_of_current
-                        if best_of_current != 0
-                        else 0.0
-                    )
-                )
+                reward = 1.0 if improv else ql.relative_reward(gbest_cost, best_of_current)
                 st_next = ql.states[st].Ai[at]
                 ql.update_q_value(st, at, reward, lf, df)
                 st = st_next

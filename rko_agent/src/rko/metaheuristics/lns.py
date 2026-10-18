@@ -250,6 +250,7 @@ class LNS(MetaheuristicBase):
                     t0 = ql.states[i_curr].par[2]
                     alpha = ql.states[i_curr].par[3]
 
+                previous_best = best_cost
                 s_line, destroyed = self._destroy(s, beta_min, beta_max)
                 s_line, s_line_cost = self._repair(s_line, destroyed)
                 s_line, s_line_cost = nelder_mead_search(
@@ -274,12 +275,7 @@ class LNS(MetaheuristicBase):
                 temp *= alpha
 
                 if ql is not None:
-                    improv = 1 if s_cost < best_cost else 0
-                    reward = (
-                        1.0
-                        if improv
-                        else ((best_cost - s_line_cost) / s_line_cost if s_line_cost != 0 else 0.0)
-                    )
+                    reward = ql.relative_reward(previous_best, s_line_cost)
                     st_next = ql.states[st].Ai[at]
                     ql.update_q_value(st, at, reward, lf, df)
                     st = st_next

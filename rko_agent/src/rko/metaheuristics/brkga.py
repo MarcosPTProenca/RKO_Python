@@ -252,10 +252,7 @@ class BRKGA(MetaheuristicBase):
                 self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
 
             if ql is not None:
-                if improv:
-                    reward = 1.0 + 1.0 / p
-                else:
-                    reward = (best_cost - best_off_cost) / best_cost if best_cost != 0 else 0.0
+                reward = 1.0 if improv else ql.relative_reward(best_cost, best_off_cost)
                 st_next = ql.states[st].Ai[at]
                 ql.update_q_value(st, at, reward, lf, df)
                 st = st_next

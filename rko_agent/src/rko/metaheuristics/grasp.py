@@ -236,6 +236,7 @@ class GRASP(MetaheuristicBase):
             he_cur = ql.states[st].par[2]
 
         while not self.time_limit_reached(limit_time):
+            previous_best = best_cost
             if ql is not None:
                 epsilon, lf, df, _, _, _ = ql.set_parameters(self.elapsed())
                 at = ql.choose_action(st, epsilon)
@@ -273,11 +274,7 @@ class GRASP(MetaheuristicBase):
                     h /= 2.0
 
             if ql is not None:
-                reward = (
-                    1.0
-                    if s_cost < best_cost
-                    else ((best_cost - s_cost) / s_cost if s_cost != 0 else 0.0)
-                )
+                reward = 1.0 if best_cost < previous_best else ql.relative_reward(best_cost, s_cost)
                 st_next = ql.states[st].Ai[at]
                 ql.update_q_value(st, at, reward, lf, df)
                 st = st_next

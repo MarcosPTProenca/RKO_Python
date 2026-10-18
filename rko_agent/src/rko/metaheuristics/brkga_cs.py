@@ -386,11 +386,7 @@ class BRKGA_CS(MetaheuristicBase):
                 best_off_cost = (
                     min(costs_inter[elite_size:]) if len(costs_inter) > elite_size else best_cost
                 )
-                reward = (
-                    (1.0 + 1.0 / p)
-                    if improv
-                    else ((best_cost - best_off_cost) / best_cost if best_cost != 0 else 0.0)
-                )
+                reward = 1.0 if improv else ql.relative_reward(best_cost, best_off_cost)
                 st_next = ql.states[st].Ai[at]
                 ql.update_q_value(st, at, reward, lf, df)
                 st = st_next
