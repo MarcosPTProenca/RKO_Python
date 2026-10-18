@@ -9,7 +9,9 @@ Class-based RKO API and immutable results; usable installed wheel/sdist resource
 GA parent-fitness ownership, current Q maxima, sign-safe rewards and IPR remainder
 coverage; named/validated parameter grids and atomic saves; callback-boundary
 stopping, decoder isolation and visible thread failures; scalar pool-count RPCs
-and non-busy IPR waiting. These have regression and installed-artifact coverage.
+and non-busy IPR waiting. A single-instance `rko` command accepts external TOML
+configuration while retaining batch/module invocation. These have regression and
+installed-artifact coverage.
 
 ## Outstanding
 
@@ -19,9 +21,10 @@ and non-busy IPR waiting. These have regression and installed-artifact coverage.
   than `n_jobs` is rejected, not fairly scheduled. Native-thread limits and
   fixed-work throughput/IPC profiles remain to be established.
 - **Algorithm contracts:** complete C++ parity/deviation specifications and
-  scientific invariants remain, including SA/GRASP adaptive behavior and direct
-  local-search first-improvement/order semantics. Corrected Q/reward/grid/IPR
-  behavior is not a promise of unchanged C++ trajectories.
+  scientific invariants remain, including SA/GRASP adaptive behavior. Six local
+  neighborhood cases now match compiled C++ kernels: strategy 1 continues the
+  sweep, and supplied indices are reshuffled. See [compatibility](cpp-compatibility.md).
+  Corrected Q/reward/grid/IPR behavior is not a promise of unchanged C++ trajectories.
 - **Configuration/results:** programmatic hyperparameter configuration, evaluation
   counts and explicit stop reasons are incomplete. Full API/error documentation
   and a supported-version/release policy are still needed.

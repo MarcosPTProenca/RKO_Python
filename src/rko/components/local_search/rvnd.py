@@ -23,8 +23,8 @@ Flow (pseudocode):
 Important criteria:
 - Pool is forwarded to Nelder-Mead when provided so that elite solutions are
   used as simplex vertices (matching C++ behaviour).
-- The optional rk_order parameter is ignored by Nelder-Mead but forwarded to
-  the other three operators.
+- Swap, mirror and Farey build their own shuffled exploration orders; this
+  function has no rk_order parameter.
 
 Inputs/Outputs:
 - Input: key vector, decoder, cost, optional strategy, optional pool.
@@ -55,7 +55,7 @@ def rvnd(
       decoder (Callable[[np.ndarray], Any]): Solution decoding function.
       cost (Callable[[Any], float]): Objective function over the decoded solution.
       strategy (int): Improvement strategy passed to each neighborhood operator
-        (1 = first-improvement, 2 = best-improvement).
+        (1 = sequential acceptance, 2 = fixed-base best improvement).
       pool (object | None): Optional elite solution pool forwarded to
         nelder_mead_search for pool-aware simplex initialisation.
 

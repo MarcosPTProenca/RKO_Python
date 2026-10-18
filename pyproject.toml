@@ -12,6 +12,9 @@ dependencies = [
     "numpy>=2.0.0",
 ]
 
+[project.scripts]
+rko = "rko.examples.run_kp_cpp_instances:main"
+
 [project.urls]
 Repository = "https://github.com/MarcosPTProenca/RKO_Python"
 Issues = "https://github.com/MarcosPTProenca/RKO_Python/issues"

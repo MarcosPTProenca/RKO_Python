@@ -4,7 +4,7 @@ Objective:
 - Intensify a solution by permuting two positions in the random-key vector.
 
 Technical approach:
-- Evaluate pairwise index permutations under first/best improvement strategy.
+- Use sequential acceptance (strategy 1) or fixed-base best improvement (strategy 2).
 
 Flow (pseudocode):
 1. Define exploration index order.
@@ -38,8 +38,8 @@ def swap_ls(
       keys (np.ndarray): Key vector of the current solution.
       decoder (Callable[[np.ndarray], Any]): Solution decoding function.
       cost (Callable[[Any], float]): Objective function over the decoded solution.
-      strategy (int): Improvement strategy (1 for first-improvement).
-      rk_order (list[int] | None): Optional order of key indices.
+      strategy (int): Sweep policy (1: sequential acceptance; 2: fixed-base best).
+      rk_order (list[int] | None): Optional base indices, copied and shuffled for the sweep.
 
     Returns:
       tuple[np.ndarray, float]: Pair with best key vector and corresponding cost.

@@ -129,22 +129,26 @@ on failure or keyboard interruption.
 The managed pool is a correctness-first baseline. IPC and process startup can
 outweigh parallelism on tiny problems; no universal speedup is promised.
 
-## Run the Knapsack reference benchmark
+## Run an instance from the terminal
 
-Requires Python 3.14+ and uv. From this directory, on Linux/WSL:
+Like C++ `runTest INSTANCE T`, the supplied problem adapter runs Knapsack:
 
 ```bash
 uv sync --locked
-PYTHONPATH=src uv run --locked python -m rko.examples.run_kp_cpp_instances \
-  --backend process --limit-time 2 --random-state 42 \
-  --output-csv /tmp/rko-knapsack.csv
+uv run --locked rko src/rko/examples/instances/kp50.txt \
+  --limit-time 10 --backend process --random-state 42 \
+  --output-csv results/kp50.csv
 ```
 
-In PowerShell, set `$env:PYTHONPATH = "src"` before the same `uv run` command and
-choose a Windows output path. The two default reference instances are bundled
-in `src/rko/examples/instances/`, with upstream revision and MIT license. No
-separate C++ checkout is required. Omit `--output-csv` to save under the caller's
-`results/` directory.
+Pass `--params-dir configs/my-run` to select your own `config.toml` and algorithm
+TOMLs. See [running an instance](docs/running.md) for copying/editing configuration,
+a four-worker portfolio, instance format, PowerShell and legacy batch selection.
+The supplied command does not infer arbitrary problem formats: other problems
+require their own reader/decoder, analogous to adapting C++ `Problem.h`.
+
+The two bundled references live in `src/rko/examples/instances/`, with upstream
+revision and MIT license. No C++ checkout or `PYTHONPATH` setting is required.
+Omit `--output-csv` to save under the caller's `results/` directory.
 
 The decoder uses `key > 0.5`. Cost is negative profit with a penalty of 100000
 per excess unit of weight, matching the reference example. Independently
@@ -175,6 +179,8 @@ callback exceptions, abrupt exits, blocked callbacks and interruption cleanup.
 
 The library is **not yet release-ready**. See [current limitations](docs/status.md)
 for the outstanding RNG, scheduling, parity, documentation and licensing work.
+[C++ compatibility](docs/cpp-compatibility.md) distinguishes verified reference
+behavior from deliberate corrections and still-unimplemented functionality.
 Installation and correctness checks are not evidence of competitive optimization.
 Internal audits, agent plans and migration diaries are local working material,
 not maintained public documentation.

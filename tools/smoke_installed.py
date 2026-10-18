@@ -21,7 +21,11 @@ Inputs/Outputs:
 - Output: assertions and a success message, or a failing process exit.
 """
 
+import csv
 import numpy as np
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from rko import RKO
 from rko.examples.run_kp_cpp_instances import default_instances_dir
@@ -59,6 +63,7 @@ def main() -> None:
     Raises:
         AssertionError: If packaging or solver result contracts fail.
         OSError: If installed runtime resources cannot be read.
+        subprocess.SubprocessError: If the installed terminal command fails or times out.
     """
     package = default_params_dir().parent
     assert not (package / "tests").exists()
@@ -80,6 +85,30 @@ def main() -> None:
         ).solve(0.02)
         assert len(result.keys) == 3
         assert np.isclose(result.cost, objective(np.asarray(result.keys)))
+    executable = shutil.which("rko")
+    assert executable is not None
+    with tempfile.TemporaryDirectory(prefix="rko-installed-cli-") as temporary:
+        output = Path(temporary) / "result.csv"
+        subprocess.run(
+            [
+                executable,
+                str(default_instances_dir() / "kp10.txt"),
+                "--backend",
+                "serial",
+                "--limit-time",
+                "0.01",
+                "--random-state",
+                "42",
+                "--output-csv",
+                str(output),
+            ],
+            check=True,
+            timeout=90,
+            cwd=temporary,
+        )
+        with output.open(newline="", encoding="utf-8") as stream:
+            rows = list(csv.DictReader(stream))
+        assert len(rows) == 1 and rows[0]["instance"] == "kp10.txt"
     print(f"Installed artifact passed: {package}")
 
 

@@ -363,29 +363,32 @@ def write_results_csv(output_path: Path, rows: list[KpRunResult]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command-line options for benchmark execution.
-
-    Args:
-      None
+    """Parse one instance or an unambiguous legacy batch selection.
 
     Returns:
-      argparse.Namespace: Parsed CLI arguments.
+      argparse.Namespace: Instance selection, parameter directory and execution options.
 
     Raises:
-      ValueError: When required by external domain validation.
+      SystemExit: If help is requested or arguments/input paths are invalid.
     """
     parser = argparse.ArgumentParser(
-        description="Run Python RKO on C++ KP benchmark instances.",
+        description="Run RKO on Knapsack instances with a TOML parameter directory.",
+    )
+    parser.add_argument(
+        "instance",
+        type=Path,
+        nargs="?",
+        help="Single Knapsack instance file; omit to use directory/glob batch selection.",
     )
     parser.add_argument(
         "--instances-dir",
         type=Path,
-        default=default_instances_dir(),
+        default=None,
         help="Directory containing KP instance files (default: bundled reference instances).",
     )
     parser.add_argument(
         "--pattern",
-        default="kp*.txt",
+        default=None,
         help="Glob pattern used to select instances within --instances-dir.",
     )
     parser.add_argument(
@@ -409,23 +412,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend", choices=("process", "thread", "serial"), default="process")
     parser.add_argument("--n-jobs", type=int, default=None, help="Maximum process worker budget.")
     parser.add_argument("--random-state", type=int, default=None, help="Worker seed source.")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.instance is not None:
+        if args.instances_dir is not None or args.pattern is not None:
+            parser.error("A single instance cannot be combined with --instances-dir or --pattern.")
+        if not args.instance.is_file():
+            parser.error(f"Instance is not a file: {args.instance}")
+    if args.instances_dir is None:
+        args.instances_dir = default_instances_dir()
+    if args.pattern is None:
+        args.pattern = "kp*.txt"
+    return args
 
 
 def main() -> None:
-    """Run selected KP instances and print one summary line per instance.
-
-    Args:
-      None
-
-    Returns:
-      None: Executes benchmark runs.
+    """Run selected Knapsack instances through the class API and export CSV.
 
     Raises:
-      FileNotFoundError: If no instance file matches the selected criteria.
+      FileNotFoundError: If no instance matches or a required file is missing.
+      ValueError: If instance contents or solver settings are invalid.
+      OSError: If configuration, instance or result files cannot be accessed.
     """
     args = parse_args()
-    instances = sorted(args.instances_dir.glob(args.pattern))
+    instances = (
+        [args.instance]
+        if args.instance is not None
+        else sorted(args.instances_dir.glob(args.pattern))
+    )
     if not instances:
         raise FileNotFoundError(
             f"No instances found in '{args.instances_dir}' with pattern '{args.pattern}'."

@@ -5,7 +5,7 @@ Objective:
 
 Technical approach:
 - Evaluate candidates by mirroring positions according to scan order.
-- Support first-improvement and best-improvement strategies.
+- Support sequential-acceptance and fixed-base best-improvement sweeps.
 
 Flow (pseudocode):
 1. Define the order of indices to explore.
@@ -39,8 +39,8 @@ def mirror_ls(
       keys (np.ndarray): Key vector of the current solution.
       decoder (Callable[[np.ndarray], Any]): Solution decoding function.
       cost (Callable[[Any], float]): Objective function over the decoded solution.
-      strategy (int): Improvement strategy (1 for first-improvement).
-      rk_order (list[int] | None): Optional order of key indices.
+      strategy (int): Sweep policy (1: sequential acceptance; 2: fixed-base best).
+      rk_order (list[int] | None): Optional base indices, copied and shuffled for the sweep.
 
     Returns:
       tuple[np.ndarray, float]: Pair with best key vector and corresponding cost.
