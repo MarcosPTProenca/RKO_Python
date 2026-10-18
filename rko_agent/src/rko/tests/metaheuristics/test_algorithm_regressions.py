@@ -26,6 +26,8 @@ import numpy as np
 import pytest
 from collections.abc import Callable
 from rko.components.adaptive_control.q_learning import QLearningController
+from rko.components.blending.blending import blending
+from rko.components.local_search import nelder_mead_ls as nelder_mead_module
 from rko.components.solution_pool import SolutionPool
 from rko.metaheuristics import ga as ga_module
 from rko.metaheuristics.ga import GeneticAlgorithm
@@ -108,3 +110,58 @@ def test_ipr_visits_partial_final_block(dimension: int) -> None:
     keys, cost = algorithm._relink(np.zeros(dimension), guide)
     assert keys[-1] == 0.9
     assert cost == -0.9
+
+
+def test_nelder_mead_retains_better_initial_pool_vertex(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Do not discard a superior simplex seed when generated points are worse.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Fix all generated simplex candidates.
+    """
+    pool = SolutionPool()
+    pool.insert((0.1, [0.1]))
+    pool.insert((0.2, [0.2]))
+    monkeypatch.setattr(nelder_mead_module, "_blend", lambda a, b, factor: np.array([0.5]))
+    keys, cost = nelder_mead_module.nelder_mead_search(
+        np.array([0.9]),
+        lambda keys: keys,
+        lambda keys: float(keys.sum()),
+        pool,
+    )
+    assert keys.tolist() == [0.1]
+    assert cost == 0.1
+
+
+def test_nelder_mead_reuses_shared_blending() -> None:
+    """Keep one mutation/inheritance implementation for both public and local use."""
+    assert nelder_mead_module._blend is blending
+
+
+def test_ipr_waits_without_busy_polling() -> None:
+    """Bound manager count requests while waiting for another elite producer."""
+
+    class CountingPool(SolutionPool):
+        """Count empty-pool observations during a bounded relinking attempt.
+
+        Responsibilities:
+        - Make repeated occupancy requests observable.
+
+        Attributes:
+            polls (int): Number of size queries.
+        """
+
+        polls: int = 0
+
+        @property
+        def size(self) -> int:
+            """Record an occupancy query.
+
+            Returns:
+                int: Zero because no producer inserts entries in this test.
+            """
+            self.polls += 1
+            return 0
+
+    pool = CountingPool()
+    IPR(pool, lambda keys: keys, lambda keys: 0.0, 2).solve(0.02)
+    assert 1 <= pool.polls < 10

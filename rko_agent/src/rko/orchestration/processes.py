@@ -28,7 +28,6 @@ import multiprocessing as mp
 import numpy as np
 import pickle
 import random
-import sys
 import time
 import traceback
 from ..components.solution_pool import SolutionPool
@@ -58,7 +57,7 @@ class PoolProxy(BaseProxy):
         _exposed_ (tuple[str, ...]): Manager methods available to workers.
     """
 
-    _exposed_ = ("insert", "get_elite")
+    _exposed_ = ("insert", "get_elite", "__len__")
 
     def insert(self, entry: tuple[float, list[float]], source: str = "") -> None:
         """Insert a candidate into the authoritative pool.
@@ -90,7 +89,7 @@ class PoolProxy(BaseProxy):
         Returns:
             int: Current pool occupancy.
         """
-        return len(self.get_elite(sys.maxsize))
+        return self._callmethod("__len__")
 
     @property
     def best(self) -> tuple[float, list[float]] | None:

@@ -41,6 +41,7 @@ from __future__ import annotations
 import math
 import numpy as np
 import random
+import time
 from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
@@ -162,6 +163,7 @@ class IPR(MetaheuristicBase):
         while not self.time_limit_reached(limit_time):
             pool_size: int = getattr(self.solution_pool, "size", 0)
             if pool_size < 2:
+                time.sleep(min(0.01, max(0.0, limit_time - self.elapsed())))
                 continue
 
             elite = self.solution_pool.get_elite(pool_size)

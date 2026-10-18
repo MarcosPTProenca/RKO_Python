@@ -356,6 +356,19 @@ def test_managed_pool_exchanges_elites_across_spawn() -> None:
             child.close()
 
 
+def test_managed_pool_count_does_not_fetch_vectors(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Query only an integer count rather than serializing all elite key vectors.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Fail on accidental elite-vector retrieval.
+    """
+    with PoolManager(ctx=mp.get_context("spawn")) as manager:
+        pool = manager.SolutionPool(2)
+        pool.insert((1.0, [0.1]))
+        monkeypatch.setattr(pool, "get_elite", lambda *args: pytest.fail("count fetched vectors"))
+        assert pool.size == 1
+
+
 @pytest.mark.parametrize("name", sorted(MH_SPECS))
 def test_real_algorithm_returns_consistent_result(params_dir: Path, name: str) -> None:
     """Run every registered search through the spawned public solver.

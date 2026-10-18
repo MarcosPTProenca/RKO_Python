@@ -162,6 +162,15 @@ class SolutionPool:
             limit = min(k, len(self._pool))
             return [(cost, keys.copy()) for cost, keys in self._pool[:limit]]
 
+    def __len__(self) -> int:
+        """Read current occupancy without copying key vectors.
+
+        Returns:
+            int: Stored entry count under the pool lock.
+        """
+        with self._lock:
+            return len(self._pool)
+
     @property
     def size(self) -> int:
         """Number of solutions currently stored in the pool.
@@ -169,8 +178,7 @@ class SolutionPool:
         Returns:
           int: Current pool occupancy.
         """
-        with self._lock:
-            return len(self._pool)
+        return len(self)
 
     @property
     def best(self) -> tuple[float, list[float]] | None:

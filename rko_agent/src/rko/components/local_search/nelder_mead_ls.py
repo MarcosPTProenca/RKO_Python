@@ -27,7 +27,7 @@ Inputs/Outputs:
 
 import math
 import numpy as np
-import random
+from ..blending.blending import blending as _blend
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -65,38 +65,6 @@ def _evaluate(
     return cost(decoder(keys))
 
 
-def _blend(a: np.ndarray, b: np.ndarray, factor: float) -> np.ndarray:
-    """Combines two vectors to generate a simplex transformation candidate.
-
-    Args:
-        a (np.ndarray): First base vector.
-        b (np.ndarray): Second base vector.
-        factor (float): Factor defining normal or complementary mode.
-
-    Returns:
-        np.ndarray: Combined candidate vector.
-
-    Raises:
-        ValueError: When required by external domain validation.
-    """
-    n = len(a)
-    out = np.empty(n, dtype=float)
-
-    for j in range(n):
-        if random.random() < 0.02:
-            out[j] = random.random()
-        else:
-            if random.random() < 0.5:
-                out[j] = a[j]
-            else:
-                if factor == -1:
-                    out[j] = min(max(1.0 - b[j], 0.0), 0.9999999)
-                else:
-                    out[j] = b[j]
-
-    return out
-
-
 def nelder_mead_search(
     keys: np.ndarray,
     decoder: Callable[[np.ndarray], Any],
@@ -129,6 +97,7 @@ def nelder_mead_search(
 
     x1_origin = keys.copy()
     x1 = _Point(keys.copy(), _evaluate(keys, decoder, cost))
+    origin_cost = x1.ofv
 
     elite = pool.get_elite(2) if pool is not None and hasattr(pool, "get_elite") else []
     if len(elite) >= 2:
@@ -158,7 +127,7 @@ def nelder_mead_search(
 
     x_best = min([x1, x2, x3, x0], key=lambda p: p.ofv)
     improved = x0.ofv < x1.ofv
-    improved_x1 = 1 if x_best.ofv < x1.ofv else 0
+    improved_x1 = 1 if x_best.ofv < origin_cost else 0
 
     iter_count = 1
     max_iter = int(n * math.exp(-2.0))
@@ -250,5 +219,4 @@ def nelder_mead_search(
 
     if improved_x1 == 1:
         return x_best.keys.copy(), x_best.ofv
-    origin_cost = _evaluate(x1_origin, decoder, cost)
     return x1_origin, origin_cost

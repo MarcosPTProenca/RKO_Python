@@ -90,6 +90,14 @@ the entire audit resolved after delivering only its API or packaging portion.
   strings or fractional integers. All179 tests passed (127.94s), including real
   online execution of all8 adaptive algorithms and parent-side rejection checks.
 
+- Managed pool occupancy now transfers only an integer, not all elite vectors;
+  IPR waits briefly instead of busy-polling an empty pool. Standalone IPR has no
+  independent elite producer, so use it with another search for meaningful
+  relinking. Nelder-Mead reuses shared blending and retains superior initial
+  pool vertices even if generated points do not beat that simplex seed. This
+  also removes an unnecessary reevaluation of the original input. All183 tests
+  passed (139.53s), including direct operator and no-vector-count regressions.
+
 Linux/Windows CI succeeded for class API (`39134476139`), packaging including both
 installed artifact checks (`39134774674`), and scientific state fixes (`39135014525`).
 
