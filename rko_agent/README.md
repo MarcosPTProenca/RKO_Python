@@ -92,6 +92,11 @@ CSV records feasibility, objective, backend, requested worker budget, seed and
 end-to-end elapsed time. A blank budget means one worker per selected algorithm.
 These two small instances are correctness checks, not production-scale evidence.
 
+A [1,000-item public-instance experiment](docs/benchmarks/2026-10-17-large-knapsack.md)
+confirms multi-core CPU use, but also exposes poor optimization quality: best
+RKO gap 17.56%, versus 0.00474% for a simple greedy baseline. Do not interpret
+working process execution as evidence of a competitive Knapsack solver.
+
 ## Quality checks
 
 ```bash
