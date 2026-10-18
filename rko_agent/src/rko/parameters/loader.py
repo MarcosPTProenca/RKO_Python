@@ -31,11 +31,31 @@ Inputs/Outputs:
           or global config dict.
 """
 
+import json
+import logging
+import math
 import os
 import threading
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+logger = logging.getLogger(__name__)
+
+_ONLINE_AXES: dict[str, tuple[str, ...]] = {
+    "sa": ("sa_max", "t0", "alpha", "beta_min", "beta_max"),
+    "multi_start": (),
+    "ils": ("beta_min", "beta_max"),
+    "vns": ("k_max", "beta_min"),
+    "lns": ("beta_min", "beta_max", "t0", "alpha_lns"),
+    "grasp": ("alpha_grasp", "hs", "he"),
+    "brkga": ("p", "pe", "pm", "rhoe"),
+    "ga": ("size_pop", "prob_cros", "prob_mut"),
+    "pso": ("p_size", "c1", "c2", "w"),
+    "brkga_cs": ("p", "pe", "pm", "rhoe"),
+    "ipr": (),
+}
 
 _PARAMS_DIR: Path = Path(__file__).parent
 
@@ -133,7 +153,7 @@ def load_online_grid(
     """Read the ``[online]`` section and return it as a list-of-lists grid.
 
     The grid is the direct input for ``QLearningController(parameters=...)``.
-    The axis order matches the key order in the ``[online]`` TOML section.
+    Axis order follows the algorithm schema, not textual TOML key order.
 
     Args:
       mh_name: Recognised metaheuristic name.
@@ -148,11 +168,7 @@ def load_online_grid(
       KeyError: When *mh_name* is not recognised.
       FileNotFoundError: When the ``.toml`` file does not exist.
     """
-    path = toml_path(mh_name, params_dir)
-    with open(path, "rb") as fh:
-        data = tomllib.load(fh)
-    online: dict[str, list[float]] = data.get("online", {})
-    return [list(v) for v in online.values()]
+    return list(load_online_named(mh_name, params_dir).values())
 
 
 def load_online_named(
@@ -175,7 +191,37 @@ def load_online_named(
     path = toml_path(mh_name, params_dir)
     with open(path, "rb") as fh:
         data = tomllib.load(fh)
-    return {k: list(v) for k, v in data.get("online", {}).items()}
+    return _ordered_online(mh_name, data.get("online", {}))
+
+
+def _ordered_online(mh_name: str, online: object) -> dict[str, list[float]]:
+    """Validate named axes and return them in algorithm-defined order.
+
+    Args:
+        mh_name (str): Registered metaheuristic or alias.
+        online (object): Parsed online table.
+
+    Returns:
+        dict[str, list[float]]: Canonically ordered, finite nonempty axes.
+
+    Raises:
+        ValueError: If names, axis shapes or values violate the schema.
+        KeyError: If the metaheuristic name is unknown.
+    """
+    names = _ONLINE_AXES[_NAME_TO_FILE[mh_name]]
+    if not isinstance(online, dict) or set(online) != set(names):
+        raise ValueError(f"{mh_name}: online keys must be {names}.")
+    result = {}
+    for name in names:
+        axis = online[name]
+        if (
+            not isinstance(axis, list)
+            or not axis
+            or any(type(value) not in (int, float) or not math.isfinite(value) for value in axis)
+        ):
+            raise ValueError(f"{mh_name}: online axis '{name}' must be finite and nonempty.")
+        result[name] = list(axis)
+    return result
 
 
 def save_online_grid(
@@ -186,9 +232,9 @@ def save_online_grid(
 ) -> None:
     """Overwrite the ``[online]`` values in the TOML file with *grid*.
 
-    The parameter names are inferred from the current file so the axis order
-    is preserved.  Offline values and comment blocks are regenerated without
-    inline comments.
+    Grid axes follow the same algorithm-defined order as load_online_grid.
+    Offline scalar values are preserved; formatting/comments are regenerated.
+    Validation and atomic replacement protect the original on write failure.
 
     Args:
       mh_name: Recognised metaheuristic name.
@@ -198,23 +244,26 @@ def save_online_grid(
 
     Raises:
       KeyError: When *mh_name* is not recognised.
-      FileNotFoundError: When the ``.toml`` file does not exist.
-      ValueError: When *grid* has a different number of axes than the file.
+      FileNotFoundError: When the parameter file does not exist.
+      ValueError: When grid names, axes, values or file sections are unsupported.
+      OSError: When writing or atomically replacing the file fails.
     """
     path = toml_path(mh_name, params_dir)
     with open(path, "rb") as fh:
         data = tomllib.load(fh)
 
-    online_keys = list(data.get("online", {}).keys())
+    if set(data) - {"offline", "online"}:
+        raise ValueError("Cannot overwrite parameter files containing unsupported sections.")
+    online_keys = list(_ordered_online(mh_name, data.get("online", {})))
     if len(online_keys) != len(grid):
         raise ValueError(
             f"{mh_name}: grid has {len(grid)} axes but file has {len(online_keys)} online keys."
         )
 
     new_online: dict[str, list[float]] = {
-        k: list(v) for k, v in zip(online_keys, grid, strict=False)
+        k: list(v) for k, v in zip(online_keys, grid, strict=True)
     }
-    _write_toml(path, dict(data.get("offline", {})), new_online)
+    _write_toml(path, dict(data.get("offline", {})), _ordered_online(mh_name, new_online))
 
 
 def _fmt_value(val: float | int | bool | str) -> str:
@@ -225,12 +274,17 @@ def _fmt_value(val: float | int | bool | str) -> str:
 
     Returns:
       TOML-compatible string representation.
+
+    Raises:
+      ValueError: When the scalar type is unsupported or numeric value is nonfinite.
     """
+    if isinstance(val, str):
+        return json.dumps(val, ensure_ascii=False)
     if isinstance(val, bool):
         return "true" if val else "false"
-    if isinstance(val, float):
+    if type(val) in (int, float) and math.isfinite(val):
         return repr(val)
-    return str(val)
+    raise ValueError("Only finite numeric, boolean and string parameter values are supported.")
 
 
 def _write_toml(
@@ -244,12 +298,16 @@ def _write_toml(
       path: Destination file path.
       offline: ``{param_name: scalar_value}`` for ``[offline]`` section.
       online: ``{param_name: [values]}`` for ``[online]`` section.
+
+    Raises:
+      ValueError: When parameter values cannot be serialized as supported TOML.
+      OSError: When temporary writing or replacement fails; original remains intact.
     """
     lines: list[str] = []
     if offline:
         lines.append("[offline]\n")
         for key, val in offline.items():
-            lines.append(f"{key} = {_fmt_value(val)}\n")
+            lines.append(f"{_fmt_value(key)} = {_fmt_value(val)}\n")
     else:
         lines.append("[offline]\n")
         lines.append("# (no parameters)\n")
@@ -258,12 +316,31 @@ def _write_toml(
     if online:
         for key, vals in online.items():
             vals_str = ", ".join(_fmt_value(v) for v in vals)
-            lines.append(f"{key} = [{vals_str}]\n")
+            lines.append(f"{_fmt_value(key)} = [{vals_str}]\n")
     else:
         lines.append("# (no parameters)\n")
 
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.writelines(lines)
+    content = "".join(lines)
+    tomllib.loads(content)
+    temporary: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as fh:
+            temporary = Path(fh.name)
+            fh.write(content)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.chmod(temporary, path.stat().st_mode & 0o777)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 class ParameterWatcher:
@@ -370,4 +447,4 @@ class ParameterWatcher:
                     grid = load_online_grid(self.mh_name, self.params_dir)
                     self.callback(self.mh_name, offline, grid)
                 except Exception:
-                    pass
+                    logger.exception("Parameter update failed for %s", self.mh_name)
