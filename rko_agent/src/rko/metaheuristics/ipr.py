@@ -17,16 +17,16 @@ Technical approach:
 Flow (pseudocode):
 1. Wait until pool contains at least two solutions.
 2. Draw ``atual`` and ``guia`` randomly from the pool.
-3. Divide the chromosome into num_blocks = n // block_size blocks.
-4. Repeat num_blocks-1 times:
+3. Divide the chromosome into ceil(n / block_size) blocks.
+4. Repeat max(1, num_blocks-1) times:
    a. For every unfixed block i, evaluate swapping those genes to guia.
    b. Fix the block with the best improvement; update s_current.
 5. Insert the best solution seen along the path into the pool.
 
 Important criteria:
-- Block size is always at least 1 gene; num_blocks = n // block_size.
-- Only num_blocks-1 swaps are performed (the last block is implicitly the
-  guide solution and is left out to preserve path diversity).
+- Block size is at least 1 gene; include any partial final block.
+- For multiple blocks, stop before the full guide to preserve path diversity.
+- A one-block chromosome evaluates the guide rather than an empty block.
 - The routine repeats continuously until the time budget is exhausted,
   drawing a fresh pair from the pool at each IPR call.
 
@@ -106,14 +106,14 @@ class IPR(MetaheuristicBase):
         """
         n = self.tam_solution
         block_size = max(1, int(n * 0.10))
-        num_blocks = max(2, n // block_size)
+        num_blocks = (n + block_size - 1) // block_size
         fixed_block = [False] * num_blocks
 
         s_current = atual_keys.copy()
         best_path_keys = s_current.copy()
         best_path_cost: float = self.cost(self.decoder(s_current))
 
-        for _ in range(num_blocks - 1):
+        for _ in range(max(1, num_blocks - 1)):
             best_iter_cost = math.inf
             best_iter_keys: np.ndarray | None = None
             best_block = -1

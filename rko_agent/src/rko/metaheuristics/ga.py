@@ -173,13 +173,15 @@ class GeneticAlgorithm(MetaheuristicBase):
                     pop_costs = pop_costs[:size_pop]
 
             pop_inter: list[np.ndarray] = []
+            selected_costs: list[float] = []
             for _ in range(size_pop):
                 p1, p2, p3 = random.sample(range(size_pop), 3)
                 best_t = min(p1, p2, p3, key=lambda i: pop_costs[i])
                 pop_inter.append(pop[best_t].copy())
+                selected_costs.append(pop_costs[best_t])
 
             pop_new: list[np.ndarray] = [c.copy() for c in pop_inter]
-            pop_new_costs: list[float] = list(pop_costs)
+            pop_new_costs: list[float] = list(selected_costs)
 
             best_off_cost = float("inf")
             i = 0
@@ -196,9 +198,6 @@ class GeneticAlgorithm(MetaheuristicBase):
                             pop_new[i + 1][j] = random.random()
                     pop_new_costs[i] = self.cost(self.decoder(pop_new[i]))
                     pop_new_costs[i + 1] = self.cost(self.decoder(pop_new[i + 1]))
-                else:
-                    pop_new_costs[i] = pop_costs[i]
-                    pop_new_costs[i + 1] = pop_costs[i + 1]
 
                 if pop_new_costs[i] < best_off_cost:
                     best_off_cost = pop_new_costs[i]

@@ -14,7 +14,7 @@ Flow (pseudocode):
 
 Important criteria:
 - Cyclical epsilon control.
-- Incremental updates of the best value per state.
+- Recompute the current best action after every Q update.
 
 Inputs/Outputs:
 - Input: parameter grid, rewards, and current time.
@@ -43,7 +43,7 @@ class QState:
       Ai (list[int]): Indices of states reachable by each action.
       Qa (list[float]): Q-values for each feasible action.
       sumQ (float): Auxiliary sum of Q-values.
-      maxQ (float): Highest observed Q-value in the state.
+      maxQ (float): Maximum current Q-value in the state.
       minA (int): Auxiliary index for minimum action.
       maxA (int): Index of the current best action.
     """
@@ -237,9 +237,8 @@ class QLearningController:
         q_new = q_old + lf * (reward + df * self.states[st_next].maxQ - q_old)
         state.Qa[at] = q_new
 
-        if q_new > state.maxQ:
-            state.maxQ = q_new
-            state.maxA = at
+        state.maxA = max(range(len(state.Qa)), key=state.Qa.__getitem__)
+        state.maxQ = state.Qa[state.maxA]
 
 
 def create_states(parameters: list[list[float]]) -> list[QState]:

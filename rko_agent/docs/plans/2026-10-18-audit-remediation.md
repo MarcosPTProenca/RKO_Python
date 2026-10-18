@@ -44,6 +44,23 @@ Each increment gets Ruff lint/format, regression tests and the full suite, its o
 commit and GitHub push. Update progress below with observed evidence; do not mark
 the entire audit resolved after delivering only its API or packaging portion.
 
+## Delivered increments
+
+- `d924f5e`: RKO class owns execution, RKOResult snapshots, Python portfolio
+  selection and compatibility adapter; all108 tests passed (86.18s).
+- `6d7f650`: explicit setuptools resources/discovery and isolated wheel/sdist
+  checks, including serial and spawn; all108 tests passed (89.45s). CI now runs
+  the same installed-artifact checks on Linux and Windows.
+- Scientific state corrections: GA retains selected parent fitness for skipped
+  crossover and odd populations; IPR includes partial final blocks; Q-learning
+  uses the actual current maximum after every update. Five deterministic cases
+  failed before the changes, and all114 tests passed afterward (88.04s).
+
+The Q-learning choice intentionally follows current-action Bellman semantics,
+not the reference C++ historical-maximum cache. IPR preserves the pre-guide
+stopping policy for multiple blocks, but no longer drops final genes. These are
+explicit correctness deviations, not a claim of unchanged C++ trajectories.
+
 ## Remaining release gates
 
 Owner-approved project license; scientific correctness and online transition
