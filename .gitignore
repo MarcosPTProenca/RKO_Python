@@ -17,3 +17,13 @@ dist/
 htmlcov/
 results/
 /site/
+
+# Local working notes and generated analysis, not library documentation.
+/docs/audits/
+/docs/plans/
+/docs/migrations/
+/docs/superpowers/
+/docs/benchmarks/
+/graphify-out/
+/.vscode/
+/.idea/

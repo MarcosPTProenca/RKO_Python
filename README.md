@@ -26,9 +26,8 @@ The distribution retains the name `rko`; version `0.3.0.dev0` identifies this
 unreleased class-based development line, not a PyPI publication. It replaces
 the previous implementation on `main`, whose complete code/history is retained
 at `archive/pre-standalone-migration-2026-10-18`. The new API and Python 3.14
-requirement are breaking changes from that older implementation. See the
-[migration record](docs/migrations/2026-10-18-standalone-repository.md) for
-history, attribution, rollback and licensing boundaries.
+requirement are breaking changes from that older implementation. Attribution
+and licensing boundaries are retained in [NOTICE](NOTICE).
 
 ## Class-based solver API
 
@@ -154,13 +153,11 @@ CSV records feasibility, objective, backend, requested worker budget, seed and
 end-to-end elapsed time. A blank budget means one worker per selected algorithm.
 These two small instances are correctness checks, not production-scale evidence.
 
-A [1,000-item public-instance experiment](docs/benchmarks/2026-10-17-large-knapsack.md)
-confirms multi-core CPU use, but also exposes poor optimization quality: best
-RKO gap 17.56%, versus 0.00474% for a simple greedy baseline. Do not interpret
-working process execution as evidence of a competitive Knapsack solver.
-A [post-audit-core repetition](docs/benchmarks/2026-10-18-audit-core-knapsack.md)
-completed all six trials but retained poor quality (best process gap 18.46%).
-Correctness fixes have not established improved optimization performance.
+The [larger benchmark](benchmarks/README.md) includes a runnable experiment and
+one current reference CSV. Re-run on October 18 against the standalone solver,
+all six trials were feasible, but the best process gap was **17.82%**, versus
+**0.00474%** for a simple greedy baseline. This demonstrates multicore execution,
+not competitive solution quality or fixed-work speedup.
 
 ## Quality checks
 
@@ -176,10 +173,8 @@ callback exceptions, abrupt exits, blocked callbacks and interruption cleanup.
 
 ## Remaining release work
 
-See the [finding-by-finding status](docs/audits/2026-10-18-remediation-status.md)
-and `docs/plans/2026-10-18-audit-remediation.md` for delivered increments and
-remaining work: complete parameter/configuration validation, per-search RNG
-ownership, bounded portfolio scheduling, C++ behavioral/deviation contracts,
-stronger quality/performance evidence, API documentation and owner-approved
-project licensing. Wheel/sdist installation and callback-boundary stopping are
-now tested. Do not infer scientific or production readiness from smoke tests.
+The library is **not yet release-ready**. See [current limitations](docs/status.md)
+for the outstanding RNG, scheduling, parity, documentation and licensing work.
+Installation and correctness checks are not evidence of competitive optimization.
+Internal audits, agent plans and migration diaries are local working material,
+not maintained public documentation.

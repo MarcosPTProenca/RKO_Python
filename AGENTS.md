@@ -5,7 +5,10 @@ Run all tooling from this repository root, not an enclosing `rko_agent` director
 The previous RKO-Agent checkout is historical and must not receive new library
 changes. Preserve both parent histories and the pre-migration archive tag.
 Memory scope: workspace `default`, project `marcosptproenca-rko-python`.
-Migration details: `docs/migrations/2026-10-18-standalone-repository.md`.
+Public limitations: `docs/status.md`. Reproducible measurements: `benchmarks/`.
+Do not commit local audits, agent plans, migration diaries, generated analysis or
+editor settings. Keep those ignored; retain only maintained user documentation,
+benchmark code and an explicitly identified reference measurement in Git.
 
 ## DO
 

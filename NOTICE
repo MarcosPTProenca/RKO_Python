@@ -1,0 +1,18 @@
+RKO Python — provenance and licensing boundaries
+
+This repository retains its pre-existing Apache-2.0 LICENSE unchanged.
+The previous project metadata credited Felipe Silvestre Cardoso Roberto and
+João Assaoka. Their code and attribution remain in history and in the tag
+archive/pre-standalone-migration-2026-10-18 (revision 9240994).
+
+The class-based implementation was imported from MarcosPTProenca/RKO-Agent,
+revision 1066171f238c3820dfc315e6412e3526356b4e40. Merge daa2e94 preserves
+both original histories without rewriting their commits. Source authorship
+remains recorded there. The implementation is inspired by RKO C++ v2.
+
+Bundled reference fixtures retain their separate upstream MIT license and
+provenance under src/rko/examples/instances/.
+
+This provenance notice does not relicense imported work, assign authorship,
+or establish ownership. The owner must confirm the combined implementation's
+licensing and attribution before a release.
