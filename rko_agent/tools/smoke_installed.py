@@ -1,0 +1,87 @@
+"""Exercise a built artifact without importing the source checkout.
+
+Objective:
+- Detect missing runtime resources and unusable installed solver entry points.
+
+Technical approach:
+- Run under python -I inside an environment containing only the installed artifact.
+- Check package contents and solve a small problem with serial and spawn execution.
+
+Flow (pseudocode):
+1. Locate the installed package and assert expected data and excluded tests.
+2. Read packaged parameters and reference instances.
+3. Verify class-based results against an independent objective calculation.
+
+Important criteria:
+- Use the main guard and importable callbacks for Windows spawn.
+- This is an installation contract check, not an optimization-quality benchmark.
+
+Inputs/Outputs:
+- Input: installed wheel or sdist and its runtime dependencies.
+- Output: assertions and a success message, or a failing process exit.
+"""
+
+import numpy as np
+from pathlib import Path
+from rko import RKO
+from rko.examples.run_kp_cpp_instances import default_instances_dir
+from rko.examples.run_kp_cpp_instances import read_kp_instance
+from rko.parameters.loader import default_params_dir
+
+
+def decode(keys: np.ndarray) -> np.ndarray:
+    """Decode keys without changing the vector.
+
+    Args:
+        keys (np.ndarray): Candidate vector.
+
+    Returns:
+        np.ndarray: Unmodified candidate.
+    """
+    return keys
+
+
+def objective(keys: np.ndarray) -> float:
+    """Evaluate the installed smoke objective.
+
+    Args:
+        keys (np.ndarray): Candidate vector.
+
+    Returns:
+        float: Squared Euclidean norm.
+    """
+    return float(np.dot(keys, keys))
+
+
+def main() -> None:
+    """Validate installed resources and actual public execution.
+
+    Raises:
+        AssertionError: If packaging or solver result contracts fail.
+        OSError: If installed runtime resources cannot be read.
+    """
+    package = default_params_dir().parent
+    assert not (package / "tests").exists()
+    assert (default_params_dir() / "config.toml").is_file()
+    assert len(list(default_params_dir().glob("*.toml"))) == 12
+    assert read_kp_instance(default_instances_dir() / "kp10.txt").n_items == 10
+    assert read_kp_instance(default_instances_dir() / "kp50.txt").n_items == 50
+    assert any("LICENSE" in path.name for path in default_instances_dir().iterdir())
+    assert package.resolve() != Path(__file__).resolve().parents[1] / "src" / "rko"
+    for backend in ("serial", "process"):
+        result = RKO(
+            decode,
+            objective,
+            3,
+            algorithms=["MultiStart"],
+            control=0,
+            backend=backend,
+            random_state=42,
+        ).solve(0.02)
+        assert len(result.keys) == 3
+        assert np.isclose(result.cost, objective(np.asarray(result.keys)))
+    print(f"Installed artifact passed: {package}")
+
+
+if __name__ == "__main__":
+    main()

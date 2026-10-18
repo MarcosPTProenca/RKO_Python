@@ -29,3 +29,11 @@ jobs:
         run: uv run --locked ruff format --check .
       - name: Full test suite
         run: uv run --locked pytest src/rko/tests -q
+      - name: Build distribution artifacts
+        run: uv build
+      - name: Test isolated wheel and sdist installs
+        shell: bash
+        run: |
+          for artifact in dist/*.whl dist/*.tar.gz; do
+            uv run --isolated --no-project --with "$artifact" python -I tools/smoke_installed.py
+          done
