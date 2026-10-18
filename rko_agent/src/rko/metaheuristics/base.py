@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from abc import ABC
 from abc import abstractmethod
@@ -32,6 +33,7 @@ class MetaheuristicBase(ABC):
         self.solution_pool = solution_pool
         self.name = name or self.__class__.__name__
         self._start_time: float | None = None
+        self._cancelled: threading.Event | None = None
 
     @abstractmethod
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:
@@ -41,7 +43,7 @@ class MetaheuristicBase(ABC):
         Call :meth:`_start_timer` at the beginning and use
         :meth:`time_limit_reached` to check the stopping criterion inside
         the main loop. Whenever a new best solution is found, insert it into
-        the shared pool via ``self.pool.insert((cost, keys), self.name, tag)``.
+        the shared pool via ``self.solution_pool.insert((cost, keys), self.name)``.
 
         Args:
           limit_time: Maximum wall-clock time (seconds) allowed for this run.
@@ -67,7 +69,9 @@ class MetaheuristicBase(ABC):
 
     def time_limit_reached(self, limit_time: float) -> bool:
         """Return ``True`` when :meth:`elapsed` exceeds *limit_time*."""
-        return self.elapsed() >= limit_time
+        return (
+            self._cancelled is not None and self._cancelled.is_set()
+        ) or self.elapsed() >= limit_time
 
     def _start_timer(self) -> None:
         """Record the wall-clock start time.

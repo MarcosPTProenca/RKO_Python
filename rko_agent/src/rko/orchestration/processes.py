@@ -34,6 +34,7 @@ import traceback
 from ..components.solution_pool import SolutionPool
 from .execution import select_best_result
 from .factory import build_metaheuristic
+from .search import SearchSession
 from .types import CostFn
 from .types import DecoderFn
 from .types import RunConfig
@@ -153,7 +154,8 @@ def _worker(
         remaining = deadline.value - time.perf_counter()
         if remaining <= 0:
             raise TimeoutError("Search deadline elapsed before worker execution.")
-        connection.send(("result", mh.solve(remaining)))
+        result = SearchSession(decoder, cost).solve(mh, remaining, deadline=deadline.value)
+        connection.send(("result", result))
     except BaseException as exc:
         details = traceback.format_exc()
         try:

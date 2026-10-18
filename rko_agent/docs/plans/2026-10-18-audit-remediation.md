@@ -66,6 +66,15 @@ the entire audit resolved after delivering only its API or packaging portion.
   extreme finite costs, and actual ILS/LNS/GRASP transitions. All135 tests passed
   (94.74s); larger benchmark quality has not yet been remeasured.
 
+- Callback-boundary deadline sessions now cover RKO initialization and all nested
+  operators without duplicating deadline branches throughout algorithms. Completed
+  evaluations survive stopping; the first evaluation is allowed to finish, so this
+  is cooperative rather than hard real-time. Decoder input is detached. Thread
+  failures include BaseException, preserve causes and signal peer cancellation.
+  The dimension100 returning1ms-callback ILS reproducer now returns a valid result
+  with a0.01s budget through serial/thread/process instead of timing out. All143
+  tests passed (118.75s), including blocked-process cleanup and decoder mutation.
+
 Linux/Windows CI succeeded for class API (`39134476139`), packaging including both
 installed artifact checks (`39134774674`), and scientific state fixes (`39135014525`).
 

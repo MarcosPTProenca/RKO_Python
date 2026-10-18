@@ -34,6 +34,7 @@ from .orchestration.execution import run_metaheuristics_parallel
 from .orchestration.execution import select_best_result
 from .orchestration.factory import build_metaheuristic
 from .orchestration.processes import run_processes
+from .orchestration.search import SearchSession
 from .orchestration.types import CostFn
 from .orchestration.types import DecoderFn
 from .orchestration.types import RunConfig
@@ -243,7 +244,7 @@ class RKO:
                 seed = int(sequence.generate_state(1)[0])
                 random.seed(seed)
                 np.random.seed(seed)
-                results.append(mh.solve(time_limit))
+                results.append(SearchSession(self.decoder, self.cost).solve(mh, time_limit))
             return select_best_result(results, pool)
         finally:
             random.setstate(python_state)

@@ -71,13 +71,20 @@ because its workers share global RNG state. Serial mode restores caller RNG
 state after execution.
 
 Process startup is excluded from the requested search duration. Workers start
-searching together after construction. Startup has a 60-second watchdog; search
-has five seconds of overrun grace for existing local-search loops. A blocked
-callback or excessive overrun raises `TimeoutError` and stops workers. This is
-not a hard real-time API; deadline propagation through local searches remains
-release work. Algorithm failures identify the search and preserve pickleable
-exception causes. The parent cleans up workers and the manager on failure or
-keyboard interruption.
+searching together after construction. A per-search callback session carries the
+same deadline through initialization and every nested operator, stopping between
+decoder/objective calls and preserving the best completed evaluation. A first
+valid evaluation is allowed even if initialization used the budget. User callbacks
+receive ordinary decoded payloads; candidate arrays are isolated from decoder
+mutation. Low-level operator calls made outside RKO do not acquire this budget.
+
+Startup has a 60-second watchdog; process execution has five seconds of grace
+for callbacks that are still running. A blocked process callback or excessive
+overrun raises `TimeoutError` and stops workers. Thread mode propagates worker
+failures and cooperatively cancels peers, but cannot force-kill a blocked Python
+thread. This is not a hard real-time API. Algorithm failures identify the search
+and preserve exception causes. The parent cleans up processes and the manager
+on failure or keyboard interruption.
 
 The managed pool is a correctness-first baseline. IPC and process startup can
 outweigh parallelism on tiny problems; no universal speedup is promised.
@@ -125,9 +132,9 @@ callback exceptions, abrupt exits, blocked callbacks and interruption cleanup.
 
 ## Remaining release work
 
-See `docs/plans/2026-10-17-multicore.md` and the approved design under
-`docs/superpowers/specs/`. In particular: larger real-world instances,
-fixed-work performance measurements, local-search deadlines, C++ behavioral
-parity, unused configuration settings, clean wheel/resource installation and
-release packaging. Do not infer scientific or production readiness from passing
-smoke tests alone.
+See `docs/plans/2026-10-18-audit-remediation.md` for delivered increments and
+remaining work: complete parameter/configuration validation, per-search RNG
+ownership, bounded portfolio scheduling, C++ behavioral/deviation contracts,
+stronger quality/performance evidence, API documentation and owner-approved
+project licensing. Wheel/sdist installation and callback-boundary stopping are
+now tested. Do not infer scientific or production readiness from smoke tests.
