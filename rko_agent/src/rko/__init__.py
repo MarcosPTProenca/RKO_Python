@@ -5,11 +5,12 @@ Objective:
 
 Technical approach:
 - Mark `src/rko` as a regular Python package for tooling compatibility.
-- Re-export the main `run` entrypoint from `rko_main`.
+- Export RKO and RKOResult as the primary class-based API.
+- Preserve run as a compatibility adapter.
 
 Flow (pseudocode):
-1. Import `run` from `rko_main`.
-2. Expose it through `__all__`.
+1. Import the solver, result and compatibility adapter.
+2. Expose stable symbols through __all__.
 
 Important criteria:
 - Keep package API minimal and explicit.
@@ -20,5 +21,7 @@ Inputs/Outputs:
 """
 
 from .rko_main import run
+from .solver import RKO
+from .solver import RKOResult
 
-__all__ = ["run"]
+__all__ = ["RKO", "RKOResult", "run"]

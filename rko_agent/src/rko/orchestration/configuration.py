@@ -96,22 +96,26 @@ def parse_run_config(cfg: dict[str, object]) -> RunConfig:
         )
 
     try:
-        control = int(run_section["control"])
-        pool_size = int(run_section["pool_size"])
+        control = run_section["control"]
+        pool_size = run_section["pool_size"]
         active_raw = active_section["list"]
     except KeyError as exc:
         raise ValueError("Invalid config.toml: required keys are missing.") from exc
 
-    if control not in (0, 1):
+    if type(control) is not int or control not in (0, 1):
         raise ValueError("Invalid config.toml: 'run.control' must be 0 (offline) or 1 (online).")
-    if pool_size <= 0:
+    if type(pool_size) is not int or pool_size <= 0:
         raise ValueError("Invalid config.toml: 'run.pool_size' must be > 0.")
     if not isinstance(active_raw, list) or not active_raw:
         raise ValueError(
             "Invalid config.toml: 'active_metaheuristics.list' must be a non-empty list."
         )
 
-    active = tuple(canonical_mh_name(str(name)) for name in active_raw)
+    if any(not isinstance(name, str) for name in active_raw):
+        raise ValueError("Metaheuristic names must be strings.")
+    active = tuple(canonical_mh_name(name) for name in active_raw)
+    if len(set(active)) != len(active):
+        raise ValueError("Duplicate metaheuristic names are not supported.")
     unknown = sorted(name for name in active if name not in MH_SPECS)
     if unknown:
         raise ValueError(f"Unknown metaheuristic names in config.toml: {', '.join(unknown)}")

@@ -33,12 +33,13 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from rko import rko_main
+from rko import RKO
 from rko.examples.run_kp_cpp_instances import KpInstance
 from rko.examples.run_kp_cpp_instances import decode_knapsack
 from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import make_cost
 from rko.examples.run_kp_cpp_instances import read_kp_instance
+from rko.parameters.loader import default_params_dir
 
 
 def exact_profit(instance: KpInstance) -> int:
@@ -108,7 +109,7 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="rko-large-") as temporary:
         params = Path(temporary)
-        for source in (Path(rko_main.__file__).parent / "parameters").glob("*.toml"):
+        for source in default_params_dir().glob("*.toml"):
             shutil.copy2(source, params / source.name)
         (params / "config.toml").write_text(
             "[run]\ncontrol = 1\npool_size = 10\n"
@@ -128,16 +129,16 @@ def main() -> None:
                     row = dict.fromkeys(fields, "")
                     row.update(backend=backend, seed=seed, budget_seconds=15, optimum=optimum)
                     try:
-                        keys, cost = rko_main.run(
+                        result = RKO(
                             decode_knapsack,
                             make_cost(instance),
                             instance.n_items,
-                            15.0,
                             params_dir=params,
                             backend=backend,
                             n_jobs=4 if backend == "process" else None,
                             random_state=seed if backend == "process" else None,
-                        )
+                        ).solve(15.0)
+                        keys, cost = result.keys, result.cost
                         assert len(keys) == instance.n_items
                         selected = [key > 0.5 for key in keys]
                         profit = sum(

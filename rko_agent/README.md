@@ -4,10 +4,20 @@ Random-key optimization with cooperating metaheuristics, inspired by RKO C++ v2.
 Development lives in `MarcosPTProenca/RKO-Agent`, branch `rko`. This is not yet a
 finished replacement release for the separate `RKO_Python` package.
 
-## Execution modes
+## Class-based solver API
 
-`rko.run(decoder, cost, tam_solution, limit_time, ...)` returns
-`(best_keys, best_cost)`, minimizing `cost(decoder(keys))`.
+`RKO(decoder, cost, n_variables, ...).solve(time_limit)` minimizes
+`cost(decoder(keys))`. The constructor stores configuration without reading files
+or starting workers. Each solve builds a fresh portfolio and returns an immutable
+`RKOResult` with `keys`, `cost`, `elapsed_seconds`, `backend`, `algorithms` and
+`random_state`. `solver.result_` holds the latest successful result and is cleared
+before every attempt, including failed solves.
+
+Select `algorithms`, `control` and `pool_size` directly in Python; omitted values
+use the packaged TOML defaults. `params_dir` remains available for hyperparameter
+files. `rko.run(...)` is only a compatibility adapter retaining the old tuple API.
+
+## Execution modes
 
 - **`backend="process"` (default):** one spawned worker per selected algorithm,
   plus one manager hosting the shared elite pool. `n_jobs=None` permits that
@@ -21,9 +31,9 @@ finished replacement release for the separate `RKO_Python` package.
   algorithm count times `limit_time`. This is not an equal-wall-time benchmark
   against concurrent modes.
 
-Configuration and algorithm parameters are currently in `src/rko/parameters/`.
-To select fewer algorithms, copy that directory and edit
-`[active_metaheuristics].list` in its `config.toml`, then pass `params_dir`.
+Algorithm hyperparameters are currently in packaged `rko/parameters/` TOMLs.
+Use `algorithms=["SA", "GA"]` to select a smaller portfolio without copying files.
+Custom hyperparameter TOMLs can still be supplied through `params_dir`.
 
 ### Spawn-compatible callbacks
 
@@ -34,7 +44,7 @@ rather than an interactive notebook cell, and guard the entry point:
 
 ```python
 import numpy as np
-from rko import run
+from rko import RKO
 
 
 def decode(keys):
@@ -46,8 +56,12 @@ def objective(solution):
 
 
 if __name__ == "__main__":
-    keys, value = run(decode, objective, 10, 5.0, random_state=42)
-    print(keys, value)
+    solver = RKO(
+        decode, objective, n_variables=10,
+        algorithms=["SA", "GA"], n_jobs=2, random_state=42,
+    )
+    result = solver.solve(time_limit=5.0)
+    print(result.keys, result.cost, result.elapsed_seconds)
 ```
 
 `random_state` gives distinct, repeatable seed allocation to Python and NumPy

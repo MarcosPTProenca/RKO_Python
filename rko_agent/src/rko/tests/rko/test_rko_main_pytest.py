@@ -25,18 +25,19 @@ from __future__ import annotations
 
 import pytest
 from rko import rko_main
+from rko import solver
 from rko.orchestration.types import RunConfig
 
 
 def test_run_rejects_invalid_tam_solution() -> None:
     """Ensure `run` rejects non-positive solution size."""
-    with pytest.raises(ValueError, match="tam_solution"):
+    with pytest.raises(ValueError, match="n_variables"):
         rko_main.run(lambda x: x, lambda x: 0.0, tam_solution=0, limit_time=1.0)
 
 
 def test_run_rejects_invalid_limit_time() -> None:
     """Ensure `run` rejects non-positive execution time limits."""
-    with pytest.raises(ValueError, match="limit_time"):
+    with pytest.raises(ValueError, match="time_limit"):
         rko_main.run(lambda x: x, lambda x: 0.0, tam_solution=3, limit_time=0.0)
 
 
@@ -47,7 +48,7 @@ def test_run_rejects_nonfinite_or_nonnumeric_time(limit_time: object) -> None:
     Args:
         limit_time (object): Invalid public time-budget input.
     """
-    with pytest.raises(ValueError, match="limit_time"):
+    with pytest.raises(ValueError, match="time_limit"):
         rko_main.run(lambda keys: keys, lambda keys: 0.0, 3, limit_time)
 
 
@@ -55,14 +56,14 @@ def test_run_executes_orchestration_flow(monkeypatch: pytest.MonkeyPatch) -> Non
     """Ensure orchestration collaborators are called and best result is returned."""
     captured: dict[str, object] = {}
 
-    monkeypatch.setattr(rko_main, "load_config", lambda params_dir: {"ok": True})
+    monkeypatch.setattr(solver, "load_config", lambda params_dir: {"ok": True})
     monkeypatch.setattr(
-        rko_main,
+        solver,
         "parse_run_config",
         lambda cfg: RunConfig(control=0, pool_size=3, active_metaheuristics=("SA", "GA")),
     )
     monkeypatch.setattr(
-        rko_main,
+        solver,
         "build_metaheuristic",
         lambda name, pool, decoder, cost, tam_solution, control, params_dir: f"mh:{name}",
     )
@@ -74,8 +75,8 @@ def test_run_executes_orchestration_flow(monkeypatch: pytest.MonkeyPatch) -> Non
         captured["limit_time"] = limit_time
         return [([], [0.2, 0.3], 12.0)]
 
-    monkeypatch.setattr(rko_main, "run_metaheuristics_parallel", _fake_parallel)
-    monkeypatch.setattr(rko_main, "select_best_result", lambda results, pool: ([0.2, 0.3], 12.0))
+    monkeypatch.setattr(solver, "run_metaheuristics_parallel", _fake_parallel)
+    monkeypatch.setattr(solver, "select_best_result", lambda results, pool: ([0.2, 0.3], 12.0))
 
     best_keys, best_cost = rko_main.run(
         decoder=lambda keys: keys,

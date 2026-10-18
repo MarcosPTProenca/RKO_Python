@@ -12,7 +12,7 @@ Technical approach:
 Flow (pseudocode):
 1. Resolve instance files from CLI path or default C++ folder.
 2. Read each instance and build pickleable decoder/cost callbacks.
-3. Run `rko_main.run` with `tam_solution = n_items`.
+3. Construct RKO with the instance dimension and call solve.
 4. Decode best keys, print summary, and save rows to CSV.
 
 Important criteria:
@@ -32,7 +32,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from rko import rko_main
+from rko import RKO
 from typing import Literal
 
 
@@ -279,25 +279,24 @@ def run_single_instance(
     """
     instance = read_kp_instance(instance_path)
     started = time.perf_counter()
-    best_keys, best_cost = rko_main.run(
+    outcome = RKO(
         decoder=decode_knapsack,
         cost=make_cost(instance),
-        tam_solution=instance.n_items,
-        limit_time=limit_time,
+        n_variables=instance.n_items,
         params_dir=params_dir,
         backend=backend,
         n_jobs=n_jobs,
         random_state=random_state,
-    )
+    ).solve(limit_time)
     elapsed = time.perf_counter() - started
-    best_sol = decode_knapsack(best_keys)
+    best_sol = decode_knapsack(outcome.keys)
     profit, weight, feasible = evaluate_solution(best_sol, instance)
 
     result = KpRunResult(
         instance=instance.name,
         n_items=instance.n_items,
         capacity=instance.capacity,
-        cost=best_cost,
+        cost=outcome.cost,
         profit=profit,
         weight=weight,
         feasible=feasible,
