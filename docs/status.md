@@ -10,8 +10,10 @@ GA parent-fitness ownership, current Q maxima, sign-safe rewards and IPR remaind
 coverage; named/validated parameter grids and atomic saves; callback-boundary
 stopping, decoder isolation and visible thread failures; scalar pool-count RPCs
 and non-busy IPR waiting. A single-instance `rko` command accepts external TOML
-configuration while retaining batch/module invocation. These have regression and
-installed-artifact coverage.
+configuration while retaining batch/module invocation. The CLI now shows live,
+attributed pool updates by default (`--quiet` suppresses them); library progress
+is opt-in through `verbose=True`. These have regression and installed-artifact
+coverage.
 
 ## Outstanding
 

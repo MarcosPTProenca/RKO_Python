@@ -100,10 +100,12 @@ def test_instance_must_be_a_file(
 
 @pytest.mark.parametrize("backend", ["serial", "process"])
 @pytest.mark.parametrize("selection", ["single", "batch"])
+@pytest.mark.parametrize("quiet", [False, True])
 def test_console_runs_external_instance_and_parameters(
     tmp_path: Path,
     backend: str,
     selection: str,
+    quiet: bool,
 ) -> None:
     """Execute the real entry point with user-owned configuration and CSV output.
 
@@ -111,6 +113,7 @@ def test_console_runs_external_instance_and_parameters(
         tmp_path (Path): Temporary instance/configuration/result directory.
         backend (str): Serial or spawned execution mode.
         selection (str): Direct path or legacy directory/glob selection.
+        quiet (bool): Suppress live progress but retain the final CSV summary.
     """
     executable = shutil.which("rko")
     assert executable is not None
@@ -141,6 +144,7 @@ def test_console_runs_external_instance_and_parameters(
         [
             executable,
             *arguments,
+            *(["--quiet"] if quiet else []),
             *(["--n-jobs", "1"] if backend == "process" else []),
             "--params-dir",
             str(parameters),
@@ -170,4 +174,7 @@ def test_console_runs_external_instance_and_parameters(
     assert row["seed"] == "42"
     assert float(row["cost"]) == 100000 * max(0, int(row["weight"]) - 5) - int(row["profit"])
     assert "CSV saved to:" in completed.stdout
+    assert ("NEW BEST" in completed.stdout) == (not quiet)
+    assert ("RKO START" in completed.stdout) == (not quiet)
+    assert ("RKO DONE" in completed.stdout) == (not quiet)
     assert before == {path.name: path.read_bytes() for path in parameters.iterdir()}

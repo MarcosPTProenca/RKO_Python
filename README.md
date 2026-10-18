@@ -40,7 +40,9 @@ before every attempt, including failed solves.
 
 Select `algorithms`, `control` and `pool_size` directly in Python; omitted values
 use the packaged TOML defaults. `params_dir` remains available for hyperparameter
-files. `rko.run(...)` is only a compatibility adapter retaining the old tuple API.
+files. Library calls are quiet by default; `verbose=True` on `RKO` prints lifecycle
+and attributed shared-pool improvements. `rko.run(...)` retains the old tuple API
+and also accepts `verbose=True`.
 
 ## Execution modes
 
@@ -139,6 +141,9 @@ uv run --locked rko src/rko/examples/instances/kp50.txt \
   --limit-time 10 --backend process --random-state 42 \
   --output-csv results/kp50.csv
 ```
+
+The terminal command shows live elapsed time, producing algorithms, new best costs
+and pool contents by default. Add `--quiet` for final results only.
 
 Pass `--params-dir configs/my-run` to select your own `config.toml` and algorithm
 TOMLs. See [running an instance](docs/running.md) for copying/editing configuration,

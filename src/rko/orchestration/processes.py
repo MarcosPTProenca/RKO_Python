@@ -176,6 +176,9 @@ def run_processes(
     params_dir: Path | None,
     n_jobs: int | None,
     random_state: int | None,
+    *,
+    verbose: bool = False,
+    started_at: float | None = None,
 ) -> tuple[list[float], float]:
     """Execute a selected portfolio with a common start and managed pool.
 
@@ -188,6 +191,8 @@ def run_processes(
         params_dir (Path | None): Optional parameter directory.
         n_jobs (int | None): Process budget; None allows one per algorithm.
         random_state (int | None): Seed used to derive independent worker seeds.
+        verbose (bool): Emit pool updates from its single authoritative manager.
+        started_at (float | None): Parent solve's monotonic origin for elapsed log times.
 
     Returns:
         tuple[list[float], float]: Best keys and minimization objective.
@@ -211,7 +216,7 @@ def run_processes(
     context = mp.get_context("spawn")
     seeds = np.random.SeedSequence(random_state).spawn(len(names))
     with PoolManager(ctx=context) as manager:
-        pool = manager.SolutionPool(config.pool_size)
+        pool = manager.SolutionPool(config.pool_size, verbose=verbose, started_at=started_at)
         start = context.Event()
         deadline = context.Value("d", 0.0)
         processes: list[mp.Process] = []

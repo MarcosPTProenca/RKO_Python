@@ -260,6 +260,7 @@ def run_single_instance(
     backend: Literal["process", "thread", "serial"] = "process",
     n_jobs: int | None = None,
     random_state: int | None = None,
+    verbose: bool = False,
 ) -> KpRunResult:
     """Execute one KP instance and print a concise summary line.
 
@@ -270,6 +271,7 @@ def run_single_instance(
       backend (Literal): Process, thread or serial execution mode.
       n_jobs (int | None): Optional process budget.
       random_state (int | None): Optional worker-seed source.
+      verbose (bool): Emit lifecycle and attributed shared-pool updates.
 
     Returns:
       KpRunResult: Normalized result row including end-to-end elapsed time.
@@ -287,6 +289,7 @@ def run_single_instance(
         backend=backend,
         n_jobs=n_jobs,
         random_state=random_state,
+        verbose=verbose,
     ).solve(limit_time)
     elapsed = time.perf_counter() - started
     best_sol = decode_knapsack(outcome.keys)
@@ -412,6 +415,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--backend", choices=("process", "thread", "serial"), default="process")
     parser.add_argument("--n-jobs", type=int, default=None, help="Maximum process worker budget.")
     parser.add_argument("--random-state", type=int, default=None, help="Worker seed source.")
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Hide live algorithm/pool updates; retain the final result and CSV.",
+    )
     args = parser.parse_args()
     if args.instance is not None:
         if args.instances_dir is not None or args.pattern is not None:
@@ -456,6 +464,7 @@ def main() -> None:
                 backend=args.backend,
                 n_jobs=args.n_jobs,
                 random_state=args.random_state,
+                verbose=not args.quiet,
             )
         )
 

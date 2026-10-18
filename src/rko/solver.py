@@ -88,6 +88,7 @@ class RKO:
         backend (str): Process, thread or serial execution.
         n_jobs (int | None): Process budget; portfolio must currently fit.
         random_state (int | None): Nonnegative serial/process seed.
+        verbose (bool): Print lifecycle and attributed shared-pool updates; default False.
         result_ (RKOResult | None): Last successful solve; cleared before each attempt.
     """
 
@@ -104,6 +105,7 @@ class RKO:
         backend: Literal["process", "thread", "serial"] = "process",
         n_jobs: int | None = None,
         random_state: int | None = None,
+        verbose: bool = False,
     ) -> None:
         """Store problem and solver settings without I/O or search execution.
 
@@ -118,6 +120,7 @@ class RKO:
             backend (Literal): Process, legacy thread or serial execution.
             n_jobs (int | None): Process budget; None allows one per algorithm.
             random_state (int | None): Nonnegative seed for serial/process modes.
+            verbose (bool): Flush lifecycle and shared-pool progress to stdout.
         """
         self.decoder = decoder
         self.cost = cost
@@ -129,6 +132,7 @@ class RKO:
         self.backend = backend
         self.n_jobs = n_jobs
         self.random_state = random_state
+        self.verbose = verbose
         self.result_: RKOResult | None = None
 
     def solve(self, time_limit: float) -> RKOResult:
@@ -158,6 +162,8 @@ class RKO:
             or time_limit <= 0
         ):
             raise ValueError("'time_limit' must be positive and finite.")
+        if type(self.verbose) is not bool:
+            raise ValueError("'verbose' must be a boolean.")
         if self.backend not in ("process", "thread", "serial"):
             raise ValueError("'backend' must be 'process', 'thread', or 'serial'.")
         if not callable(self.decoder) or not callable(self.cost):
@@ -185,8 +191,15 @@ class RKO:
             if value is not None:
                 raw["run"][key] = value
         config = parse_run_config(raw)
-        keys, value = self._execute(config, time_limit)
-        self.result_ = RKOResult(
+        if self.verbose:
+            print(
+                f"RKO START backend={self.backend} "
+                f"algorithms=[{', '.join(config.active_metaheuristics)}] "
+                f"search_budget={time_limit:g}s",
+                flush=True,
+            )
+        keys, value = self._execute(config, time_limit, started_at=started)
+        result = RKOResult(
             keys=tuple(float(key) for key in keys),
             cost=float(value),
             elapsed_seconds=time.perf_counter() - started,
@@ -194,14 +207,23 @@ class RKO:
             algorithms=config.active_metaheuristics,
             random_state=self.random_state,
         )
-        return self.result_
+        if self.verbose:
+            print(
+                f"RKO DONE best={result.cost:.8g} elapsed={result.elapsed_seconds:.3f}s",
+                flush=True,
+            )
+        self.result_ = result
+        return result
 
-    def _execute(self, config: RunConfig, time_limit: float) -> tuple[list[float], float]:
+    def _execute(
+        self, config: RunConfig, time_limit: float, *, started_at: float
+    ) -> tuple[list[float], float]:
         """Dispatch a validated portfolio without retaining worker state.
 
         Args:
             config (RunConfig): Validated selection and elite settings.
             time_limit (float): Positive search duration.
+            started_at (float): Solve's monotonic origin, including configuration/startup.
 
         Returns:
             tuple[list[float], float]: Best keys and objective.
@@ -211,7 +233,7 @@ class RKO:
             RuntimeError: If a worker fails.
             TimeoutError: If process execution exceeds its watchdog.
         """
-        pool = SolutionPool(capacity=config.pool_size)
+        pool = SolutionPool(capacity=config.pool_size, verbose=self.verbose, started_at=started_at)
         metaheuristics = [
             build_metaheuristic(
                 name,
@@ -234,6 +256,8 @@ class RKO:
                 self.params_dir,
                 self.n_jobs,
                 self.random_state,
+                verbose=self.verbose,
+                started_at=started_at,
             )
         if self.backend == "thread":
             return select_best_result(run_metaheuristics_parallel(metaheuristics, time_limit), pool)

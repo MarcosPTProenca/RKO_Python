@@ -19,7 +19,8 @@ Flow (pseudocode):
 Important criteria:
 - Pool capacity is fixed at construction time and never exceeded.
 - All public methods are thread-safe.
-- Pool entries are (cost, keys_list) tuples, identical to the format used by SA.
+- Public entries remain (cost, keys_list) pairs; internal entries retain source labels.
+- Optional progress is emitted under the pool lock with immediate stdout flushing.
 
 Inputs/Outputs:
 - Input: capacity at construction; (cost, keys_list) tuples on insert.
@@ -28,6 +29,7 @@ Inputs/Outputs:
 
 import math
 import threading
+import time
 from typing import Protocol
 
 
@@ -93,15 +95,21 @@ class SolutionPool:
 
     Attributes:
       capacity (int): Maximum number of solutions retained in the pool.
-      _pool (list[tuple[float, list[float]]]): Sorted list of (cost, keys) pairs.
-      _lock (threading.Lock): Mutual-exclusion guard for all pool mutations.
+      verbose (bool): Emit accepted updates with elapsed time and attributed costs.
+      _pool (list[tuple[float, list[float], str]]): Sorted cost/key/source entries.
+      _lock (threading.Lock): Mutual-exclusion guard for mutation and progress output.
+      _started_at (float): Monotonic origin shared with the owning solve.
     """
 
-    def __init__(self, capacity: int = 10) -> None:
+    def __init__(
+        self, capacity: int = 10, *, verbose: bool = False, started_at: float | None = None
+    ) -> None:
         """Initialises an empty solution pool.
 
         Args:
-          capacity: Maximum number of solutions to keep. Must be >= 1.
+          capacity (int): Maximum number of solutions to keep. Must be >= 1.
+          verbose (bool): Print accepted pool updates; default is silent.
+          started_at (float | None): Solve's perf_counter origin, or pool creation time.
 
         Returns:
           None: Initialises internal state.
@@ -112,7 +120,9 @@ class SolutionPool:
         if capacity < 1:
             raise ValueError("capacity must be >= 1")
         self.capacity: int = capacity
-        self._pool: list[tuple[float, list[float]]] = []
+        self.verbose = verbose
+        self._started_at = time.perf_counter() if started_at is None else started_at
+        self._pool: list[tuple[float, list[float], str]] = []
         self._lock: threading.Lock = threading.Lock()
 
     def insert(self, entry: tuple[float, list[float]], source: str = "") -> None:
@@ -125,7 +135,7 @@ class SolutionPool:
         Args:
           entry: A ``(cost, keys_list)`` pair describing the candidate.
           source: Human-readable label of the metaheuristic that produced the
-            solution (used for traceability only; not stored in the pool).
+            solution, retained internally for attributed progress output.
 
         Returns:
           None: Mutates the pool in-place when the candidate is accepted.
@@ -139,10 +149,23 @@ class SolutionPool:
             raise ValueError("Pool entries require a finite cost and a nonempty finite key vector.")
         with self._lock:
             if len(self._pool) < self.capacity or cost < self._pool[-1][0]:
-                self._pool.append((cost, list(keys)))
+                improved = not self._pool or cost < self._pool[0][0]
+                self._pool.append((cost, list(keys), source))
                 self._pool.sort(key=lambda t: t[0])
                 if len(self._pool) > self.capacity:
                     self._pool.pop()
+                if self.verbose:
+                    status = "NEW BEST" if improved else "POOL UPDATE"
+                    costs = ", ".join(
+                        f"{value:.8g} ({owner or 'unknown'})" for value, _, owner in self._pool
+                    )
+                    print(
+                        f"[{time.perf_counter() - self._started_at:8.3f}s] {status} "
+                        f"algorithm={source or 'unknown'} cost={cost:.8g} "
+                        f"best={self._pool[0][0]:.8g} "
+                        f"pool={len(self._pool)}/{self.capacity} [{costs}]",
+                        flush=True,
+                    )
 
     def get_elite(self, k: int = 1) -> list[tuple[float, list[float]]]:
         """Returns up to *k* elite solutions sorted by cost (ascending).
@@ -160,7 +183,7 @@ class SolutionPool:
         """
         with self._lock:
             limit = min(k, len(self._pool))
-            return [(cost, keys.copy()) for cost, keys in self._pool[:limit]]
+            return [(cost, keys.copy()) for cost, keys, _ in self._pool[:limit]]
 
     def __len__(self) -> int:
         """Read current occupancy without copying key vectors.
@@ -191,7 +214,7 @@ class SolutionPool:
         with self._lock:
             if not self._pool:
                 return None
-            cost, keys = self._pool[0]
+            cost, keys, _ = self._pool[0]
             return cost, keys.copy()
 
     def __repr__(self) -> str:

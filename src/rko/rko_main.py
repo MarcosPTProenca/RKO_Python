@@ -38,6 +38,7 @@ def run(
     backend: Literal["process", "thread", "serial"] = "process",
     n_jobs: int | None = None,
     random_state: int | None = None,
+    verbose: bool = False,
 ) -> tuple[list[float], float]:
     """Delegate a legacy call to RKO and retain its tuple result contract.
 
@@ -50,6 +51,7 @@ def run(
         backend (Literal): Process, legacy thread or serial execution.
         n_jobs (int | None): Optional process budget.
         random_state (int | None): Nonnegative serial/process seed.
+        verbose (bool): Flush lifecycle and pool updates; quiet by default.
 
     Returns:
         tuple[list[float], float]: Best keys and objective value.
@@ -68,5 +70,6 @@ def run(
         backend=backend,
         n_jobs=n_jobs,
         random_state=random_state,
+        verbose=verbose,
     ).solve(limit_time)
     return list(result.keys), result.cost

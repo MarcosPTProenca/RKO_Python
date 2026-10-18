@@ -23,6 +23,41 @@ Defaults currently select ten algorithms/workers, which may oversubscribe a
 small machine. Use an explicit smaller portfolio as below rather than assuming
 `--n-jobs 4` schedules the default ten.
 
+## Live progress
+
+The same short command now shows progress automatically:
+
+```bash
+uv run rko src/rko/examples/instances/kp50.txt
+```
+
+It prints the backend/portfolio at startup, then accepted pool updates immediately.
+For example (values and timing vary):
+
+```text
+[   2.103s] NEW BEST algorithm=SA cost=-140 best=-140 pool=1/10 [-140 (SA)]
+[   2.260s] NEW BEST algorithm=GA cost=-145 best=-145 pool=2/10 [-145 (GA), -140 (SA)]
+```
+
+`NEW BEST` marks a new shared-pool minimum. `POOL UPDATE` means the candidate
+entered the elite pool without improving its minimum. Each line identifies the
+producing algorithm, candidate cost, best pool cost, occupancy/capacity and sorted
+elite costs with their sources. Elapsed time starts at the beginning of `solve`,
+including configuration and worker startup. Chromosomes are not dumped.
+
+Updates are event-driven, not an iteration counter or heartbeat: rejected
+candidates, unshared local evaluations and periods without accepted updates are
+not printed. A successful run ends with `RKO DONE` and its final best objective;
+a best evaluation recovered at a budget boundary may not yet have entered the
+shared pool. A failed run propagates its error rather than announcing completion.
+
+Use `--quiet` for the previous final-result-only display. Library calls remain
+silent by default; request the same progress with `RKO(..., verbose=True)` or
+legacy `run(..., verbose=True)`. Process output comes from the authoritative
+pool manager; thread output is protected by the pool lock. Lines are flushed
+immediately, including when stdout is redirected. Synchronous output can affect
+timed search performance; keep library benchmarks quiet.
+
 ## Your configuration directory
 
 `--params-dir` selects a directory, not a single file. It must contain
