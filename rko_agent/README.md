@@ -34,6 +34,16 @@ files. `rko.run(...)` is only a compatibility adapter retaining the old tuple AP
 Algorithm hyperparameters are currently in packaged `rko/parameters/` TOMLs.
 Use `algorithms=["SA", "GA"]` to select a smaller portfolio without copying files.
 Custom hyperparameter TOMLs can still be supplied through `params_dir`.
+Constructors and configured runs validate scalar domains, population sizes and
+joint constraints before execution. Online grids retain named axes and exclude
+infeasible joint combinations (such as reversed perturbation bounds); an entirely
+infeasible grid is rejected. No scalar value is silently truncated.
+
+Only `control` and `pool_size` are supported under `[run]`. Remove the formerly
+ignored `strategy`, `max_runs` and `debug` fields from custom configurations;
+unsupported keys now raise an error. Portfolio local search currently uses
+best-improvement defaults. Repeat `solve` for independent trials and use standard
+Python logging for diagnostics.
 
 ### Spawn-compatible callbacks
 

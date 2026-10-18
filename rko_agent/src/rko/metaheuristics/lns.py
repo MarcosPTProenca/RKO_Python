@@ -47,6 +47,7 @@ import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.farey_ls import FAREY_INTERVALS
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -122,12 +123,17 @@ class LNS(MetaheuristicBase):
         self.t0 = t0
         self.alpha_lns = alpha_lns
         self.control = control
-        self.parameters: list[list[float]] = parameters or [
-            [0.10, 0.20, 0.30],
-            [0.20, 0.30, 0.40],
-            [100.0, 500.0, 1000.0],
-            [0.90, 0.95, 0.99],
-        ]
+        self.parameters: list[list[float]] = (
+            parameters
+            if parameters is not None
+            else [
+                [0.10, 0.20, 0.30],
+                [0.20, 0.30, 0.40],
+                [100.0, 500.0, 1000.0],
+                [0.90, 0.95, 0.99],
+            ]
+        )
+        self._state_filter = ParameterValidator.check(self, "LNS")
 
     def _destroy(
         self,
@@ -213,6 +219,7 @@ class LNS(MetaheuristicBase):
                 epsilon_min=0.1,
                 restart_epsilon=1,
                 max_time=limit_time,
+                state_filter=self._state_filter,
             )
             st = random.randint(0, max(0, len(ql.states) - 1))
 

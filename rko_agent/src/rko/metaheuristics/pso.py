@@ -36,6 +36,7 @@ import numpy as np
 import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -107,12 +108,17 @@ class PSO(MetaheuristicBase):
         self.c2 = c2
         self.w = w
         self.control = control
-        self.parameters: list[list[float]] = parameters or [
-            [20.0, 30.0, 50.0],
-            [1.5, 2.0, 2.5],
-            [1.5, 2.0, 2.5],
-            [0.4, 0.7, 0.9],
-        ]
+        self.parameters: list[list[float]] = (
+            parameters
+            if parameters is not None
+            else [
+                [20.0, 30.0, 50.0],
+                [1.5, 2.0, 2.5],
+                [1.5, 2.0, 2.5],
+                [0.4, 0.7, 0.9],
+            ]
+        )
+        self._state_filter = ParameterValidator.check(self, "PSO")
 
     @override
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:
@@ -147,6 +153,7 @@ class PSO(MetaheuristicBase):
                 epsilon_min=0.1,
                 restart_epsilon=1,
                 max_time=limit_time,
+                state_filter=self._state_filter,
             )
             st = random.randint(0, max(0, len(ql.states) - 1))
             if ql.states:

@@ -28,6 +28,7 @@ import numpy as np
 import random
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
 from ..components.shaking.random import shake
+from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import override
@@ -113,6 +114,7 @@ class SA(MetaheuristicBase):
         self.alpha = alpha
         self.beta_min = beta_min
         self.beta_max = beta_max
+        self._state_filter = ParameterValidator.check(self, "SA")
 
     @override
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:

@@ -41,6 +41,7 @@ from __future__ import annotations
 import math
 import numpy as np
 import random
+from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -89,6 +90,7 @@ class IPR(MetaheuristicBase):
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
+        self._state_filter = ParameterValidator.check(self, "IPR")
 
     def _relink(
         self,

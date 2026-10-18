@@ -27,6 +27,7 @@ Inputs/Outputs:
 from __future__ import annotations
 
 import numpy as np
+from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -74,6 +75,7 @@ class MultiStart(MetaheuristicBase):
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
+        self._state_filter = ParameterValidator.check(self, "MultiStart")
 
     @override
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:

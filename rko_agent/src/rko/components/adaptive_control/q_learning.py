@@ -23,6 +23,7 @@ Inputs/Outputs:
 
 import math
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field
 
@@ -85,6 +86,7 @@ class QLearningController:
         epsilon_min: float = 0.1,
         restart_epsilon: int = 1,
         max_time: float = 1.0,
+        state_filter: Callable[[list[float]], bool] | None = None,
     ) -> None:
         """Initializes the Q-learning controller.
 
@@ -94,10 +96,13 @@ class QLearningController:
           epsilon_min: Minimum exploration value.
           restart_epsilon: Restart counter for exploration.
           max_time: Maximum execution time for dynamic normalization.
+          state_filter: Optional predicate excluding infeasible joint states.
         """
         self.parameters = parameters
         if parameters and all(len(values) > 0 for values in parameters):
-            self.states: list[QState] = self._create_states(parameters)
+            self.states: list[QState] = self._create_states(parameters, state_filter)
+            if not self.states:
+                raise ValueError("Online parameters contain no feasible states.")
         else:
             self.states = []
         self.epsilon_max = epsilon_max
@@ -107,11 +112,15 @@ class QLearningController:
         self.ti = max(1, int(max_time * 0.1))
 
     @staticmethod
-    def _create_states(parameters: list[list[float]]) -> list[QState]:
+    def _create_states(
+        parameters: list[list[float]],
+        state_filter: Callable[[list[float]], bool] | None = None,
+    ) -> list[QState]:
         """Creates discrete states and feasible actions for the Q-structure.
 
         Args:
           parameters (list[list[float]]): Discrete values per parameter.
+          state_filter (Callable | None): Optional joint-state feasibility predicate.
 
         Returns:
           list[QState]: List of initialized states with actions and Q-values.
@@ -138,6 +147,12 @@ class QLearningController:
                 column_index = i // (num_states // n_c)
                 column_index = column_index % len(parameters[j])
                 states[i].par[j] = parameters[j][column_index]
+
+        if state_filter is not None:
+            states = [state for state in states if state_filter(state.par)]
+            for label, state in enumerate(states):
+                state.label = label
+            num_states = len(states)
 
         for i in range(num_states):
             for j in range(num_states):

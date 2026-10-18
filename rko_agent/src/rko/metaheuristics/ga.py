@@ -35,6 +35,7 @@ import numpy as np
 import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -103,11 +104,16 @@ class GeneticAlgorithm(MetaheuristicBase):
         self.prob_cros = prob_cros
         self.prob_mut = prob_mut
         self.control = control
-        self.parameters: list[list[float]] = parameters or [
-            [30.0, 50.0, 100.0],
-            [0.60, 0.80, 0.90],
-            [0.01, 0.02, 0.05],
-        ]
+        self.parameters: list[list[float]] = (
+            parameters
+            if parameters is not None
+            else [
+                [30.0, 50.0, 100.0],
+                [0.60, 0.80, 0.90],
+                [0.01, 0.02, 0.05],
+            ]
+        )
+        self._state_filter = ParameterValidator.check(self, "GA")
 
     @override
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:
@@ -141,6 +147,7 @@ class GeneticAlgorithm(MetaheuristicBase):
                 epsilon_min=0.1,
                 restart_epsilon=1,
                 max_time=limit_time,
+                state_filter=self._state_filter,
             )
             st = random.randint(0, max(0, len(ql.states) - 1))
             if ql.states:

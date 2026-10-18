@@ -44,6 +44,7 @@ import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
 from ..components.local_search.rvnd import rvnd
+from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -217,12 +218,17 @@ class BRKGA_CS(MetaheuristicBase):
         self.rhoe = rhoe
         self.sigma = sigma
         self.control = control
-        self.parameters: list[list[float]] = parameters or [
-            [30.0, 50.0, 100.0],
-            [0.10, 0.15, 0.20],
-            [0.05, 0.10, 0.15],
-            [0.60, 0.70, 0.80],
-        ]
+        self.parameters: list[list[float]] = (
+            parameters
+            if parameters is not None
+            else [
+                [30.0, 50.0, 100.0],
+                [0.10, 0.15, 0.20],
+                [0.05, 0.10, 0.15],
+                [0.60, 0.70, 0.80],
+            ]
+        )
+        self._state_filter = ParameterValidator.check(self, "BRKGA_CS")
 
     def _pux_cs(
         self,
@@ -288,6 +294,7 @@ class BRKGA_CS(MetaheuristicBase):
                 epsilon_min=0.1,
                 restart_epsilon=1,
                 max_time=limit_time,
+                state_filter=self._state_filter,
             )
             st = random.randint(0, max(0, len(ql.states) - 1))
             if ql.states:

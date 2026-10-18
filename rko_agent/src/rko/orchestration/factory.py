@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from ..components.solution_pool import ElitePool
 from ..metaheuristics.base import MetaheuristicBase
 from ..parameters.loader import load_offline
@@ -15,17 +16,48 @@ from typing import Any
 
 
 def _as_int(params: dict[str, Any], key: str, mh_name: str) -> int:
-    try:
-        return int(params[key])
-    except KeyError as exc:
-        raise ValueError(f"Missing offline parameter '{key}' for '{mh_name}'.") from exc
+    """Read an integral numeric parameter without truncating fractional values.
+
+    Args:
+        params (dict[str, Any]): Parsed offline table.
+        key (str): Required parameter name.
+        mh_name (str): Algorithm identifier for diagnostics.
+
+    Returns:
+        int: Exact integral numeric value.
+
+    Raises:
+        ValueError: If the value is missing, nonfinite, fractional or nonnumeric.
+    """
+    if key in params and type(params[key]) is int:
+        return params[key]
+    value = _as_float(params, key, mh_name)
+    if not value.is_integer():
+        raise ValueError(f"{mh_name}: '{key}' must be integral; fractional values are invalid.")
+    return int(value)
 
 
 def _as_float(params: dict[str, Any], key: str, mh_name: str) -> float:
+    """Read a finite TOML number without coercing strings or booleans.
+
+    Args:
+        params (dict[str, Any]): Parsed offline table.
+        key (str): Required parameter name.
+        mh_name (str): Algorithm identifier for diagnostics.
+
+    Returns:
+        float: Finite numeric parameter.
+
+    Raises:
+        ValueError: If the value is missing, nonfinite or nonnumeric.
+    """
     try:
-        return float(params[key])
+        value = params[key]
     except KeyError as exc:
         raise ValueError(f"Missing offline parameter '{key}' for '{mh_name}'.") from exc
+    if type(value) not in (int, float) or not math.isfinite(value):
+        raise ValueError(f"{mh_name}: '{key}' must be a finite number, not a string or boolean.")
+    return float(value)
 
 
 def build_metaheuristic(

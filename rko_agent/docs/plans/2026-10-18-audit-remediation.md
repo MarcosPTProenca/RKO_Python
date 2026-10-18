@@ -75,6 +75,21 @@ the entire audit resolved after delivering only its API or packaging portion.
   with a0.01s budget through serial/thread/process instead of timing out. All143
   tests passed (118.75s), including blocked-process cleanup and decoder mutation.
 
+- Semantic validation now applies to all11 direct constructors and configured
+  execution before process startup: dimensions, callbacks, control, integer/range
+  domains, cooling, populations and coupled bounds. Explicit empty online grids
+  no longer silently become defaults. Valid grid values are preserved, but
+  infeasible joint combinations are excluded from Q states with labels/actions
+  rebuilt; no-feasible-state grids fail. This is necessary because the shipped
+  ILS/LNS axes overlap and their raw Cartesian product includes reversed bounds.
+  This deliberately differs from constructing every reference-grid combination.
+- Formerly ignored strategy/max_runs/debug settings are removed from defaults
+  and explicitly rejected in custom configurations, along with unknown run keys.
+  Local search keeps best-improvement defaults; repeated trials use solve calls
+  and diagnostics use standard logging. Factory casts no longer accept booleans,
+  strings or fractional integers. All179 tests passed (127.94s), including real
+  online execution of all8 adaptive algorithms and parent-side rejection checks.
+
 Linux/Windows CI succeeded for class API (`39134476139`), packaging including both
 installed artifact checks (`39134774674`), and scientific state fixes (`39135014525`).
 

@@ -173,6 +173,8 @@ class RKO:
                 "Thread workers share RNG state; use process or serial with random_state."
             )
         raw = load_config(self.params_dir)
+        if not isinstance(raw.get("run"), dict):
+            raise ValueError("Configuration section 'run' must be a table.")
         if self.algorithms is not None:
             if isinstance(self.algorithms, (str, bytes)) or not isinstance(
                 self.algorithms, Sequence
@@ -209,17 +211,6 @@ class RKO:
             RuntimeError: If a worker fails.
             TimeoutError: If process execution exceeds its watchdog.
         """
-        if self.backend == "process":
-            return run_processes(
-                config,
-                self.decoder,
-                self.cost,
-                self.n_variables,
-                time_limit,
-                self.params_dir,
-                self.n_jobs,
-                self.random_state,
-            )
         pool = SolutionPool(capacity=config.pool_size)
         metaheuristics = [
             build_metaheuristic(
@@ -233,6 +224,17 @@ class RKO:
             )
             for name in config.active_metaheuristics
         ]
+        if self.backend == "process":
+            return run_processes(
+                config,
+                self.decoder,
+                self.cost,
+                self.n_variables,
+                time_limit,
+                self.params_dir,
+                self.n_jobs,
+                self.random_state,
+            )
         if self.backend == "thread":
             return select_best_result(run_metaheuristics_parallel(metaheuristics, time_limit), pool)
         python_state = random.getstate()

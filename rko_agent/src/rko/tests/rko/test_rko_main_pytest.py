@@ -56,7 +56,7 @@ def test_run_executes_orchestration_flow(monkeypatch: pytest.MonkeyPatch) -> Non
     """Ensure orchestration collaborators are called and best result is returned."""
     captured: dict[str, object] = {}
 
-    monkeypatch.setattr(solver, "load_config", lambda params_dir: {"ok": True})
+    monkeypatch.setattr(solver, "load_config", lambda params_dir: {"run": {}})
     monkeypatch.setattr(
         solver,
         "parse_run_config",

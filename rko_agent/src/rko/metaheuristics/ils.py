@@ -37,6 +37,7 @@ import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.rvnd import rvnd
 from ..components.shaking.random import shake
+from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -101,10 +102,15 @@ class ILS(MetaheuristicBase):
         self.beta_min = beta_min
         self.beta_max = beta_max
         self.control = control
-        self.parameters: list[list[float]] = parameters or [
-            [0.05, 0.10, 0.20, 0.30],
-            [0.10, 0.20, 0.30, 0.40],
-        ]
+        self.parameters: list[list[float]] = (
+            parameters
+            if parameters is not None
+            else [
+                [0.05, 0.10, 0.20, 0.30],
+                [0.10, 0.20, 0.30, 0.40],
+            ]
+        )
+        self._state_filter = ParameterValidator.check(self, "ILS")
 
     @override
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:
@@ -137,6 +143,7 @@ class ILS(MetaheuristicBase):
                 epsilon_min=0.1,
                 restart_epsilon=1,
                 max_time=limit_time,
+                state_filter=self._state_filter,
             )
             st = random.randint(0, max(0, len(ql.states) - 1))
             beta_min = ql.states[st].par[0] if ql.states else beta_min

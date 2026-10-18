@@ -95,6 +95,10 @@ def parse_run_config(cfg: dict[str, object]) -> RunConfig:
             "Invalid config.toml: sections 'run' and 'active_metaheuristics' must be tables."
         )
 
+    unsupported = set(run_section) - {"control", "pool_size"}
+    if unsupported:
+        raise ValueError(f"Unsupported run settings: {', '.join(sorted(unsupported))}")
+
     try:
         control = run_section["control"]
         pool_size = run_section["pool_size"]
