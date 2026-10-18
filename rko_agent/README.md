@@ -31,6 +31,11 @@ files. `rko.run(...)` is only a compatibility adapter retaining the old tuple AP
   algorithm count times `limit_time`. This is not an equal-wall-time benchmark
   against concurrent modes.
 
+IPR consumes elite pairs from other searches. Running it alone returns an initial
+candidate without meaningful relinking; select another search alongside it and
+use a pool capacity of at least two. Waiting uses bounded backoff, and process
+occupancy queries transfer only a count rather than the entire pool.
+
 Algorithm hyperparameters are currently in packaged `rko/parameters/` TOMLs.
 Use `algorithms=["SA", "GA"]` to select a smaller portfolio without copying files.
 Custom hyperparameter TOMLs can still be supplied through `params_dir`.
@@ -127,6 +132,9 @@ A [1,000-item public-instance experiment](docs/benchmarks/2026-10-17-large-knaps
 confirms multi-core CPU use, but also exposes poor optimization quality: best
 RKO gap 17.56%, versus 0.00474% for a simple greedy baseline. Do not interpret
 working process execution as evidence of a competitive Knapsack solver.
+A [post-audit-core repetition](docs/benchmarks/2026-10-18-audit-core-knapsack.md)
+completed all six trials but retained poor quality (best process gap 18.46%).
+Correctness fixes have not established improved optimization performance.
 
 ## Quality checks
 
@@ -142,7 +150,8 @@ callback exceptions, abrupt exits, blocked callbacks and interruption cleanup.
 
 ## Remaining release work
 
-See `docs/plans/2026-10-18-audit-remediation.md` for delivered increments and
+See the [finding-by-finding status](docs/audits/2026-10-18-remediation-status.md)
+and `docs/plans/2026-10-18-audit-remediation.md` for delivered increments and
 remaining work: complete parameter/configuration validation, per-search RNG
 ownership, bounded portfolio scheduling, C++ behavioral/deviation contracts,
 stronger quality/performance evidence, API documentation and owner-approved
