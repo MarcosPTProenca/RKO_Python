@@ -1,3 +1,0 @@
-# Plots
-
-::: rko.Plots

@@ -1,0 +1,74 @@
+{
+  "ga_tournament_fitness": {
+    "actual": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "stored": [
+      0.1,
+      0.2,
+      0.3
+    ]
+  },
+  "q_stale_argmax": {
+    "q": [
+      -1.0,
+      0.5
+    ],
+    "cached_max": 1.0,
+    "chosen": 0,
+    "actual_best": 1
+  },
+  "negative_objective_reward": {
+    "incumbent": -100,
+    "worse_candidate": -50,
+    "reward": 1.0
+  },
+  "ignored_settings": "RunConfig(control=0, pool_size=2, active_metaheuristics=('SA',))",
+  "truncated_settings": "RunConfig(control=0, pool_size=2, active_metaheuristics=('SA',))",
+  "ipr_tail": {
+    "last_key": 0.0,
+    "cost": -0.0,
+    "guide_cost": -0.9
+  },
+  "reordered_online_keys": {
+    "grid": [
+      [
+        0.02
+      ],
+      [
+        0.8
+      ],
+      [
+        30.0
+      ]
+    ],
+    "error": "min() iterable argument is empty"
+  },
+  "toml_string_corruption": "TOMLDecodeError: Invalid value (at line 2, column 9)",
+  "local_search_deadline": {
+    "requested": 0.01,
+    "elapsed": 7.2362095120042795,
+    "error": "RKO search timed out; unfinished: ['ILS']"
+  },
+  "installed_wheel": {
+    "commit": "c9765ddb5168a11a22fea4b02704bbfbbf1df98f",
+    "wheel": "rko_agent-0.1.0-py3-none-any.whl",
+    "toml_files": 0,
+    "instance_files": 0,
+    "test_files": 9,
+    "run_error": "FileNotFoundError: rko/parameters/config.toml missing from installed wheel"
+  },
+  "thread_base_exception": {
+    "callback": "raises SystemExit",
+    "result_keys": [],
+    "result_cost": "inf",
+    "raised_to_caller": false
+  },
+  "invalid_ga_population": {
+    "size_pop": 2,
+    "constructor": "accepted",
+    "solve_error": "ValueError: Sample larger than population or is negative"
+  }
+}

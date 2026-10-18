@@ -1,155 +1,185 @@
-# RKO - Random-Key Optimizer (Python Parallel Framework)
+# RKO Python
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Python: 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
+Random-key optimization with cooperating metaheuristics, inspired by RKO C++ v2.
+Development lives in [MarcosPTProenca/RKO_Python](https://github.com/MarcosPTProenca/RKO_Python),
+branch `main`. This is a standalone library: no agent repository, parent checkout
+or C++ installation is required. Packaging, source, documentation and CI live
+at the repository root.
 
-The **Random-Key Optimizer (RKO)** is a high-performance, parallel metaheuristic framework designed for combinatorial optimization problems. By mapping discrete, high-dimensional search spaces onto a continuous unit hypercube $[0, 1)^n$, RKO detaches optimization algorithms from problem-specific logic.
+## Development setup
 
-RKO orchestrates up to **9 parallel metaheuristic workers** using Python's native multiprocessing. Workers cooperate in real time by feeding and pulling elite solutions from a thread-safe, shared **Solution Pool**, accelerating convergence and improving optimization robustness.
-
----
-
-## 💎 Core Features
-
-- **9 Concurrent Metaheuristics:** Run **BRKGA, Multi-Start, SA, VNS, ILS, LNS, PSO, GA, and GRASP** concurrently.
-- **Online hyperparameters tuning via Q-learning**
-- **Collaborative Search:** Thread-safe `SolutionPool` sharing elite solutions to pull workers out of local minima.
-- **Automatic Result Structuring:** Automatically groups execution runs, creating a dedicated timestamped folder (`results_{instance}_{timestamp}/`) containing:
-  - `results.txt`: Scientific summary containing aggregated averages, standard deviations, lists of costs, and computational times for academic reporting.
-  - `logs.txt`: Chronological trace of improvements (`NEW BEST`), optimized and clean for parser engines.
-  - `run_x.png`: Convergence trajectory plot generated automatically for each trial.
-
----
-
-## 📦 Installation
+Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/):
 
 ```bash
-pip install rko
+git clone https://github.com/MarcosPTProenca/RKO_Python.git
+cd RKO_Python
+uv sync --locked --group dev
+uv run --locked pre-commit run --all-files
 ```
 
----
+For automatic commit checks, run `uv run pre-commit install` if Git uses its
+standard hooks directory. If `core.hooksPath` is centrally managed, integrate
+pre-commit with those existing hooks instead; no global Git settings are changed
+by this migration.
 
-## ⚙️ Solver Configuration
+The distribution retains the name `rko`; version `0.3.0.dev0` identifies this
+unreleased class-based development line, not a PyPI publication. It replaces
+the previous implementation on `main`, whose complete code/history is retained
+at `archive/pre-standalone-migration-2026-10-18`. The new API and Python 3.14
+requirement are breaking changes from that older implementation. See the
+[migration record](docs/migrations/2026-10-18-standalone-repository.md) for
+history, attribution, rollback and licensing boundaries.
 
-### RKO Class Initializer
+## Class-based solver API
+
+`RKO(decoder, cost, n_variables, ...).solve(time_limit)` minimizes
+`cost(decoder(keys))`. The constructor stores configuration without reading files
+or starting workers. Each solve builds a fresh portfolio and returns an immutable
+`RKOResult` with `keys`, `cost`, `elapsed_seconds`, `backend`, `algorithms` and
+`random_state`. `solver.result_` holds the latest successful result and is cleared
+before every attempt, including failed solves.
+
+Select `algorithms`, `control` and `pool_size` directly in Python; omitted values
+use the packaged TOML defaults. `params_dir` remains available for hyperparameter
+files. `rko.run(...)` is only a compatibility adapter retaining the old tuple API.
+
+## Execution modes
+
+- **`backend="process"` (default):** one spawned worker per selected algorithm,
+  plus one manager hosting the shared elite pool. `n_jobs=None` permits that
+  many workers, even if the selection exceeds available CPU cores. Specify a
+  budget explicitly to prevent accidental oversubscription. A portfolio larger
+  than `n_jobs` is rejected, not queued or silently truncated.
+- **`backend="thread"`:** legacy shared-memory execution; arbitrary local
+  callbacks work, but CPU-bound Python code is subject to the standard GIL.
+- **`backend="serial"`:** debugging/reference execution with shared elites.
+  Each algorithm gets its own time budget, so total search time can approach
+  algorithm count times `limit_time`. This is not an equal-wall-time benchmark
+  against concurrent modes.
+
+IPR consumes elite pairs from other searches. Running it alone returns an initial
+candidate without meaningful relinking; select another search alongside it and
+use a pool capacity of at least two. Waiting uses bounded backoff, and process
+occupancy queries transfer only a count rather than the entire pool.
+
+Algorithm hyperparameters are currently in packaged `rko/parameters/` TOMLs.
+Use `algorithms=["SA", "GA"]` to select a smaller portfolio without copying files.
+Custom hyperparameter TOMLs can still be supplied through `params_dir`.
+Constructors and configured runs validate scalar domains, population sizes and
+joint constraints before execution. Online grids retain named axes and exclude
+infeasible joint combinations (such as reversed perturbation bounds); an entirely
+infeasible grid is rejected. No scalar value is silently truncated.
+
+Only `control` and `pool_size` are supported under `[run]`. Remove the formerly
+ignored `strategy`, `max_runs` and `debug` fields from custom configurations;
+unsupported keys now raise an error. Portfolio local search currently uses
+best-improvement defaults. Repeat `solve` for independent trials and use standard
+Python logging for diagnostics.
+
+### Spawn-compatible callbacks
+
+Use module-level functions, `functools.partial`, or callable instances carrying
+serializable state. Lambdas and nested functions are rejected in process mode.
+The defining module must be importable in a fresh interpreter. Run from a script
+rather than an interactive notebook cell, and guard the entry point:
 
 ```python
+import numpy as np
 from rko import RKO
 
-rko_solver = RKO(
-    env=my_environment,
-    best_possible=None,     # early-stop threshold
-    logger="dual",          # logger strategy or custom LogStrategy instance
-    log_filepath="./results/results.txt" # Base directory for structured outputs
-)
+
+def decode(keys):
+    return keys
+
+
+def objective(solution):
+    return float(np.sum(solution**2))
+
+
+if __name__ == "__main__":
+    solver = RKO(
+        decode, objective, n_variables=10,
+        algorithms=["SA", "GA"], n_jobs=2, random_state=42,
+    )
+    result = solver.solve(time_limit=5.0)
+    print(result.keys, result.cost, result.elapsed_seconds)
 ```
 
-### Solve Method Parameters
+`random_state` gives distinct, repeatable seed allocation to Python and NumPy
+worker RNGs. Timed searches still depend on scheduling and elite exchange;
+identical seeds do not guarantee identical results. Thread mode rejects a seed
+because its workers share global RNG state. Serial mode restores caller RNG
+state after execution.
 
-```python
-final_cost, final_solution, time_to_best = rko_solver.solve(
-    time_total=30,      # Total time limit in seconds
-    brkga=1,            # Number of parallel BRKGA instances
-    ms=1,               # Number of parallel Multi-Start instances
-    sa=1,               # Number of parallel SA instances
-    vns=1,              # Number of parallel VNS instances
-    ils=1,              # Number of parallel ILS instances
-    lns=1,              # Number of parallel LNS instances
-    pso=1,              # Number of parallel PSO instances
-    ga=1,               # Number of parallel GA instances
-    grasp=1,            # Number of parallel GRASP instances
-    restart=1.0,        # Fraction of total time for each restart cycle
-    runs=10,            # Number of independent trials
-    plot=True           # Enable automatic convergence plotting (generates .png charts)
-)
+Process startup is excluded from the requested search duration. Workers start
+searching together after construction. A per-search callback session carries the
+same deadline through initialization and every nested operator, stopping between
+decoder/objective calls and preserving the best completed evaluation. A first
+valid evaluation is allowed even if initialization used the budget. User callbacks
+receive ordinary decoded payloads; candidate arrays are isolated from decoder
+mutation. Low-level operator calls made outside RKO do not acquire this budget.
+
+Startup has a 60-second watchdog; process execution has five seconds of grace
+for callbacks that are still running. A blocked process callback or excessive
+overrun raises `TimeoutError` and stops workers. Thread mode propagates worker
+failures and cooperatively cancels peers, but cannot force-kill a blocked Python
+thread. This is not a hard real-time API. Algorithm failures identify the search
+and preserve exception causes. The parent cleans up processes and the manager
+on failure or keyboard interruption.
+
+The managed pool is a correctness-first baseline. IPC and process startup can
+outweigh parallelism on tiny problems; no universal speedup is promised.
+
+## Run the Knapsack reference benchmark
+
+Requires Python 3.14+ and uv. From this directory, on Linux/WSL:
+
+```bash
+uv sync --locked
+PYTHONPATH=src uv run --locked python -m rko.examples.run_kp_cpp_instances \
+  --backend process --limit-time 2 --random-state 42 \
+  --output-csv /tmp/rko-knapsack.csv
 ```
 
----
+In PowerShell, set `$env:PYTHONPATH = "src"` before the same `uv run` command and
+choose a Windows output path. The two default reference instances are bundled
+in `src/rko/examples/instances/`, with upstream revision and MIT license. No
+separate C++ checkout is required. Omit `--output-csv` to save under the caller's
+`results/` directory.
 
-## 📊 Extensible Logging Engine
+The decoder uses `key > 0.5`. Cost is negative profit with a penalty of 100000
+per excess unit of weight, matching the reference example. Independently
+computed exact optima are **31** for `kp10.txt` and **149** for `kp50.txt`. The
+CSV records feasibility, objective, backend, requested worker budget, seed and
+end-to-end elapsed time. A blank budget means one worker per selected algorithm.
+These two small instances are correctness checks, not production-scale evidence.
 
-The RKO logging subsystem is built on the **Strategy Pattern**, allowing developers to customize logging behavior by passing a subclass of `LogStrategy` directly to the `logger` parameter in the `RKO` constructor.
+A [1,000-item public-instance experiment](docs/benchmarks/2026-10-17-large-knapsack.md)
+confirms multi-core CPU use, but also exposes poor optimization quality: best
+RKO gap 17.56%, versus 0.00474% for a simple greedy baseline. Do not interpret
+working process execution as evidence of a competitive Knapsack solver.
+A [post-audit-core repetition](docs/benchmarks/2026-10-18-audit-core-knapsack.md)
+completed all six trials but retained poor quality (best process gap 18.46%).
+Correctness fixes have not established improved optimization performance.
 
-### Built-in Logger Strategies
+## Quality checks
 
-- **`"dual"` (TerminalLogger with filepath):** Prints logs to stdout and saves structured records to the dynamic results directory.
-- **`"terminal"` (TerminalLogger):** Outputs logs exclusively to stdout.
-- **`"file"` (FileLogger):** Saves logs exclusively to the specified disk path.
-
-### Custom Logging Strategy Example
-
-You can inherit from `LogStrategy` to route logs to databases, dashboards, or external analytical tools:
-
-```python
-from rko.LogStrategy import LogStrategy
-
-class DatabaseLogger(LogStrategy):
-    def __init__(self, db_connection):
-        self.db = db_connection
-
-    def log(self, *args, **kwargs):
-        msg = " ".join(str(arg) for arg in args)
-        # Custom logic to write to database
-        self.db.insert_log(msg)
+```bash
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked pytest src/rko/tests -q
 ```
 
-## 🛠️ Environment Interface & Validation
+GitHub Actions runs the full suite on Linux and Windows. Tests include real
+spawn execution, shared elites, independent RNG streams, algorithm execution,
+callback exceptions, abrupt exits, blocked callbacks and interruption cleanup.
 
-To adapt RKO to your problem, subclass `RKOEnvAbstract` and implement `decoder` and `cost`.
+## Remaining release work
 
-```python
-,
-import numpy as np
-
-class RKOEnv():
-    def __init__(self):
-        # Required attributes
-        self.tam_solution: int = 50           # Dimension of the random key vector
-        self.LS_type: str = 'Best'            # Local Search strategy ('Best' or 'First')
-        self.dict_best: dict = {}             # Shared best dictionary
-        self.instance_name: str = "kp50.txt"  # Name of your problem instance
-
-        # Configurations for Metaheuristics
-        self.BRKGA_parameters = {'p': [1000, 2000], 'pe': [0.2, 0.15], 'pm': [0.05], 'rhoe': [0.7]}
-        self.SA_parameters = {'SAmax': [100], 'alphaSA': [0.99, 0.9], 'betaMin': [0.01], 'betaMax': [0.05], 'T0': [10000]}
-        self.ILS_parameters = {'betaMin': [0.1], 'betaMax': [0.2]}
-        self.VNS_parameters = {'kMax': [8,7,6,5], 'betaMin': [0.05]}
-        self.LNS_parameters = {'betaMin': [0.1], 'betaMax': [0.3], 'TO': [1000], 'alphaLNS': [0.99, 0.95, 0.9]}
-        self.PSO_parameters = {'PSize': [1000], 'c1': [2.05], 'c2': [2.05], 'w': [0.73]}
-        self.GA_parameters = {'sizePop': [1000], 'probCros': [0.98], 'probMut': [0.005]}
-        self.GRASP_parameters = {'alphaGrasp': [0.1, 0.3], 'hs': [0.125], 'he': [0.00098]}
-
-  
-    def decoder(self, keys: np.ndarray):
-        """Maps random keys [0, 1) into a problem-specific discrete representation."""
-        pass
-
-  
-    def cost(self, solution, final_solution: bool = False) -> float:
-        """Returns objective cost (RKO minimizes this; return negated value for maximization)."""
-        pass
-```
-
-### Static and Functional Verification via `check_env`
-
-RKO provides a built-in diagnostic utility `check_env` to validate custom environments before runtime. It performs the following verification passes:
-
-1. **Attribute & Type Verification:** Verifies the presence and types of all core variables (`tam_solution`, `LS_type`, `dict_best`, `instance_name`) and metaheuristic parameter dictionaries.
-2. **Functional Dry-Run:** Invokes the custom `decoder` and `cost` methods using mock random keys to verify execution safety.
-3. **Mathematical Compliance:** Checks that the returned cost is a scalar float and that the decoder successfully processes vectors of dimensions defined by `tam_solution`.
-4. **Actionable Diagnostics:** If a check fails, the utility prints detailed stack traces and configuration hints to assist the developer in resolving interface mismatches or bugs.
-
-```python
-from rko.Environment import check_env
-
-my_env = MyProblemEnv()
-if check_env(my_env):
-    print("Environment successfully validated.")
-```
-
----
-
-## 👥 Maintainers
-
-- **Felipe Silvestre Cardoso Roberto** - [LinkedIn](https://www.linkedin.com/in/felipesilvestrecr/)
-- **João Victor Assaoka Ribeiro** - [LinkedIn](https://www.linkedin.com/in/assaoka/)
+See the [finding-by-finding status](docs/audits/2026-10-18-remediation-status.md)
+and `docs/plans/2026-10-18-audit-remediation.md` for delivered increments and
+remaining work: complete parameter/configuration validation, per-search RNG
+ownership, bounded portfolio scheduling, C++ behavioral/deviation contracts,
+stronger quality/performance evidence, API documentation and owner-approved
+project licensing. Wheel/sdist installation and callback-boundary stopping are
+now tested. Do not infer scientific or production readiness from smoke tests.

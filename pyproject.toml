@@ -1,31 +1,53 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "rko"
-version = "0.2.1"
-description = "A Python library for Random-Key Optimization (RKO)."
+version = "0.3.0.dev0"
+description = "Cooperative random-key optimization with configurable metaheuristic portfolios"
 readme = "README.md"
-requires-python = ">=3.8"
-authors = [
-  { name = "Felipe Silvestre Cardoso Roberto", email = "felipe.silvestre@unifesp.br" },
-  { name = "João Assaoka", email = "joao.assaoka@unifesp.br" },
-]
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-]
+requires-python = ">=3.14"
 dependencies = [
-    "numpy",
-    "pandas",
-    "matplotlib",
+    "numpy>=2.0.0",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/RKO-solver/RKO_Python"
-"Bug Tracker" = "https://github.com/RKO-solver/RKO_Python/issues"
+Repository = "https://github.com/MarcosPTProenca/RKO_Python"
+Issues = "https://github.com/MarcosPTProenca/RKO_Python/issues"
+
+[tool.setuptools]
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["rko*"]
+exclude = ["rko.tests*", "*__pycache__*", "rko.examples.results*"]
+
+[tool.setuptools.package-data]
+rko = ["parameters/*.toml", "examples/instances/*"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.2.0",
+    "pytest>=9.0.2",
+    "ruff==0.15.7",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "D", "ANN"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+no-sections = true
+force-single-line = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["src/rko/tests"]
