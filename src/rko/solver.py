@@ -259,19 +259,25 @@ class RKO:
                 verbose=self.verbose,
                 started_at=started_at,
             )
-        if self.backend == "thread":
-            return select_best_result(run_metaheuristics_parallel(metaheuristics, time_limit), pool)
-        python_state = random.getstate()
-        numpy_state = np.random.get_state()
+        pool.start_progress()
         try:
-            seeds = np.random.SeedSequence(self.random_state).spawn(len(metaheuristics))
-            results = []
-            for mh, sequence in zip(metaheuristics, seeds, strict=True):
-                seed = int(sequence.generate_state(1)[0])
-                random.seed(seed)
-                np.random.seed(seed)
-                results.append(SearchSession(self.decoder, self.cost).solve(mh, time_limit))
-            return select_best_result(results, pool)
+            if self.backend == "thread":
+                return select_best_result(
+                    run_metaheuristics_parallel(metaheuristics, time_limit), pool
+                )
+            python_state = random.getstate()
+            numpy_state = np.random.get_state()
+            try:
+                seeds = np.random.SeedSequence(self.random_state).spawn(len(metaheuristics))
+                results = []
+                for mh, sequence in zip(metaheuristics, seeds, strict=True):
+                    seed = int(sequence.generate_state(1)[0])
+                    random.seed(seed)
+                    np.random.seed(seed)
+                    results.append(SearchSession(self.decoder, self.cost).solve(mh, time_limit))
+                return select_best_result(results, pool)
+            finally:
+                random.setstate(python_state)
+                np.random.set_state(numpy_state)
         finally:
-            random.setstate(python_state)
-            np.random.set_state(numpy_state)
+            pool.stop_progress()

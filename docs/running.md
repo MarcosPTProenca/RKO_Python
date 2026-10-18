@@ -31,32 +31,40 @@ The same short command now shows progress automatically:
 uv run rko src/rko/examples/instances/kp50.txt
 ```
 
-It prints the backend/portfolio at startup, then accepted pool updates immediately.
-For example (values and timing vary):
+It prints the backend/portfolio at startup, compact new-best events immediately,
+and a pool status approximately once per second, even without improvements.
+For example (illustrative values and timing):
 
 ```text
-[   2.103s] NEW BEST algorithm=SA cost=-140 best=-140 pool=1/10 [-140 (SA)]
-[   2.260s] NEW BEST algorithm=GA cost=-145 best=-145 pool=2/10 [-145 (GA), -140 (SA)]
+[2026-10-18 15:30:01 +2.103s] NEW BEST algorithm=SA cost=-140 best=-140
+[2026-10-18 15:30:02 +3.001s] STATUS best=-140 pool=1/10 [-140 (SA)]
+[2026-10-18 15:30:03 +4.001s] STATUS best=-140 pool=1/10 [-140 (SA)]
 ```
 
-`NEW BEST` marks a new shared-pool minimum. `POOL UPDATE` means the candidate
-entered the elite pool without improving its minimum. Each line identifies the
-producing algorithm, candidate cost, best pool cost, occupancy/capacity and sorted
-elite costs with their sources. Elapsed time starts at the beginning of `solve`,
-including configuration and worker startup. Chromosomes are not dumped.
+Timestamps show local wall-clock time and monotonic elapsed solve seconds,
+including configuration/startup. `NEW BEST` identifies the producing algorithm
+and new shared-pool minimum. `STATUS` shows occupancy/capacity and sorted elite
+costs with their sources. An initial empty snapshot, and a final snapshot before
+completion, are also emitted. Chromosomes are not dumped, and full pool contents
+are not repeated for every insertion.
 
-Updates are event-driven, not an iteration counter or heartbeat: rejected
-candidates, unshared local evaluations and periods without accepted updates are
-not printed. A successful run ends with `RKO DONE` and its final best objective;
+Search improvements can genuinely cluster within a fraction of a second; records
+are never delayed or replayed to simulate steady improvement. Periodic status
+keeps the terminal active during plateaus. It indicates an unfinished portfolio,
+not proof that callbacks are unblocked or objectives are improving. Rejected and
+unshared local evaluations are not logged. A successful run ends with `RKO DONE`;
 a best evaluation recovered at a budget boundary may not yet have entered the
-shared pool. A failed run propagates its error rather than announcing completion.
+shared pool. Failed runs propagate errors and stop the reporter without a false
+completion message.
 
 Use `--quiet` for the previous final-result-only display. Library calls remain
 silent by default; request the same progress with `RKO(..., verbose=True)` or
 legacy `run(..., verbose=True)`. Process output comes from the authoritative
-pool manager; thread output is protected by the pool lock. Lines are flushed
-immediately, including when stdout is redirected. Synchronous output can affect
-timed search performance; keep library benchmarks quiet.
+pool manager; thread output is protected by the pool lock. The status thread is
+explicitly stopped and joined when the solve exits, including failures. Lines are
+flushed immediately, including when stdout is redirected. Output/blocking system
+scheduling can delay status and affect timed performance; keep library benchmarks
+quiet.
 
 ## Your configuration directory
 

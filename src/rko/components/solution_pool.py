@@ -20,7 +20,8 @@ Important criteria:
 - Pool capacity is fixed at construction time and never exceeded.
 - All public methods are thread-safe.
 - Public entries remain (cost, keys_list) pairs; internal entries retain source labels.
-- Optional progress is emitted under the pool lock with immediate stdout flushing.
+- Flush compact new-best events and one-second status snapshots under the pool lock.
+- Explicit start/stop methods bound the progress thread to its owning solve.
 
 Inputs/Outputs:
 - Input: capacity at construction; (cost, keys_list) tuples on insert.
@@ -95,10 +96,13 @@ class SolutionPool:
 
     Attributes:
       capacity (int): Maximum number of solutions retained in the pool.
-      verbose (bool): Emit accepted updates with elapsed time and attributed costs.
+      verbose (bool): Emit new bests and periodic status with clock/elapsed timestamps.
       _pool (list[tuple[float, list[float], str]]): Sorted cost/key/source entries.
       _lock (threading.Lock): Mutual-exclusion guard for mutation and progress output.
       _started_at (float): Monotonic origin shared with the owning solve.
+      _progress_guard (threading.Lock): Serialize reporter start/stop operations.
+      _progress_stop (threading.Event): Wake and stop the periodic reporter.
+      _progress_thread (threading.Thread | None): Owner-managed status reporter.
     """
 
     def __init__(
@@ -108,7 +112,7 @@ class SolutionPool:
 
         Args:
           capacity (int): Maximum number of solutions to keep. Must be >= 1.
-          verbose (bool): Print accepted pool updates; default is silent.
+          verbose (bool): Print new bests and periodic status; default is silent.
           started_at (float | None): Solve's perf_counter origin, or pool creation time.
 
         Returns:
@@ -124,6 +128,80 @@ class SolutionPool:
         self._started_at = time.perf_counter() if started_at is None else started_at
         self._pool: list[tuple[float, list[float], str]] = []
         self._lock: threading.Lock = threading.Lock()
+        self._progress_guard = threading.Lock()
+        self._progress_stop = threading.Event()
+        self._progress_thread: threading.Thread | None = None
+
+    def _timestamp(self) -> str:
+        """Format local wall-clock time and monotonic elapsed solve seconds.
+
+        Returns:
+            str: Timestamp prefix for an immediately emitted progress record.
+        """
+        return (
+            f"[{time.strftime('%Y-%m-%d %H:%M:%S')} +{time.perf_counter() - self._started_at:.3f}s]"
+        )
+
+    def _report_status(self) -> None:
+        """Flush an atomic pool snapshot even when no candidate improved.
+
+        Raises:
+            OSError: If stdout cannot accept progress output.
+            ValueError: If the output stream has been closed.
+        """
+        with self._lock:
+            if self.verbose:
+                best = f"{self._pool[0][0]:.8g}" if self._pool else "pending"
+                costs = ", ".join(
+                    f"{value:.8g} ({owner or 'unknown'})" for value, _, owner in self._pool
+                )
+                print(
+                    f"{self._timestamp()} STATUS best={best} "
+                    f"pool={len(self._pool)}/{self.capacity} [{costs}]",
+                    flush=True,
+                )
+
+    def _report_periodically(self) -> None:
+        """Emit one snapshot per second until stopped or stdout becomes unavailable."""
+        while not self._progress_stop.wait(1.0):
+            try:
+                self._report_status()
+            except OSError, ValueError:
+                return
+
+    def start_progress(self) -> None:
+        """Start one owner-managed status thread when verbose output is enabled.
+
+        Raises:
+            RuntimeError: If the operating system cannot start the reporter thread.
+            OSError: If the initial status cannot be written.
+            ValueError: If the output stream has been closed.
+        """
+        with self._progress_guard:
+            if not self.verbose or self._progress_thread is not None:
+                return
+            self._progress_stop.clear()
+            self._report_status()
+            reporter = threading.Thread(
+                target=self._report_periodically, name="rko-progress", daemon=True
+            )
+            reporter.start()
+            self._progress_thread = reporter
+
+    def stop_progress(self) -> None:
+        """Join the reporter and flush the final snapshot before the owner returns.
+
+        Raises:
+            OSError: If the final status cannot be written.
+            ValueError: If the output stream has been closed.
+        """
+        with self._progress_guard:
+            if self._progress_thread is None:
+                return
+            self._progress_stop.set()
+            self._progress_thread.join()
+            self._progress_thread = None
+            self._report_status()
 
     def insert(self, entry: tuple[float, list[float]], source: str = "") -> None:
         """Inserts a candidate solution if it improves the pool.
@@ -154,16 +232,10 @@ class SolutionPool:
                 self._pool.sort(key=lambda t: t[0])
                 if len(self._pool) > self.capacity:
                     self._pool.pop()
-                if self.verbose:
-                    status = "NEW BEST" if improved else "POOL UPDATE"
-                    costs = ", ".join(
-                        f"{value:.8g} ({owner or 'unknown'})" for value, _, owner in self._pool
-                    )
+                if self.verbose and improved and not self._progress_stop.is_set():
                     print(
-                        f"[{time.perf_counter() - self._started_at:8.3f}s] {status} "
-                        f"algorithm={source or 'unknown'} cost={cost:.8g} "
-                        f"best={self._pool[0][0]:.8g} "
-                        f"pool={len(self._pool)}/{self.capacity} [{costs}]",
+                        f"{self._timestamp()} NEW BEST "
+                        f"algorithm={source or 'unknown'} cost={cost:.8g} best={cost:.8g}",
                         flush=True,
                     )
 

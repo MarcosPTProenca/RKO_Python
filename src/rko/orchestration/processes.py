@@ -57,7 +57,7 @@ class PoolProxy(BaseProxy):
         _exposed_ (tuple[str, ...]): Manager methods available to workers.
     """
 
-    _exposed_ = ("insert", "get_elite", "__len__")
+    _exposed_ = ("insert", "get_elite", "__len__", "start_progress", "stop_progress")
 
     def insert(self, entry: tuple[float, list[float]], source: str = "") -> None:
         """Insert a candidate into the authoritative pool.
@@ -70,6 +70,14 @@ class PoolProxy(BaseProxy):
             ValueError: If the candidate violates pool validation.
         """
         self._callmethod("insert", (entry, source))
+
+    def start_progress(self) -> None:
+        """Start periodic status reporting inside the authoritative manager."""
+        self._callmethod("start_progress")
+
+    def stop_progress(self) -> None:
+        """Join the managed reporter and flush its last snapshot before shutdown."""
+        self._callmethod("stop_progress")
 
     def get_elite(self, k: int = 1) -> list[tuple[float, list[float]]]:
         """Fetch detached elite entries from the manager.
@@ -226,6 +234,7 @@ def run_processes(
         results: list[RunResult] = []
         expires = time.perf_counter() + 60.0
         try:
+            pool.start_progress()
             for name, sequence in zip(names, seeds, strict=True):
                 parent, child = context.Pipe(duplex=False)
                 connections.append(parent)
@@ -295,3 +304,4 @@ def run_processes(
                 process.close()
             for connection in connections:
                 connection.close()
+            pool.stop_progress()

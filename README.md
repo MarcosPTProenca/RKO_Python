@@ -142,8 +142,9 @@ uv run --locked rko src/rko/examples/instances/kp50.txt \
   --output-csv results/kp50.csv
 ```
 
-The terminal command shows live elapsed time, producing algorithms, new best costs
-and pool contents by default. Add `--quiet` for final results only.
+The terminal command shows clock/elapsed timestamps and new-best algorithms, plus
+pool status approximately every second even during plateaus. Add `--quiet` for
+final results only.
 
 Pass `--params-dir configs/my-run` to select your own `config.toml` and algorithm
 TOMLs. See [running an instance](docs/running.md) for copying/editing configuration,

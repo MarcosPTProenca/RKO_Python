@@ -23,7 +23,11 @@ Inputs/Outputs:
 
 import numpy as np
 import pytest
+import re
+import subprocess
+import sys
 import threading
+import time
 from rko import RKO
 from rko.components.solution_pool import SolutionPool
 from rko.tests.rko.test_solver import decode
@@ -43,12 +47,14 @@ def test_pool_reports_attributed_updates_and_keeps_public_pairs(
     pool.insert((5.0, [0.2]), "GA")
     pool.insert((8.0, [0.3]), "PSO")
     pool.insert((12.0, [0.4]), "rejected")
+    pool._report_status()
     output = capsys.readouterr().out
     lines = output.splitlines()
     assert len(lines) == 3
     assert "NEW BEST" in lines[0] and "SA" in lines[0]
     assert "NEW BEST" in lines[1] and "GA" in lines[1]
-    assert "POOL" in lines[2] and "PSO" in lines[2]
+    assert "STATUS" in lines[2] and "PSO" in lines[2]
+    assert all("pool=" not in line for line in lines[:2])
     assert "best=5" in lines[2]
     assert "pool=2/2 [5 (GA), 8 (PSO)]" in lines[2]
     assert "rejected" not in output
@@ -179,6 +185,66 @@ def test_pool_output_is_live_before_solve_finishes(capsys: pytest.CaptureFixture
     assert not failures
     assert optimizer.result_ is not None
     assert "RKO DONE" in capsys.readouterr().out
+
+
+def constant_objective(keys: np.ndarray) -> float:
+    """Hold the objective constant to reproduce long stretches without improvements.
+
+    Args:
+        keys (np.ndarray): Unused candidate vector.
+
+    Returns:
+        float: Fixed objective, producing only one shared-pool improvement.
+    """
+    return 1.0
+
+
+@pytest.mark.parametrize("backend", ["serial", "thread", "process"])
+def test_status_streams_during_plateaus_and_stops_with_search(backend: str) -> None:
+    """Read periodic stdout while a real plateauing search is still running.
+
+    Args:
+        backend (str): Execution mode of the isolated search.
+    """
+    program = (
+        "import threading; from rko import RKO; "
+        "from rko.tests.rko.test_progress import decode, constant_objective; "
+        "RKO(decode, constant_objective, 2, algorithms=['MultiStart'], control=0, "
+        f"backend={backend!r}, verbose=True).solve(2.2); "
+        "print('PROGRESS_THREADS', sum(t.name == 'rko-progress' for t in threading.enumerate()))"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", program],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    watchdog = threading.Timer(45, process.kill)
+    watchdog.daemon = True
+    received: list[tuple[float, str, bool]] = []
+    try:
+        watchdog.start()
+        for line in process.stdout:
+            received.append((time.perf_counter(), line.strip(), process.poll() is None))
+        assert process.wait(timeout=10) == 0, process.stderr.read()
+    finally:
+        watchdog.cancel()
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=10)
+    improvements = [stamp for stamp, line, _ in received if "NEW BEST" in line]
+    assert len(improvements) == 1
+    statuses = [(stamp, line, alive) for stamp, line, alive in received if "STATUS" in line]
+    plateau = [stamp for stamp, _, _ in statuses if stamp > improvements[0]]
+    assert len(plateau) >= 2
+    assert plateau[-1] - plateau[0] >= 0.5
+    assert any(alive for _, _, alive in statuses)
+    assert all(
+        re.match(r"^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \+\d+\.\d{3}s\]", line)
+        for _, line, _ in statuses
+    )
+    assert any(line == "PROGRESS_THREADS 0" for _, line, _ in received)
 
 
 def failing_objective(keys: np.ndarray) -> float:
