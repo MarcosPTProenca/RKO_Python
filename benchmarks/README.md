@@ -470,3 +470,33 @@ gain was established. Avoid interpreting separate Linux-filesystem and mounted
 Windows checkouts as a controlled runtime comparison. Serial timing excludes
 process startup, configuration I/O and transport, and does not establish
 native-code parity.
+
+## Owned RNG replay and overhead
+
+`random_streams.py` compares production searches using private Python/NumPy
+streams against a **trusted pre-isolation source package** loaded under a separate
+namespace. It warms each case, balances execution order over two repeats and
+three seeds, and checks 1,000 evaluations at 64 keys for all eleven algorithms,
+with adaptive control where supported. Costs, keys, final elites and both final
+RNG states must match exactly. Adaptive policy clocks are frozen, not real timed
+cooperation. The reference package executes Python code and must be trusted.
+
+```bash
+git worktree add --detach /tmp/rko-rng-baseline-a281c6a a281c6a
+uv run --locked python benchmarks/random_streams.py \
+  --reference /tmp/rko-rng-baseline-a281c6a/src/rko > /tmp/rko-rng-replay.jsonl
+```
+
+One WSL2 reference passed all **342 pairs**. Across its 57 case medians, the median
+baseline/owned wall and CPU ratios were **0.981 / 0.983**; individual cases varied
+substantially in both directions. These are short serial fixed-work measurements,
+not an aggregate throughput ratio or proof of a universal overhead bound.
+Per-pair timings are retained in the JSON output. Stream construction, imports,
+configuration reads and process startup are outside the timed region.
+
+This is a correctness change, not a speed optimization: independent searches no
+longer reseed global generators, and seeded thread searches are now supported.
+Callback-global draws are neither implicitly seeded nor rolled back; stochastic
+callbacks must own their generators. Standalone built-in operators retain global
+RNG compatibility. No RSS, whole-portfolio speedup or quality improvement follows
+from these replay checks.

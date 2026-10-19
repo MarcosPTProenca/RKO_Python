@@ -26,8 +26,8 @@ from __future__ import annotations
 
 import math
 import numpy as np
-import random
 import time
+from .components.random_streams import RandomStreams
 from .components.solution_pool import SolutionPool
 from .orchestration.configuration import parse_run_config
 from .orchestration.execution import run_metaheuristics_parallel
@@ -89,7 +89,7 @@ class RKO:
         params_dir (Path | None): Optional parameter directory.
         backend (str): Process, thread or serial execution.
         n_jobs (int | None): Positive process-worker limit, excluding the pool manager.
-        random_state (int | None): Nonnegative serial/process seed.
+        random_state (int | None): Nonnegative per-search seed in every backend.
         verbose (bool): Print lifecycle and attributed shared-pool updates; default False.
         hyperparameters (Hyperparameters | None): Partial named offline scalar overrides.
         result_ (RKOResult | None): Last successful solve; cleared before each attempt.
@@ -124,7 +124,7 @@ class RKO:
             backend (Literal): Process, legacy thread or serial execution.
             n_jobs (int | None): Positive worker limit; None allows one per algorithm.
                 Smaller limits share workers and split the common search budget.
-            random_state (int | None): Nonnegative seed for serial/process modes.
+            random_state (int | None): Nonnegative seed for owned library RNG streams.
             verbose (bool): Flush lifecycle and shared-pool progress to stdout.
             hyperparameters (Hyperparameters | None): Per-algorithm offline overrides;
                 require control=0 and merge with TOML defaults without writing files.
@@ -182,10 +182,6 @@ class RKO:
             raise ValueError("'random_state' must be a nonnegative integer or None.")
         if self.backend != "process" and self.n_jobs is not None:
             raise ValueError("'n_jobs' is only supported by the process backend.")
-        if self.backend == "thread" and self.random_state is not None:
-            raise ValueError(
-                "Thread workers share RNG state; use process or serial with random_state."
-            )
         raw = load_config(self.params_dir)
         if not isinstance(raw.get("run"), dict):
             raise ValueError("Configuration section 'run' must be a table.")
@@ -253,19 +249,23 @@ class RKO:
             TimeoutError: If process execution exceeds its watchdog.
         """
         pool = SolutionPool(capacity=config.pool_size, verbose=self.verbose, started_at=started_at)
-        metaheuristics = [
-            build_metaheuristic(
-                name,
-                pool,
-                self.decoder,
-                self.cost,
-                self.n_variables,
-                config.control,
-                self.params_dir,
-                (hyperparameters or {}).get(name),
-            )
-            for name in config.active_metaheuristics
-        ]
+        seeds = np.random.SeedSequence(self.random_state).spawn(len(config.active_metaheuristics))
+        streams = [RandomStreams(int(sequence.generate_state(1)[0])) for sequence in seeds]
+        metaheuristics = []
+        for name, stream in zip(config.active_metaheuristics, streams, strict=True):
+            with stream.activate():
+                metaheuristics.append(
+                    build_metaheuristic(
+                        name,
+                        pool,
+                        self.decoder,
+                        self.cost,
+                        self.n_variables,
+                        config.control,
+                        self.params_dir,
+                        (hyperparameters or {}).get(name),
+                    )
+                )
         if self.backend == "process":
             return run_processes(
                 config,
@@ -284,21 +284,12 @@ class RKO:
         try:
             if self.backend == "thread":
                 return select_best_result(
-                    run_metaheuristics_parallel(metaheuristics, time_limit), pool
+                    run_metaheuristics_parallel(metaheuristics, time_limit, streams), pool
                 )
-            python_state = random.getstate()
-            numpy_state = np.random.get_state()
-            try:
-                seeds = np.random.SeedSequence(self.random_state).spawn(len(metaheuristics))
-                results = []
-                for mh, sequence in zip(metaheuristics, seeds, strict=True):
-                    seed = int(sequence.generate_state(1)[0])
-                    random.seed(seed)
-                    np.random.seed(seed)
+            results = []
+            for mh, stream in zip(metaheuristics, streams, strict=True):
+                with stream.activate():
                     results.append(SearchSession(self.decoder, self.cost).solve(mh, time_limit))
-                return select_best_result(results, pool)
-            finally:
-                random.setstate(python_state)
-                np.random.set_state(numpy_state)
+            return select_best_result(results, pool)
         finally:
             pool.stop_progress()

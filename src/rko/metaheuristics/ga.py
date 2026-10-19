@@ -32,9 +32,10 @@ Inputs/Outputs:
 from __future__ import annotations
 
 import numpy as np
-import random
+import random as random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
 from .base import LocalSearchOperator
@@ -133,6 +134,8 @@ class GeneticAlgorithm(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
+        random = RandomStreams.python_rng()
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
         n = self.tam_solution
         size_pop = self.size_pop
@@ -159,7 +162,7 @@ class GeneticAlgorithm(MetaheuristicBase):
                 prob_cros = ql.states[st].par[1]
                 prob_mut = ql.states[st].par[2]
 
-        pop: list[np.ndarray] = [np.random.random(n) for _ in range(size_pop)]
+        pop: list[np.ndarray] = [numpy_rng.random(n) for _ in range(size_pop)]
         pop_costs: list[float] = [self.cost(self.decoder(c)) for c in pop]
 
         best_idx = min(range(size_pop), key=lambda i: pop_costs[i])
@@ -176,7 +179,7 @@ class GeneticAlgorithm(MetaheuristicBase):
                 prob_cros = ql.states[i_curr].par[1]
                 prob_mut = ql.states[i_curr].par[2]
                 while len(pop) < size_pop:
-                    new_c = np.random.random(n)
+                    new_c = numpy_rng.random(n)
                     pop.append(new_c)
                     pop_costs.append(self.cost(self.decoder(new_c)))
                 if len(pop) > size_pop:

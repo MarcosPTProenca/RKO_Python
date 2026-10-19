@@ -6,7 +6,7 @@ Objective:
 Technical approach:
 - Run under python -I inside an environment containing only the installed artifact.
 - Check filtered adaptive graphs and package contents.
-- Solve a small problem with serial and spawn execution.
+- Check seeded serial/thread/spawn execution without modifying caller RNG state.
 
 Flow (pseudocode):
 1. Locate the installed package and assert expected data and excluded tests.
@@ -24,6 +24,8 @@ Inputs/Outputs:
 
 import csv
 import numpy as np
+import pickle
+import random
 import shutil
 import subprocess
 import tempfile
@@ -80,7 +82,8 @@ def main() -> None:
     )
     assert [state.par for state in controller.states] == [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
     assert [state.Ai for state in controller.states] == [[0, 1, 2], [0, 1], [0, 2]]
-    for backend in ("serial", "process"):
+    global_rng = pickle.dumps((random.getstate(), np.random.get_state()))
+    for backend in ("serial", "thread", "process"):
         for algorithm, dimension, control in (("MultiStart", 3, 0), ("PSO", 64, 0), ("PSO", 64, 1)):
             result = RKO(
                 decode,
@@ -111,6 +114,7 @@ def main() -> None:
     ).solve(0.1)
     assert len(bounded.keys) == 64
     assert np.isclose(bounded.cost, objective(np.asarray(bounded.keys)))
+    assert pickle.dumps((random.getstate(), np.random.get_state())) == global_rng
     executable = shutil.which("rko")
     assert executable is not None
     with tempfile.TemporaryDirectory(prefix="rko-installed-cli-") as temporary:

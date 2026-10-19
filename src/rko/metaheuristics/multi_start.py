@@ -27,6 +27,7 @@ Inputs/Outputs:
 from __future__ import annotations
 
 import numpy as np
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import SolutionPoolWriter
 from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
@@ -92,16 +93,17 @@ class MultiStart(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
         n = self.tam_solution
 
-        keys: np.ndarray = np.random.random(n)
+        keys: np.ndarray = numpy_rng.random(n)
         best_cost: float = self.cost(self.decoder(keys))
         best_keys: np.ndarray = keys.copy()
         self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
 
         while not self.time_limit_reached(limit_time):
-            keys = np.random.random(n)
+            keys = numpy_rng.random(n)
             current_cost: float = self.cost(self.decoder(keys))
 
             if current_cost < best_cost:

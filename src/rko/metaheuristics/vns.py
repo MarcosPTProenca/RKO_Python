@@ -34,9 +34,10 @@ Inputs/Outputs:
 from __future__ import annotations
 
 import numpy as np
-import random
+import random as random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.rvnd import rvnd
+from ..components.random_streams import RandomStreams
 from ..components.shaking.random import shake
 from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
@@ -139,6 +140,8 @@ class VNS(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
+        random = RandomStreams.python_rng()
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
         n = self.tam_solution
         k_max = self.k_max
@@ -162,7 +165,7 @@ class VNS(MetaheuristicBase):
             k_max = int(ql.states[st].par[0]) if ql.states else k_max
             beta_min = ql.states[st].par[1] if ql.states else beta_min
 
-        keys: np.ndarray = np.random.random(n)
+        keys: np.ndarray = numpy_rng.random(n)
         best_cost: float = self.cost(self.decoder(keys))
         best_keys: np.ndarray = keys.copy()
         s = best_keys.copy()

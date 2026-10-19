@@ -27,7 +27,8 @@ Inputs/Outputs:
 """
 
 import math
-import random
+import random as random
+from ..random_streams import RandomStreams
 from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field
@@ -137,6 +138,7 @@ class QLearningController:
         Raises:
           ValueError: When required by external domain validation.
         """
+        random = RandomStreams.python_rng()
         if not parameters:
             return []
 
@@ -206,6 +208,7 @@ class QLearningController:
         Raises:
           ValueError: When required by external domain validation.
         """
+        random = RandomStreams.python_rng()
         if not self.states:
             return 0
         state = self.states[st]

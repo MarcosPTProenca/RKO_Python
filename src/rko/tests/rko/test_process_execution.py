@@ -25,7 +25,6 @@ import multiprocessing as mp
 import numpy as np
 import os
 import pytest
-import random
 import shutil
 import time
 from dataclasses import dataclass
@@ -33,6 +32,7 @@ from functools import partial
 from multiprocessing.connection import Connection
 from pathlib import Path
 from rko import run
+from rko.components.random_streams import RandomStreams
 from rko.examples.run_kp_cpp_instances import decode_knapsack
 from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import evaluate_solution
@@ -85,7 +85,7 @@ class RecordingCost:
     recorded: bool = False
 
     def __call__(self, keys: np.ndarray) -> float:
-        """Record once and return a sphere objective.
+        """Record the active owned streams once and return a sphere objective.
 
         Args:
             keys (np.ndarray): Candidate vector.
@@ -95,7 +95,8 @@ class RecordingCost:
         """
         if not self.recorded:
             self.directory.joinpath(str(os.getpid())).write_text(
-                f"{random.random()} {np.random.random()}", encoding="utf-8"
+                f"{RandomStreams.python_rng().random()} {RandomStreams.numpy_rng().random()}",
+                encoding="utf-8",
             )
             self.recorded = True
         return sphere(keys)

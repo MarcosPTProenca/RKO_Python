@@ -169,11 +169,20 @@ a structured problem, replace its identity decoder and sphere objective with
 your own adapter. RKO itself does not parse problem files or assume a solution
 representation.
 
-`random_state` gives distinct, repeatable seed allocation to Python and NumPy
-worker RNGs. Timed searches still depend on scheduling and elite exchange;
-identical seeds do not guarantee identical results. Thread mode rejects a seed
-because its workers share global RNG state. Serial mode restores caller RNG
-state after execution.
+`random_state` gives distinct, repeatable seed allocation to privately owned
+Python and NumPy RNGs in **all three backends**, including threads. Library
+operations do not reseed or restore caller-global generators, so independent
+solver instances can overlap without contaminating each other's library draws.
+Timed searches still depend on scheduling and elite exchange; identical seeds
+do not guarantee identical results.
+
+Custom decoders, objectives and operator overrides must manage their own
+randomness and concurrent mutable state. In particular, `random_state` no longer
+implicitly seeds global RNG calls inside callbacks, and callback-owned global
+draws are not rolled back after a serial solve. Use explicitly owned generators
+for stochastic callbacks. Standalone built-in operators called outside RKO keep
+their existing global-RNG behavior. A single mutable RKO instance is not intended
+for simultaneous `solve` calls.
 
 Process startup is excluded from the requested search duration. Workers start
 searching together after construction. A per-search callback session carries the
@@ -260,7 +269,7 @@ uv run --locked mutmut results
 ## Remaining release work
 
 The library is **not yet release-ready**. See [current limitations](docs/status.md)
-for the outstanding RNG, scheduling, parity, documentation and licensing work.
+for the outstanding scheduling, parity, results, documentation and licensing work.
 [C++ compatibility](docs/cpp-compatibility.md) distinguishes verified reference
 behavior from deliberate corrections and still-unimplemented functionality.
 Installation and correctness checks are not evidence of competitive optimization.

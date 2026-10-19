@@ -42,9 +42,10 @@ from __future__ import annotations
 
 import math
 import numpy as np
-import random
+import random as random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.rvnd import rvnd
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
 from .base import LocalSearchOperator
@@ -164,6 +165,7 @@ class GRASP(MetaheuristicBase):
         Returns:
             tuple[np.ndarray, float]: Constructed keys and their objective value.
         """
+        random = RandomStreams.python_rng()
         intensity = int(random.uniform(0.3, 0.7) * self.tam_solution)
         unfixed: list[int] = list(range(self.tam_solution))
         solution = keys.copy()
@@ -194,6 +196,8 @@ class GRASP(MetaheuristicBase):
         Returns:
           Tuple of (empty extras, best key vector as list, best cost).
         """
+        random = RandomStreams.python_rng()
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
         n = self.tam_solution
 
@@ -213,7 +217,7 @@ class GRASP(MetaheuristicBase):
             )
             st = random.randint(0, max(0, len(ql.states) - 1))
 
-        best_keys: np.ndarray = np.random.random(n)
+        best_keys: np.ndarray = numpy_rng.random(n)
         best_keys, best_cost = (self.local_search_operator or rvnd)(
             best_keys, self.decoder, self.cost, pool=self.solution_pool
         )

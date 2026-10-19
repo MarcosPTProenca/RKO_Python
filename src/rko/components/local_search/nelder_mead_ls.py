@@ -28,6 +28,7 @@ Inputs/Outputs:
 import math
 import numpy as np
 from ..blending.blending import blending as _blend
+from ..random_streams import RandomStreams
 from ..solution_pool import ElitePool
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -92,6 +93,7 @@ def nelder_mead_search(
     Raises:
         ValueError: When required by external domain validation.
     """
+    numpy_rng = RandomStreams.numpy_rng()
     n = len(keys)
     if n == 0:
         return keys, _evaluate(keys, decoder, cost)
@@ -105,17 +107,17 @@ def nelder_mead_search(
         x2_keys = np.array(elite[0][1], dtype=float)
         x3_keys = np.array(elite[1][1], dtype=float)
         if len(x2_keys) != n:
-            x2_keys = np.random.random(n)
+            x2_keys = numpy_rng.random(n)
         if len(x3_keys) != n:
-            x3_keys = np.random.random(n)
+            x3_keys = numpy_rng.random(n)
     elif len(elite) == 1:
         x2_keys = np.array(elite[0][1], dtype=float)
         if len(x2_keys) != n:
-            x2_keys = np.random.random(n)
-        x3_keys = np.random.random(n)
+            x2_keys = numpy_rng.random(n)
+        x3_keys = numpy_rng.random(n)
     else:
-        x2_keys = np.random.random(n)
-        x3_keys = np.random.random(n)
+        x2_keys = numpy_rng.random(n)
+        x3_keys = numpy_rng.random(n)
 
     x2 = _Point(x2_keys, _evaluate(x2_keys, decoder, cost))
     x3 = _Point(x3_keys, _evaluate(x3_keys, decoder, cost))

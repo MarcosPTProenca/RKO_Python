@@ -20,7 +20,8 @@ Inputs/Outputs:
 """
 
 import numpy as np
-import random
+import random as random
+from ..random_streams import RandomStreams
 
 
 def swap_shake(keys: np.ndarray) -> np.ndarray:
@@ -35,6 +36,7 @@ def swap_shake(keys: np.ndarray) -> np.ndarray:
     Raises:
       ValueError: When required by external domain validation.
     """
+    random = RandomStreams.python_rng()
     n = len(keys)
     if n < 2:
         return keys

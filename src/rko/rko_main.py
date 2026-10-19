@@ -50,7 +50,7 @@ def run(
         params_dir (Path | None): Optional parameter TOML directory.
         backend (Literal): Process, legacy thread or serial execution.
         n_jobs (int | None): Optional process budget.
-        random_state (int | None): Nonnegative serial/process seed.
+        random_state (int | None): Nonnegative per-search seed in every backend.
         verbose (bool): Flush lifecycle and pool updates; quiet by default.
 
     Returns:

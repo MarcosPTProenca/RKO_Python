@@ -43,10 +43,11 @@ from __future__ import annotations
 
 import math
 import numpy as np
-import random
+import random as random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.farey_ls import FAREY_INTERVALS
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
 from .base import LocalSearchOperator
@@ -155,6 +156,7 @@ class LNS(MetaheuristicBase):
         Returns:
           Tuple of (modified key vector, list of destroyed positions).
         """
+        random = RandomStreams.python_rng()
         n = len(keys)
         intensity = random.randint(
             max(1, int(beta_min * n)),
@@ -208,6 +210,8 @@ class LNS(MetaheuristicBase):
         Returns:
           Tuple of (empty extras, best key vector as list, best cost).
         """
+        random = RandomStreams.python_rng()
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
         n = self.tam_solution
 
@@ -227,7 +231,7 @@ class LNS(MetaheuristicBase):
             )
             st = random.randint(0, max(0, len(ql.states) - 1))
 
-        best_keys: np.ndarray = np.random.random(n)
+        best_keys: np.ndarray = numpy_rng.random(n)
         best_cost: float = self.cost(self.decoder(best_keys))
         best_keys, best_cost = (self.local_search_operator or nelder_mead_search)(
             best_keys, self.decoder, self.cost, pool=self.solution_pool

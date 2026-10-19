@@ -32,7 +32,8 @@ Inputs/Outputs:
 """
 
 import numpy as np
-import random
+import random as random
+from ..random_streams import RandomStreams
 from ..solution_pool import ElitePool
 from .farey_ls import farey_ls
 from .mirror_ls import mirror_ls
@@ -67,6 +68,7 @@ def rvnd(
     Raises:
       ValueError: When required by external domain validation.
     """
+    random = RandomStreams.python_rng()
     current = keys.copy()
     current_cost = cost(decoder(current))
 

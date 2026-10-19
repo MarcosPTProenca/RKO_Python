@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import math
 import threading
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import ElitePool
 from ..metaheuristics.base import MetaheuristicBase
 from .search import SearchSession
@@ -34,19 +35,25 @@ from .types import RunResult
 def run_metaheuristics_parallel(
     metaheuristics: list[MetaheuristicBase],
     limit_time: float,
+    streams: list[RandomStreams] | None = None,
 ) -> list[RunResult]:
     """Run thread searches with callback-budget and failure cancellation checks.
 
     Args:
         metaheuristics (list[MetaheuristicBase]): Fresh configured portfolio.
         limit_time (float): Search seconds per concurrently started algorithm.
+        streams (list[RandomStreams] | None): Owned streams in portfolio order.
 
     Returns:
         list[RunResult]: Search outcomes in portfolio order.
 
     Raises:
+        ValueError: If stream count does not match the portfolio.
         RuntimeError: If any worker fails or returns no outcome.
     """
+    streams = streams if streams is not None else [RandomStreams(None) for _ in metaheuristics]
+    if len(streams) != len(metaheuristics):
+        raise ValueError("One random stream pair is required per search.")
     results: list[RunResult | None] = [None] * len(metaheuristics)
     errors: list[BaseException | None] = [None] * len(metaheuristics)
     cancelled = threading.Event()
@@ -59,11 +66,12 @@ def run_metaheuristics_parallel(
             mh (MetaheuristicBase): Fresh search instance.
         """
         try:
-            results[index] = SearchSession(mh.decoder, mh.cost).solve(
-                mh,
-                limit_time,
-                cancelled=cancelled,
-            )
+            with streams[index].activate():
+                results[index] = SearchSession(mh.decoder, mh.cost).solve(
+                    mh,
+                    limit_time,
+                    cancelled=cancelled,
+                )
         except BaseException as exc:
             errors[index] = exc
             cancelled.set()

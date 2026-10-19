@@ -28,9 +28,9 @@ from __future__ import annotations
 import multiprocessing as mp
 import numpy as np
 import pickle
-import random
 import time
 import traceback
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import SolutionPool
 from .execution import select_best_result
 from .factory import build_metaheuristic
@@ -117,7 +117,7 @@ class PoolProxy(BaseProxy):
         """
         if type(pool_size) is not int or pool_size < 2:
             raise ValueError("Pair sampling requires an integer pool size of at least two.")
-        first, second = random.sample(list(range(pool_size)), 2)
+        first, second = RandomStreams.python_rng().sample(list(range(pool_size)), 2)
         return self._callmethod("_get_elite_pair", ((first, second),))
 
     @property
@@ -188,31 +188,30 @@ def _worker(
     try:
         prepared = []
         for name, seed in assignments:
-            random.seed(seed)
-            np.random.seed(seed)
-            mh = build_metaheuristic(
-                name,
-                pool,
-                decoder,
-                cost,
-                dimension,
-                config.control,
-                params_dir,
-                (hyperparameters or {}).get(name),
-            )
-            prepared.append((mh, random.getstate(), np.random.get_state()))
+            streams = RandomStreams(seed)
+            with streams.activate():
+                mh = build_metaheuristic(
+                    name,
+                    pool,
+                    decoder,
+                    cost,
+                    dimension,
+                    config.control,
+                    params_dir,
+                    (hyperparameters or {}).get(name),
+                )
+            prepared.append((mh, streams))
         connection.send(("ready", None))
         start.wait()
         best: RunResult | None = None
-        for mh, python_state, numpy_state in prepared:
+        for mh, streams in prepared:
             name = mh.name
             search_deadline = min(deadline.value, time.perf_counter() + slice_seconds)
             remaining = search_deadline - time.perf_counter()
             if remaining <= 0:
                 break
-            random.setstate(python_state)
-            np.random.set_state(numpy_state)
-            result = SearchSession(decoder, cost).solve(mh, remaining, deadline=search_deadline)
+            with streams.activate():
+                result = SearchSession(decoder, cost).solve(mh, remaining, deadline=search_deadline)
             if best is None or result[2] < best[2]:
                 best = result
             del result

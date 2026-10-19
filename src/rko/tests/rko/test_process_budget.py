@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
 from rko import RKO
+from rko.components.random_streams import RandomStreams
 from rko.components.solution_pool import SolutionPool
 from rko.orchestration import processes
 from rko.orchestration.types import CostFn
@@ -94,7 +95,11 @@ class InitialCost:
                 self.seen.add(index)
                 self.directory.joinpath(f"{index}.json").write_text(
                     json.dumps(
-                        {"pid": os.getpid(), "sample": random.random(), "at": time.perf_counter()}
+                        {
+                            "pid": os.getpid(),
+                            "sample": RandomStreams.python_rng().random(),
+                            "at": time.perf_counter(),
+                        }
                     ),
                     encoding="utf-8",
                 )
@@ -252,15 +257,15 @@ def test_worker_preserves_deadline_and_constructor_rng(
         """
         assert hyperparameters is None
         constructed.append(name)
-        random.random()
-        np.random.random()
+        RandomStreams.python_rng().random()
+        RandomStreams.numpy_rng().random()
         return SimpleNamespace(name=name)
 
     class Session:
         """Simulate completed or overrunning searches at their supplied deadlines.
 
         Responsibilities:
-        - Assert preparation and RNG restoration before advancing the test clock.
+        - Assert preparation and owned RNG activation before advancing the test clock.
         """
 
         def __init__(self, decoder: DecoderFn, cost: CostFn) -> None:
@@ -274,7 +279,7 @@ def test_worker_preserves_deadline_and_constructor_rng(
         def solve(
             self, algorithm: SimpleNamespace, limit_time: float, *, deadline: float
         ) -> RunResult:
-            """Check the restored stream and simulate one search slice.
+            """Check the reactivated owned stream and simulate one search slice.
 
             Args:
                 algorithm (SimpleNamespace): Named prepared search.
@@ -290,8 +295,8 @@ def test_worker_preserves_deadline_and_constructor_rng(
             numpy_rng = np.random.RandomState(seed)
             python_rng.random()
             numpy_rng.random()
-            assert random.random() == python_rng.random()
-            assert np.random.random() == numpy_rng.random()
+            assert RandomStreams.python_rng().random() == python_rng.random()
+            assert RandomStreams.numpy_rng().random() == numpy_rng.random()
             assert deadline <= 100.0 + duration
             assert deadline == pytest.approx(clock[0] + limit_time)
             calls.append(limit_time)
@@ -319,6 +324,9 @@ def test_worker_preserves_deadline_and_constructor_rng(
             SimpleNamespace(value=100.0 + duration),
             child,
         )
+        assert random.getstate() == python_state
+        assert np.array_equal(np.random.get_state()[1], numpy_state[1])
+        assert np.random.get_state()[2:] == numpy_state[2:]
         assert parent.recv() == ("ready", None)
         status, payload = parent.recv()
         assert calls == pytest.approx(expected_slices)

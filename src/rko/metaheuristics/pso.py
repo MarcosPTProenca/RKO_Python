@@ -34,9 +34,10 @@ Inputs/Outputs:
 from __future__ import annotations
 
 import numpy as np
-import random
+import random as random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
 from .base import LocalSearchOperator
@@ -146,6 +147,7 @@ class PSO(MetaheuristicBase):
             c2 (float): Social acceleration coefficient.
             inertia (float): Multiplier applied to the complete velocity update.
         """
+        random = RandomStreams.python_rng()
         n = len(position)
         if n < 32:
             for j in range(n):
@@ -187,6 +189,8 @@ class PSO(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
+        random = RandomStreams.python_rng()
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
         n = self.tam_solution
         p_size = self.p_size
@@ -215,8 +219,8 @@ class PSO(MetaheuristicBase):
                 c2 = ql.states[st].par[2]
                 w = ql.states[st].par[3]
 
-        x: list[np.ndarray] = [np.random.random(n) for _ in range(p_size)]
-        v: list[np.ndarray] = [np.random.random(n) for _ in range(p_size)]
+        x: list[np.ndarray] = [numpy_rng.random(n) for _ in range(p_size)]
+        v: list[np.ndarray] = [numpy_rng.random(n) for _ in range(p_size)]
         x_costs: list[float] = [self.cost(self.decoder(xi)) for xi in x]
         pbest: list[np.ndarray] = [xi.copy() for xi in x]
         pbest_costs: list[float] = list(x_costs)
@@ -236,8 +240,8 @@ class PSO(MetaheuristicBase):
                 c2 = ql.states[i_curr].par[2]
                 w = ql.states[i_curr].par[3]
                 while len(x) < p_size:
-                    new_xi = np.random.random(n)
-                    new_vi = np.random.random(n)
+                    new_xi = numpy_rng.random(n)
+                    new_vi = numpy_rng.random(n)
                     new_cost = self.cost(self.decoder(new_xi))
                     x.append(new_xi)
                     v.append(new_vi)

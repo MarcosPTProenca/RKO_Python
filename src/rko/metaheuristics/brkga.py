@@ -35,9 +35,10 @@ Inputs/Outputs:
 from __future__ import annotations
 
 import numpy as np
-import random
+import random as random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
 from .base import LocalSearchOperator
@@ -145,6 +146,7 @@ class BRKGA(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
+        random = RandomStreams.python_rng()
         n = self.tam_solution
         elite_idx = random.randint(0, elite_size - 1)
         non_elite_idx = random.randint(elite_size, len(pop) - 1)
@@ -167,6 +169,8 @@ class BRKGA(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
+        random = RandomStreams.python_rng()
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
         n = self.tam_solution
         p = self.p
@@ -195,7 +199,7 @@ class BRKGA(MetaheuristicBase):
                 pm = ql.states[st].par[2]
                 rhoe = ql.states[st].par[3]
 
-        pop: list[np.ndarray] = [np.random.random(n) for _ in range(p)]
+        pop: list[np.ndarray] = [numpy_rng.random(n) for _ in range(p)]
         pop_costs: list[float] = [self.cost(self.decoder(c)) for c in pop]
         order = sorted(range(p), key=lambda i: pop_costs[i])
         pop = [pop[i] for i in order]
@@ -215,7 +219,7 @@ class BRKGA(MetaheuristicBase):
                 pm = ql.states[i_curr].par[2]
                 rhoe = ql.states[i_curr].par[3]
                 while len(pop) < p:
-                    new_c = np.random.random(n)
+                    new_c = numpy_rng.random(n)
                     pop.append(new_c)
                     pop_costs.append(self.cost(self.decoder(new_c)))
                 if len(pop) > p:
@@ -239,7 +243,7 @@ class BRKGA(MetaheuristicBase):
                     best_off_cost = child_cost
 
             for _ in range(mutant_count):
-                mutant = np.random.random(n)
+                mutant = numpy_rng.random(n)
                 mutant_cost = self.cost(self.decoder(mutant))
                 pop_inter.append(mutant)
                 costs_inter.append(mutant_cost)

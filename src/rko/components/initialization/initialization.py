@@ -22,6 +22,7 @@ Inputs/Outputs:
 """
 
 import numpy as np
+from ..random_streams import RandomStreams
 from collections.abc import Callable
 from typing import Any
 
@@ -38,9 +39,10 @@ def create_initial_solution(tam_solution: int) -> np.ndarray:
     Raises:
         ValueError: When required by external domain validation.
     """
+    numpy_rng = RandomStreams.numpy_rng()
     if tam_solution <= 0:
         return np.array([], dtype=float)
-    return np.random.random(tam_solution)
+    return numpy_rng.random(tam_solution)
 
 
 def create_pool_solutions(
@@ -63,6 +65,7 @@ def create_pool_solutions(
     Raises:
         ValueError: When required by external domain validation.
     """
+    numpy_rng = RandomStreams.numpy_rng()
     pool: list[tuple[float, np.ndarray]] = []
 
     for _ in range(max(0, size_pool)):
@@ -79,8 +82,8 @@ def create_pool_solutions(
             num_changes = int(0.2 * tam_solution)
 
             if tam_solution > 0 and num_changes > 0:
-                positions = np.random.randint(0, tam_solution, size=num_changes)
-                keys[positions] = np.random.random(num_changes)
+                positions = numpy_rng.randint(0, tam_solution, size=num_changes)
+                keys[positions] = numpy_rng.random(num_changes)
 
             ofv = float(cost(decoder(keys)))
             pool[i] = (ofv, keys)

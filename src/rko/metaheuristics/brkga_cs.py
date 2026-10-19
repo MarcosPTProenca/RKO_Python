@@ -41,10 +41,11 @@ Inputs/Outputs:
 from __future__ import annotations
 
 import numpy as np
-import random
+import random as random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
 from ..components.local_search.rvnd import rvnd
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
 from .base import LocalSearchOperator
@@ -160,6 +161,7 @@ class BRKGA_CS(MetaheuristicBase):
         Returns:
           New offspring chromosome as a 1-D array.
         """
+        random = RandomStreams.python_rng()
         n = self.tam_solution
         elite_idx = random.randint(0, elite_size - 1)
         non_elite_idx = random.randint(elite_size, len(pop) - 1)
@@ -190,6 +192,7 @@ class BRKGA_CS(MetaheuristicBase):
         Raises:
             IndexError: If adjacency references a node outside the graph.
         """
+        random = RandomStreams.python_rng()
         labels = list(range(n_nodes))
         for _ in range(n_nodes * 10):
             order = list(range(n_nodes))
@@ -223,6 +226,7 @@ class BRKGA_CS(MetaheuristicBase):
         Raises:
             IndexError: If elite_size exceeds the population length.
         """
+        random = RandomStreams.python_rng()
         elite = [population[index] for index in range(elite_size)]
         adjacency: list[list[tuple[int, float]]] = [[] for _ in range(elite_size)]
         for i in range(elite_size):
@@ -253,6 +257,7 @@ class BRKGA_CS(MetaheuristicBase):
         Raises:
             ValueError: If a read-only array is selected for mutation.
         """
+        random = RandomStreams.python_rng()
         for index in range(len(keys)):
             if random.random() > rhoe:
                 keys[index] = random.random()
@@ -268,6 +273,8 @@ class BRKGA_CS(MetaheuristicBase):
         Returns:
           Tuple of (empty extras, best key vector as list, best cost).
         """
+        random = RandomStreams.python_rng()
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
         n = self.tam_solution
         p = self.p
@@ -296,7 +303,7 @@ class BRKGA_CS(MetaheuristicBase):
                 pm = ql.states[st].par[2]
                 rhoe = ql.states[st].par[3]
 
-        pop: list[np.ndarray] = [np.random.random(n) for _ in range(p)]
+        pop: list[np.ndarray] = [numpy_rng.random(n) for _ in range(p)]
         pop_costs: list[float] = [self.cost(self.decoder(c)) for c in pop]
         order = sorted(range(p), key=lambda i: pop_costs[i])
         pop = [pop[i] for i in order]
@@ -318,7 +325,7 @@ class BRKGA_CS(MetaheuristicBase):
                 pm = ql.states[i_curr].par[2]
                 rhoe = ql.states[i_curr].par[3]
                 while len(pop) < p:
-                    new_c = np.random.random(n)
+                    new_c = numpy_rng.random(n)
                     pop.append(new_c)
                     pop_costs.append(self.cost(self.decoder(new_c)))
                 if len(pop) > p:
@@ -338,7 +345,7 @@ class BRKGA_CS(MetaheuristicBase):
                 costs_inter.append(self.cost(self.decoder(child)))
 
             for _ in range(mutant_count):
-                mutant = np.random.random(n)
+                mutant = numpy_rng.random(n)
                 pop_inter.append(mutant)
                 costs_inter.append(self.cost(self.decoder(mutant)))
 

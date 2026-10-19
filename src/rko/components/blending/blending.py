@@ -22,7 +22,8 @@ Inputs/Outputs:
 """
 
 import numpy as np
-import random
+import random as random
+from ..random_streams import RandomStreams
 
 
 def blending(parent_a: np.ndarray, parent_b: np.ndarray, factor: float = 1.0) -> np.ndarray:
@@ -48,7 +49,7 @@ def blending(parent_a: np.ndarray, parent_b: np.ndarray, factor: float = 1.0) ->
     mutation = np.zeros(n, dtype=bool)
     use_parent_a = np.zeros(n, dtype=bool)
     mutation_values = np.empty(n, dtype=float)
-    draw = random.random
+    draw = RandomStreams.python_rng().random
 
     for j in range(n):
         if draw() < 0.02:

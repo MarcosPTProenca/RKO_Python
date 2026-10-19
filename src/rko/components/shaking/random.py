@@ -22,7 +22,8 @@ Inputs/Outputs:
 """
 
 import numpy as np
-import random
+import random as random
+from ..random_streams import RandomStreams
 from .mirror import mirror_shake
 from .neighbor_swap import neighbor_swap_shake
 from .swap import swap_shake
@@ -42,6 +43,7 @@ def shake(keys: np.ndarray, beta_min: float, beta_max: float) -> np.ndarray:
     Raises:
       ValueError: When required by external domain validation.
     """
+    random = RandomStreams.python_rng()
     n = len(keys)
     if n == 0:
         return keys

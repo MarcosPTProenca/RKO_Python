@@ -13,12 +13,17 @@ and non-busy IPR waiting. A single-instance `rko` command accepts external TOML
 configuration while retaining batch/module invocation. The CLI now shows live,
 timestamped new-best events and periodic pool status during plateaus (`--quiet`
 suppresses them); library progress is opt-in through `verbose=True`. These have regression and installed-artifact
-coverage.
+coverage. Library random draws now use privately owned per-search Python/NumPy
+streams in all backends, including seeded threads; standalone operators retain
+their global-RNG behavior. Custom callbacks must own their stochastic state.
 
 ## Outstanding
 
-- **RNG isolation:** serial execution seeds/restores global RNGs, so simultaneous
-  calls are not safely isolated. Thread mode cannot accept a per-search seed.
+- **Callback concurrency:** library RNGs are isolated, but user callbacks and
+  operator overrides must manage their own randomness and mutable state. Global
+  callback draws are neither implicitly seeded nor rolled back. Independent
+  solver instances may overlap; simultaneous calls on the same mutable instance
+  are not supported.
 - **Worker scheduling:** positive `n_jobs` now caps search workers without dropping
   the portfolio. Round-robin groups get equal nominal search slices under the
   original deadline. Defaults can still oversubscribe hardware, shorter groups'
@@ -128,6 +133,14 @@ traces, and these are not RSS measurements. Another 108 fixed-work adaptive PSO
 pairs matched exact fingerprints, but timings were mixed: this does not establish
 full-search, real adaptive-clock or cold-start gains. Predicate payload identity,
 axis snapshots, action order and initialization draws remain protected by tests.
+
+RNG ownership regression coverage now observes global states inside callbacks,
+forces two independently seeded serial solves to overlap, checks all registered
+algorithms in offline/adaptive serial/thread execution, and protects nested scope
+restoration. A separate trusted pre-isolation replay passed 342 fixed-work pairs
+with exact result/pool/RNG fingerprints. Short timing comparisons were mixed;
+this closes the library-owned RNG contamination gap, not a speed or scientific
+quality gap. Stochastic custom callbacks still need explicitly owned generators.
 
 Detailed working audits and plans are kept locally and excluded from Git. Source
 history preserves prior evidence; this page is the maintained public summary.

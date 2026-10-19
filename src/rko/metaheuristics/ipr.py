@@ -44,8 +44,9 @@ from __future__ import annotations
 
 import math
 import numpy as np
-import random
+import random as random
 import time
+from ..components.random_streams import RandomStreams
 from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
@@ -162,9 +163,11 @@ class IPR(MetaheuristicBase):
         Returns:
           Tuple of (empty extras, best key vector as list, best cost).
         """
+        random = RandomStreams.python_rng()
+        numpy_rng = RandomStreams.numpy_rng()
         self._start_timer()
 
-        best_keys: np.ndarray = np.random.random(self.tam_solution)
+        best_keys: np.ndarray = numpy_rng.random(self.tam_solution)
         best_cost: float = self.cost(self.decoder(best_keys))
 
         while not self.time_limit_reached(limit_time):

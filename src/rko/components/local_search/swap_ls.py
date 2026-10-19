@@ -20,7 +20,8 @@ Inputs/Outputs:
 """
 
 import numpy as np
-import random
+import random as random
+from ..random_streams import RandomStreams
 from collections.abc import Callable
 from typing import Any
 
@@ -47,6 +48,7 @@ def swap_ls(
     Raises:
       ValueError: When required by external domain validation.
     """
+    random = RandomStreams.python_rng()
     n = len(keys)
     if n < 2:
         return keys, cost(decoder(keys))
