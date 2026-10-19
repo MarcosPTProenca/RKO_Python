@@ -53,6 +53,62 @@ snapshot queries faster, but corrected full-search trials did not demonstrate a
 reliable general benefit and small cases sometimes regressed. It was discarded;
 no cache or additional retained worker snapshots were shipped.
 
+## IPR fixed-work block copying
+
+IPR now assigns multi-gene guide blocks with NumPy slices instead of a Python
+loop. Single-gene blocks use direct scalar assignment. Candidate ownership,
+callback isolation, path order, first-best tie handling and RNG sources remain
+unchanged; no dependency or default configuration was added.
+
+```bash
+uv run --locked python benchmarks/ipr.py > /tmp/rko-ipr.jsonl
+```
+
+The executable scalar reference retains the former `_relink` method body.
+Measurements swap that method on the **same IPR class**, avoiding inherited-versus-
+direct dispatch differences. All other components are production code, including
+SearchSession's protective copies and SolutionPool operations. Initial elites use
+the actual workload objective and an independent RNG; they do not count as search
+evaluations. Both variants warm up before measurement, alternate order, and restore
+the original method and caller RNG states on exit.
+
+Reference: 2026-10-19, four-CPU WSL2, GIL-enabled CPython 3.14.8 / NumPy 2.4.3,
+after integrating main's operator-override and property/mutation-testing PRs.
+Three seeds × three repeats × three workloads × seven dimensions yielded **189
+paired searches**. Every pair matched exact best keys, costs, evaluation counts,
+final elite-pool contents and Python/NumPy RNG fingerprints. Runs used 20,000
+completed search evaluations through 80 keys and 2,000 at 1,000/10,000 keys.
+
+Median paired scalar/production ratios, **wall / process CPU**; values below one
+are slower, not improvements:
+
+| Keys | Sphere | Rugged numerical | Stable permutation |
+| ---: | ---: | ---: | ---: |
+| 1 | 1.06 / 1.06 | 0.99 / 0.99 | 1.00 / 1.00 |
+| 8 | 1.11 / 1.11 | 0.99 / 0.99 | 1.00 / 1.00 |
+| 32 | 0.87 / 0.88 | 0.97 / 0.97 | 0.98 / 0.98 |
+| 79 | 1.17 / 1.17 | 0.99 / 0.99 | 1.12 / 1.12 |
+| 80 | 1.13 / 1.13 | 1.07 / 1.07 | 1.10 / 1.10 |
+| 1,000 | 2.47 / 2.47 | 1.34 / 1.34 | 1.30 / 1.30 |
+| 10,000 | 3.46 / 3.46 | 1.45 / 1.45 | 1.22 / 1.22 |
+
+Large-vector benefits repeated across exploratory runs; absolute timings varied.
+Small cases were inconsistent, including regressions: no universal or small-vector
+speedup is claimed. Extra repeated comparisons do not turn these synthetic
+workloads into independent real-world problem families.
+
+Separately warmed, isolated `_relink` tracing measured the same peak for both
+variants: 40,560 bytes at 1,000 keys and 400,560 at 10,000. Inputs were allocated
+before tracing. Full candidate copies remain; this is not a whole-solver memory
+or RSS improvement. Forty independent list-model regression cases compare every
+evaluated candidate bit-for-bit, including signed zero, partial blocks, stable
+ordering ties, source immutability and positive/negative-stride inputs.
+
+These measurements cover complete **serial IPR searches**, not just assignment
+microbenchmarks. They exclude process startup, manager IPC, expensive external
+callbacks, scientific optimization quality and C++/Rust parity. The runner may
+take several minutes on this reference host and is not part of normal CI.
+
 ## PSO fixed-work searches
 
 PSO now uses NumPy for independent genes within a particle at 32+ dimensions,

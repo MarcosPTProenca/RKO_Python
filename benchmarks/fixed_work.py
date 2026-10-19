@@ -5,7 +5,8 @@ Objective:
 
 Technical approach:
 - Run SA, GA and BRKGA on numerical, rugged and permutation workloads.
-- Expire the shared callback boundary after exactly 2,000 completed evaluations.
+- Support seeded elite pools for IPR and configurable fixed evaluation counts.
+- Expire the shared callback boundary after the requested completed evaluations.
 - Record result and RNG fingerprints alongside unprofiled elapsed search time.
 - Optionally alternate a trusted baseline SearchSession module in the same process.
 
@@ -38,6 +39,7 @@ import time
 from pathlib import Path
 from rko.components.solution_pool import SolutionPool
 from rko.metaheuristics import BRKGA
+from rko.metaheuristics import IPR
 from rko.metaheuristics import SA
 from rko.metaheuristics import GeneticAlgorithm
 from rko.metaheuristics import MetaheuristicBase
@@ -74,6 +76,7 @@ def _run(
     seed: int,
     session_type: type[SearchSession] = SearchSession,
     dimension: int = 1000,
+    evaluation_limit: int = 2000,
 ) -> dict[str, object]:
     """Record one deterministic full-search result after a fixed evaluation count.
 
@@ -83,6 +86,7 @@ def _run(
         seed (int): Seed used for both RNG streams.
         session_type (type[SearchSession]): Callback-boundary implementation to compare.
         dimension (int): Positive number of random keys.
+        evaluation_limit (int): Completed evaluations before cooperative stopping.
 
     Returns:
         dict[str, object]: Elapsed seconds and deterministic search fingerprints.
@@ -92,8 +96,24 @@ def _run(
     evaluations = 0
     weights = np.arange(1, dimension + 1)
 
+    def score(payload: np.ndarray) -> float:
+        """Compute consistent fitness for initial elites and search candidates.
+
+        Args:
+            payload (np.ndarray): Continuous keys or a decoded permutation.
+
+        Returns:
+            float: Deterministic finite minimization objective.
+        """
+        if workload == "rugged":
+            values = 10 * payload - 5
+            return float(10 * dimension + np.sum(values**2 - 10 * np.cos(2 * np.pi * values)))
+        if workload == "ordering":
+            return float(np.dot(payload, weights))
+        return float(np.dot(payload, payload))
+
     def objective(payload: np.ndarray) -> float:
-        """Evaluate a synthetic problem and stop at the next boundary after call 2,000.
+        """Evaluate search candidates and expire the boundary at the requested count.
 
         Args:
             payload (np.ndarray): Continuous keys or a decoded permutation.
@@ -103,24 +123,25 @@ def _run(
         """
         nonlocal evaluations
         evaluations += 1
-        if evaluations == 2000:
+        if evaluations == evaluation_limit:
             session.deadline = 0.0
-        if workload == "rugged":
-            values = 10 * payload - 5
-            return float(10 * dimension + np.sum(values**2 - 10 * np.cos(2 * np.pi * values)))
-        if workload == "ordering":
-            return float(np.dot(payload, weights))
-        return float(np.dot(payload, payload))
+        return score(payload)
 
     decoder = _order if workload == "ordering" else _decode
+    pool = SolutionPool()
+    if issubclass(algorithm_type, IPR):
+        generator = np.random.RandomState(seed + 1000)
+        for _ in range(10):
+            keys = generator.random_sample(dimension)
+            pool.insert((score(decoder(keys)), keys.tolist()), "seed")
     session = session_type(decoder, objective)
-    algorithm = algorithm_type(SolutionPool(), decoder, objective, dimension)
+    algorithm = algorithm_type(pool, decoder, objective, dimension)
     started = time.perf_counter()
     started_cpu = time.process_time()
     result = session.solve(algorithm, 3600.0)
     cpu_seconds = time.process_time() - started_cpu
     elapsed = time.perf_counter() - started
-    assert evaluations == 2000
+    assert evaluations == evaluation_limit
     assert np.isfinite(result[2])
     assert len(result[1]) == dimension
     return {
@@ -133,6 +154,7 @@ def _run(
         "cpu_seconds": cpu_seconds,
         "cost": result[2],
         "keys_sha256": hashlib.sha256(np.asarray(result[1], dtype="<f8").tobytes()).hexdigest(),
+        "pool_sha256": hashlib.sha256(pickle.dumps(pool.get_elite(10))).hexdigest(),
         "rng_sha256": hashlib.sha256(
             pickle.dumps((random.getstate(), np.random.get_state()))
         ).hexdigest(),

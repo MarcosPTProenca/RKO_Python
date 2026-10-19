@@ -85,5 +85,15 @@ comparison, not equal-work throughput or an optimization-quality improvement.
 RSS sums double-count shared pages and are sampled, not exact physical-memory
 high-water marks. See [benchmarks](../benchmarks/README.md) for reproduction.
 
+IPR now uses NumPy slice assignment for multi-gene guide blocks and direct
+assignment for single-gene blocks, preserving full candidate copies and the
+original path/callback ordering. Across 189 fixed-work numerical/permutation
+pairs, best keys, costs, counts, final elites and RNG states matched exactly.
+In one reference, 1,000-key searches were 1.30–2.47× faster and 10,000-key searches
+1.22–3.46× faster; small-vector results were mixed, including regressions.
+Isolated traced relinking peaks were unchanged. These are serial IPR results,
+not whole-portfolio, process, quality or native-parity claims; see
+[benchmarks](../benchmarks/README.md).
+
 Detailed working audits and plans are kept locally and excluded from Git. Source
 history preserves prior evidence; this page is the maintained public summary.

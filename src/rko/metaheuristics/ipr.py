@@ -9,6 +9,8 @@ Technical approach:
 - The key vector is divided into fixed-size blocks (10 % of chromosme length).
 - A greedy block-relinking procedure selects, one block at a time, the most
   improving swap from the current position toward the guide solution.
+- Multi-gene blocks use NumPy slice assignment; single-gene blocks use direct
+  scalar assignment without constructing short-lived array views.
 - The best solution encountered along the explored path is inserted back into
   the pool.
 - No Q-Learning or auxiliary parameters are required; all decisions are
@@ -128,8 +130,10 @@ class IPR(MetaheuristicBase):
                 s_viz = s_current.copy()
                 start = b * block_size
                 end = min((b + 1) * block_size, n)
-                for k in range(start, end):
-                    s_viz[k] = guia_keys[k]
+                if block_size == 1:
+                    s_viz[start] = guia_keys[start]
+                else:
+                    s_viz[start:end] = guia_keys[start:end]
                 viz_cost = self.cost(self.decoder(s_viz))
                 if viz_cost < best_iter_cost:
                     best_iter_cost = viz_cost
