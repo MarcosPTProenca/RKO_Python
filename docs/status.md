@@ -19,9 +19,12 @@ coverage.
 
 - **RNG isolation:** serial execution seeds/restores global RNGs, so simultaneous
   calls are not safely isolated. Thread mode cannot accept a per-search seed.
-- **Worker scheduling:** defaults can oversubscribe hardware. A portfolio larger
-  than `n_jobs` is rejected, not fairly scheduled. Native-thread limits, peak RSS
-  and fixed-work IPC profiles remain unmeasured.
+- **Worker scheduling:** positive `n_jobs` now caps search workers without dropping
+  the portfolio. Round-robin groups get equal nominal search slices under the
+  original deadline. Defaults can still oversubscribe hardware, shorter groups'
+  unused time is not redistributed, and callbacks may exhaust later slices.
+  Native-thread limits, adaptive load balancing and broad RSS/IPC profiles remain
+  open; one sampled Linux memory/latency reference is available in benchmarks.
 - **Algorithm contracts:** complete C++ parity/deviation specifications and
   scientific invariants remain, including SA/GRASP adaptive behavior. Six local
   neighborhood cases now match compiled C++ kernels: strategy 1 continues the
@@ -71,6 +74,16 @@ searches reproduced exact best keys, costs, counts and RNG states. Batching adds
 O(n) temporary scratch, not a memory benefit. These measurements do not establish
 process/portfolio speed, optimization quality or native-code parity; reproduction
 and limitations are in [benchmarks](../benchmarks/README.md).
+
+A domain-neutral ten-algorithm process reference now measures startup latency,
+observed worker counts and sampled parent/child RSS. Setting `n_jobs=4` retained
+all ten algorithms and used four search workers rather than ten. On this WSL2
+reference, median summed sampled RSS fell from about 482–483 MiB to about 248 MiB,
+and one-second-budget end-to-end times fell from 8.12–11.25 s to 6.64–8.72 s.
+Per-algorithm time and cooperation differ, so this is a resource/short-run latency
+comparison, not equal-work throughput or an optimization-quality improvement.
+RSS sums double-count shared pages and are sampled, not exact physical-memory
+high-water marks. See [benchmarks](../benchmarks/README.md) for reproduction.
 
 Detailed working audits and plans are kept locally and excluded from Git. Source
 history preserves prior evidence; this page is the maintained public summary.

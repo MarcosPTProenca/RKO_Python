@@ -4,6 +4,55 @@ Each section identifies its workload and limits. Synthetic fixed-work and
 allocation probes complement the historical Knapsack reference; no single case
 establishes general optimization quality or native-code performance parity.
 
+## Bounded process-worker resources
+
+A positive `n_jobs` now keeps the complete selected portfolio while limiting
+search processes. Assignments are round-robin; each gets a nominal slice of
+`time_limit / ceil(N / W)`, bounded by the original common deadline. No extra
+full-duration budgets are granted to queued searches. `n_jobs=None` retains the
+previous one-worker-per-algorithm default. One additional process hosts the pool;
+BLAS/OpenMP threads are outside the search-worker limit.
+
+```bash
+uv run --locked python benchmarks/process_budget.py > /tmp/rko-process-budget.jsonl
+```
+
+Reference: 2026-10-19, four-CPU WSL2, CPython 3.14.8 / NumPy 2.4.3, GIL enabled,
+packaged ten-algorithm portfolio, offline control, 128 keys and a one-second
+common search budget. Three seeds per numerical sphere/permutation adapter,
+alternating dedicated/limited execution order, produced these medians:
+
+| Adapter | Worker limit | Observed search workers | First decode (s) | End-to-end (s) | Sampled worker RSS sum (MiB) | Sampled parent/children RSS sum (MiB) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Sphere | None | 10 | 6.632 | 8.122 | 390.4 | 481.9 |
+| Sphere | 4 | 4 | 5.465 | 6.637 | 156.3 | 247.6 |
+| Permutation | None | 10 | 9.772 | 11.254 | 391.7 | 483.4 |
+| Permutation | 4 | 4 | 7.384 | 8.721 | 156.6 | 248.1 |
+
+All twelve runs recorded every algorithm's seeded first decode, respected the
+worker cap and returned finite, independently checked objectives and valid keys.
+Memory sampling uses Linux procfs every ~20 ms. Reported peaks are maxima of
+sampled RSS sums, not exact high-water marks or unique physical memory; shared
+pages are counted once per process. The total includes the coordinator, manager,
+workers and resource tracker. Other platforms report unavailable RSS as null.
+The observation decoder adds instrumentation overhead to both variants.
+Absolute startup times varied materially between reference runs on this host;
+all six final limited/dedicated trial pairs used less RSS and elapsed time with
+four workers, but do not treat these times as portable startup guarantees.
+
+**These are different budget allocations**, not equal-work speedups. Ten searches
+on four workers receive at most a nominal one-third slice each, and shorter
+groups finish early without redistributing idle time. First-decode latency is an
+observable startup bound, not pure import time. Neither long-budget performance
+nor better optimization quality is established. Active callback overruns can leave
+queued algorithms less time or no time. Native thread limits and adaptive load
+balancing are still separate work.
+
+An exploratory versioned elite-snapshot cache made repeated unchanged large
+snapshot queries faster, but corrected full-search trials did not demonstrate a
+reliable general benefit and small cases sometimes regressed. It was discarded;
+no cache or additional retained worker snapshots were shipped.
+
 ## PSO fixed-work searches
 
 PSO now uses NumPy for independent genes within a particle at 32+ dimensions,

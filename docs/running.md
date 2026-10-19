@@ -20,9 +20,15 @@ Bash continuation backslashes with PowerShell backticks.
 `rko ...`; running the Python module directly also remains supported. Startup
 is additional to the process search budget; see README for stopping limits.
 The packaged default selects ten algorithms and can oversubscribe a small
-machine; set `--n-jobs` explicitly only when it is at least the selected
-algorithm count. Custom portfolios larger than the worker budget are rejected,
-not queued. This scheduling limitation remains under review.
+machine. `--n-jobs 4` keeps the full portfolio but uses at most four search
+workers plus the pool manager. Assignments are round-robin; each worker executes
+its group sequentially, with every search capped at `limit_time / ceil(N / W)`
+seconds and the original common deadline. Ten algorithms on four workers therefore
+receive at most one third of the search budget each. Startup remains additional.
+Workers with shorter groups may finish early; unused time is not redistributed.
+Callback overruns can consume later searches' slices. This changes timed search
+trajectories and cooperation, not the configured algorithm selection or seed
+assignment. Native-library threads are not capped by `--n-jobs`.
 
 ## Live progress
 

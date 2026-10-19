@@ -5,7 +5,8 @@ Objective:
 
 Technical approach:
 - Host SolutionPool in a manager and exchange control/results through pipes.
-- Construct each search in its worker and release ready workers together.
+- Construct searches in bounded worker groups and release ready workers together.
+- Divide the common budget into equal per-search slices when algorithms share workers.
 
 Flow (pseudocode):
 1. Validate serialization and start the managed pool and workers.
@@ -125,46 +126,63 @@ PoolManager.register("SolutionPool", SolutionPool, proxytype=PoolProxy)
 
 
 def _worker(
-    name: str,
+    assignments: tuple[tuple[str, int], ...],
     config: RunConfig,
     pool: PoolProxy,
     decoder: DecoderFn,
     cost: CostFn,
     dimension: int,
     params_dir: Path | None,
-    seed: int,
+    slice_seconds: float,
     start: Event,
     deadline: Synchronized,
     connection: Connection,
 ) -> None:
-    """Construct one search and report readiness, result or failure.
+    """Run assigned searches sequentially without extending the common deadline.
 
     Args:
-        name (str): Registered algorithm name.
+        assignments (tuple[tuple[str, int], ...]): Algorithm names and independent seeds.
         config (RunConfig): Validated global settings.
         pool (PoolProxy): Shared elite-pool proxy.
         decoder (DecoderFn): Pickleable problem decoder.
         cost (CostFn): Pickleable objective callback.
         dimension (int): Number of random keys.
         params_dir (Path | None): Optional parameter directory.
-        seed (int): Distinct worker seed for Python and NumPy.
+        slice_seconds (float): Maximum seconds per assigned search.
         start (Event): Parent-controlled simultaneous release.
         deadline (Synchronized): Common monotonic search deadline.
         connection (Connection): Dedicated result/control pipe.
     """
+    name = "startup"
     try:
-        random.seed(seed)
-        np.random.seed(seed)
-        mh = build_metaheuristic(name, pool, decoder, cost, dimension, config.control, params_dir)
+        prepared = []
+        for name, seed in assignments:
+            random.seed(seed)
+            np.random.seed(seed)
+            mh = build_metaheuristic(
+                name, pool, decoder, cost, dimension, config.control, params_dir
+            )
+            prepared.append((mh, random.getstate(), np.random.get_state()))
         connection.send(("ready", None))
         start.wait()
-        remaining = deadline.value - time.perf_counter()
-        if remaining <= 0:
+        best: RunResult | None = None
+        for mh, python_state, numpy_state in prepared:
+            name = mh.name
+            search_deadline = min(deadline.value, time.perf_counter() + slice_seconds)
+            remaining = search_deadline - time.perf_counter()
+            if remaining <= 0:
+                break
+            random.setstate(python_state)
+            np.random.set_state(numpy_state)
+            result = SearchSession(decoder, cost).solve(mh, remaining, deadline=search_deadline)
+            if best is None or result[2] < best[2]:
+                best = result
+            del result
+        if best is None:
             raise TimeoutError("Search deadline elapsed before worker execution.")
-        result = SearchSession(decoder, cost).solve(mh, remaining, deadline=deadline.value)
-        connection.send(("result", result))
+        connection.send(("result", best))
     except BaseException as exc:
-        details = traceback.format_exc()
+        details = f"{name}:\n{traceback.format_exc()}"
         try:
             pickle.dumps(exc)
             cause = exc
@@ -197,7 +215,7 @@ def run_processes(
         dimension (int): Number of random keys.
         limit_time (float): Search seconds excluding process startup.
         params_dir (Path | None): Optional parameter directory.
-        n_jobs (int | None): Process budget; None allows one per algorithm.
+        n_jobs (int | None): Positive worker limit; None allows one per algorithm.
         random_state (int | None): Seed used to derive independent worker seeds.
         verbose (bool): Emit pool updates from its single authoritative manager.
         started_at (float | None): Parent solve's monotonic origin for elapsed log times.
@@ -206,13 +224,13 @@ def run_processes(
         tuple[list[float], float]: Best keys and minimization objective.
 
     Raises:
-        ValueError: If callbacks are not pickleable or the portfolio exceeds budget.
+        ValueError: If callbacks are not pickleable or the worker limit is invalid.
         RuntimeError: If a worker fails or exits without returning a result.
         TimeoutError: If startup or search exceeds its allowed grace period.
     """
     names = config.active_metaheuristics
-    if n_jobs is not None and (type(n_jobs) is not int or n_jobs < len(names)):
-        raise ValueError("n_jobs must be an integer >= the number of active metaheuristics.")
+    if n_jobs is not None and (type(n_jobs) is not int or n_jobs < 1):
+        raise ValueError("n_jobs must be a positive integer or None.")
     try:
         pickle.dumps((decoder, cost))
     except Exception as exc:
@@ -223,6 +241,13 @@ def run_processes(
 
     context = mp.get_context("spawn")
     seeds = np.random.SeedSequence(random_state).spawn(len(names))
+    assignments = tuple(
+        (name, int(sequence.generate_state(1)[0]))
+        for name, sequence in zip(names, seeds, strict=True)
+    )
+    worker_count = len(names) if n_jobs is None else min(n_jobs, len(names))
+    groups = [assignments[index::worker_count] for index in range(worker_count)]
+    slice_seconds = limit_time / max(len(group) for group in groups)
     with PoolManager(ctx=context) as manager:
         pool = manager.SolutionPool(config.pool_size, verbose=verbose, started_at=started_at)
         start = context.Event()
@@ -235,21 +260,22 @@ def run_processes(
         expires = time.perf_counter() + 60.0
         try:
             pool.start_progress()
-            for name, sequence in zip(names, seeds, strict=True):
+            for group in groups:
+                name = "/".join(name for name, _ in group)
                 parent, child = context.Pipe(duplex=False)
                 connections.append(parent)
                 process = context.Process(
                     target=_worker,
                     name=f"rko-{name}",
                     args=(
-                        name,
+                        group,
                         config,
                         pool,
                         decoder,
                         cost,
                         dimension,
                         params_dir,
-                        int(sequence.generate_state(1)[0]),
+                        slice_seconds,
                         start,
                         deadline,
                         child,
@@ -283,7 +309,7 @@ def run_processes(
                     else:
                         results.append(payload)
                         del pending[connection]
-                if not start.is_set() and len(ready) == len(names):
+                if not start.is_set() and len(ready) == worker_count:
                     deadline.value = time.perf_counter() + limit_time
                     expires = deadline.value + 5.0
                     start.set()

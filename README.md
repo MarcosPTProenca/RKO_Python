@@ -46,11 +46,19 @@ and also accepts `verbose=True`.
 
 ## Execution modes
 
-- **`backend="process"` (default):** one spawned worker per selected algorithm,
-  plus one manager hosting the shared elite pool. `n_jobs=None` permits that
-  many workers, even if the selection exceeds available CPU cores. Specify a
-  budget explicitly to prevent accidental oversubscription. A portfolio larger
-  than `n_jobs` is rejected, not queued or silently truncated.
+- **`backend="process"` (default):** one spawned worker per selected algorithm
+  when `n_jobs=None`, plus one manager hosting the shared elite pool. The default
+  can exceed available CPU cores. A positive `n_jobs` caps search workers without
+  dropping algorithms: assignments are round-robin and each worker runs its
+  assigned searches sequentially. With N algorithms and W workers, each search
+  gets at most `time_limit / ceil(N / W)` seconds, all within one common deadline.
+  For example, ten algorithms with `n_jobs=4` use four search workers, three
+  slices and one manager—not ten workers or ten fresh full-duration searches.
+  Smaller limits change cooperation and per-algorithm budgets; they are not a
+  promise of better optimization quality. Active callbacks can overrun a slice
+  and leave later searches less time or no time. Algorithms sharing a worker
+  also share its callback instances; mutable callback state is not reset between
+  searches. Native BLAS/OpenMP threads are separate from this worker limit.
 - **`backend="thread"`:** legacy shared-memory execution; arbitrary local
   callbacks work, but CPU-bound Python code is subject to the standard GIL.
 - **`backend="serial"`:** debugging/reference execution with shared elites.
@@ -60,8 +68,10 @@ and also accepts `verbose=True`.
 
 IPR consumes elite pairs from other searches. Running it alone returns an initial
 candidate without meaningful relinking; select another search alongside it and
-use a pool capacity of at least two. Waiting uses bounded backoff, and process
-occupancy queries transfer only a count rather than the entire pool.
+use a pool capacity of at least two. With a single worker, schedule IPR after
+searches that populate the pool; otherwise its slice may be spent waiting for
+searches queued behind it. Waiting uses bounded backoff, and process occupancy
+queries transfer only a count rather than the entire pool.
 
 Algorithm hyperparameters are currently in packaged `rko/parameters/` TOMLs.
 Use `algorithms=["SA", "GA"]` to select a smaller portfolio without copying files.

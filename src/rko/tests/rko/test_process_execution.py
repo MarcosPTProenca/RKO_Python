@@ -234,41 +234,51 @@ def test_process_rejects_nested_callbacks(params_dir: Path) -> None:
     assert {child.pid for child in mp.active_children()} == before
 
 
-def test_process_rejects_undersized_worker_budget(params_dir: Path) -> None:
-    """Avoid silently queueing full-duration searches beyond the worker budget.
+@pytest.mark.parametrize("n_jobs", [0, -1, True, 1.5])
+def test_process_rejects_invalid_worker_budget(params_dir: Path, n_jobs: object) -> None:
+    """Reject nonpositive or noninteger worker limits before creating children.
 
     Args:
         params_dir (Path): Configuration selecting two algorithms.
+        n_jobs (object): Invalid explicit worker budget.
     """
+    before = {child.pid for child in mp.active_children()}
     with pytest.raises(ValueError, match="n_jobs"):
-        run(identity, sphere, 3, 0.1, params_dir=params_dir, n_jobs=1)
+        run(identity, sphere, 3, 0.1, params_dir=params_dir, n_jobs=n_jobs)
+    assert {child.pid for child in mp.active_children()} == before
 
 
 @pytest.mark.parametrize("objective", [failing_cost, exiting_cost])
-def test_worker_failure_reaps_children(params_dir: Path, objective: object) -> None:
+@pytest.mark.parametrize("n_jobs", [None, 1])
+def test_worker_failure_reaps_children(
+    params_dir: Path, objective: object, n_jobs: int | None
+) -> None:
     """Propagate callback failures and abrupt exits without orphaning children.
 
     Args:
         params_dir (Path): Complete test portfolio configuration.
         objective (object): Importable callback that fails inside the worker.
+        n_jobs (int | None): Dedicated or shared worker execution.
     """
     before = {child.pid for child in mp.active_children()}
     with pytest.raises(RuntimeError, match="MultiStart|SA") as captured:
-        run(identity, objective, 3, 0.1, params_dir=params_dir)
+        run(identity, objective, 3, 0.1, params_dir=params_dir, n_jobs=n_jobs)
     if objective is failing_cost:
         assert isinstance(captured.value.__cause__, ArithmeticError)
     assert {child.pid for child in mp.active_children()} == before
 
 
-def test_search_timeout_reaps_blocked_workers(params_dir: Path) -> None:
+@pytest.mark.parametrize("n_jobs", [None, 1])
+def test_search_timeout_reaps_blocked_workers(params_dir: Path, n_jobs: int | None) -> None:
     """Bound callbacks that fail to return within the search grace period.
 
     Args:
         params_dir (Path): Complete test portfolio configuration.
+        n_jobs (int | None): Dedicated or shared worker execution.
     """
     before = {child.pid for child in mp.active_children()}
     with pytest.raises(TimeoutError, match="search timed out"):
-        run(identity, blocking_cost, 3, 0.01, params_dir=params_dir)
+        run(identity, blocking_cost, 3, 0.01, params_dir=params_dir, n_jobs=n_jobs)
     assert {child.pid for child in mp.active_children()} == before
 
 

@@ -86,7 +86,7 @@ class RKO:
         pool_size (int | None): Shared elite capacity; None uses TOML defaults.
         params_dir (Path | None): Optional parameter directory.
         backend (str): Process, thread or serial execution.
-        n_jobs (int | None): Process budget; portfolio must currently fit.
+        n_jobs (int | None): Positive process-worker limit, excluding the pool manager.
         random_state (int | None): Nonnegative serial/process seed.
         verbose (bool): Print lifecycle and attributed shared-pool updates; default False.
         result_ (RKOResult | None): Last successful solve; cleared before each attempt.
@@ -118,7 +118,8 @@ class RKO:
             pool_size (int | None): Elite capacity, or configured default.
             params_dir (Path | None): Optional parameter TOML directory.
             backend (Literal): Process, legacy thread or serial execution.
-            n_jobs (int | None): Process budget; None allows one per algorithm.
+            n_jobs (int | None): Positive worker limit; None allows one per algorithm.
+                Smaller limits share workers and split the common search budget.
             random_state (int | None): Nonnegative seed for serial/process modes.
             verbose (bool): Flush lifecycle and shared-pool progress to stdout.
         """

@@ -88,6 +88,18 @@ def main() -> None:
             assert len(keys) == dimension
             assert np.all((keys >= 0.0) & (keys < 1.0))
             assert np.isclose(result.cost, objective(keys))
+    bounded = RKO(
+        decode,
+        objective,
+        64,
+        algorithms=["MultiStart", "PSO"],
+        control=0,
+        backend="process",
+        n_jobs=1,
+        random_state=42,
+    ).solve(0.1)
+    assert len(bounded.keys) == 64
+    assert np.isclose(bounded.cost, objective(np.asarray(bounded.keys)))
     executable = shutil.which("rko")
     assert executable is not None
     with tempfile.TemporaryDirectory(prefix="rko-installed-cli-") as temporary:
