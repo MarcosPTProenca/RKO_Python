@@ -72,7 +72,7 @@ class SearchSession:
         cost (CostFn): Original objective callback.
         deadline (float): Absolute monotonic stop time.
         cancelled (threading.Event | None): Optional portfolio failure signal.
-        best (tuple[list[float], float] | None): Best completed evaluation.
+        best (tuple[np.ndarray, float] | None): Detached best completed evaluation.
     """
 
     def __init__(self, decoder: DecoderFn, cost: CostFn) -> None:
@@ -86,7 +86,7 @@ class SearchSession:
         self.cost = cost
         self.deadline = math.inf
         self.cancelled: threading.Event | None = None
-        self.best: tuple[list[float], float] | None = None
+        self.best: tuple[np.ndarray, float] | None = None
 
     def _check(self) -> None:
         """Stop after a valid result exists or when another worker failed.
@@ -133,7 +133,7 @@ class SearchSession:
         if not math.isfinite(value):
             raise ValueError("Objective callbacks must return finite costs.")
         if self.best is None or value < self.best[1]:
-            self.best = (candidate.keys.tolist(), value)
+            self.best = (candidate.keys, value)
         return value
 
     def solve(
@@ -171,7 +171,7 @@ class SearchSession:
             except _BudgetExpired:
                 result = ([], [], math.inf)
             if self.best is not None and self.best[1] < result[2]:
-                result = (result[0], self.best[0], self.best[1])
+                result = (result[0], self.best[0].tolist(), self.best[1])
             return result
         finally:
             algorithm.decoder, algorithm.cost = original_decoder, original_cost

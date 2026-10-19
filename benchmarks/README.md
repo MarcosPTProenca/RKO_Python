@@ -108,3 +108,47 @@ uv run --locked python benchmarks/ga_population_memory.py
 To compare a baseline checkout, copy the runner into that checkout and run the
 same command there. Keep dimensions, population size, seeds, Python and NumPy
 versions fixed when comparing results.
+
+## Shared incumbent and elite-pool allocations
+
+On Python 3.14.8 / NumPy 2.4.3, the shared callback boundary now retains its
+already-detached NumPy key snapshot instead of materializing a Python float list
+at every improvement. Public result keys are still lists. Both protective decoder
+copies, finite-objective validation and deadline handling remain enabled.
+
+A 1,000-evaluation stream over 10,000 keys with an improving objective measured
+retained traced allocation **322,704 → 80,376 bytes** (-75.1%) and peak allocation
+**800,608 → 240,656 bytes** (-69.9%). The untraced callback-stream time was
+0.2321 → 0.0082 seconds; this deliberately improvement-heavy stream is not a
+whole-search throughput claim. Periodic improvements and plateaus are included
+in the runner to expose workload sensitivity.
+
+The elite pool also reuses its first validated private list copy rather than
+copying that copy again. A capacity-one pool accepting 100 successive improvements
+with 10,000 keys measured peak traced allocation **242,008 → 163,512 bytes**
+(-32.4%) against `0f3b426`. Retained pool storage is unchanged. These figures
+exclude preallocated source data and do not measure process RSS or IPC.
+
+```bash
+uv run --locked python benchmarks/search_session.py
+uv run --locked python benchmarks/fixed_work.py > /tmp/rko-fixed-work.jsonl
+git show 0f3b426:src/rko/orchestration/search.py > /tmp/rko-baseline-search.py
+uv run --locked python benchmarks/fixed_work.py \
+  --baseline-search /tmp/rko-baseline-search.py > /tmp/rko-paired-search.jsonl
+```
+
+The first runner contains the prior incumbent evaluator as a reference; copy it
+into the baseline checkout to compare pool allocation. The second runs actual
+SA, GA and BRKGA searches with sphere, rugged numerical and stable-permutation
+decoders/objectives: three seeds and exactly 2,000 evaluations per search, with
+real local search and elite exchange. Compare matching JSON records across
+checkouts; costs, key fingerprints, evaluation counts and both RNG fingerprints
+must agree before interpreting elapsed times. The optional baseline flag executes
+that trusted module and alternates implementations in the same process for three
+repeats; other components, including the elite pool, use production code in both
+variants. In 81 paired searches all replay checks matched, and per-workload median
+paired elapsed changes ranged from -2.6% to +2.6%: no reliable whole-search runtime
+gain was established. Avoid interpreting separate Linux-filesystem and mounted
+Windows checkouts as a controlled runtime comparison. Serial timing excludes
+process startup, configuration I/O and transport, and does not establish
+native-code parity.

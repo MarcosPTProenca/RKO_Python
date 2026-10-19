@@ -228,7 +228,7 @@ class SolutionPool:
         with self._lock:
             if len(self._pool) < self.capacity or cost < self._pool[-1][0]:
                 improved = not self._pool or cost < self._pool[0][0]
-                self._pool.append((cost, list(keys), source))
+                self._pool.append((cost, keys, source))
                 self._pool.sort(key=lambda t: t[0])
                 if len(self._pool) > self.capacity:
                     self._pool.pop()

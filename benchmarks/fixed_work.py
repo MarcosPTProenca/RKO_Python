@@ -1,0 +1,187 @@
+"""Deterministic fixed-evaluation search workloads for cross-revision comparison.
+
+Objective:
+- Compare complete serial search paths without conflating timed search trajectories.
+
+Technical approach:
+- Run SA, GA and BRKGA on numerical, rugged and permutation workloads.
+- Expire the shared callback boundary after exactly 2,000 completed evaluations.
+- Record result and RNG fingerprints alongside unprofiled elapsed search time.
+- Optionally alternate a trusted baseline SearchSession module in the same process.
+
+Flow (pseudocode):
+1. Seed Python and NumPy for each workload and instantiate a fresh algorithm.
+2. Execute actual population, local-search, callback and elite-pool operations.
+3. Emit JSON lines for timing and deterministic cross-checkout replay validation.
+
+Important criteria:
+- Real local search and both callback-protecting copies remain enabled.
+- Copy this runner into the baseline checkout and compare matching JSON records.
+- Prefer --baseline-search for paired callback-boundary timing without filesystem drift.
+- Synthetic serial measurements exclude configuration I/O and process startup/IPC.
+- A fingerprint mismatch invalidates equal-trajectory speed comparisons.
+
+Inputs/Outputs:
+- Input: no external data; 1,000 keys and seeds 200 through 202.
+- Output: JSON lines with elapsed time, cost, evaluation count and replay fingerprints.
+"""
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import numpy as np
+import pickle
+import random
+import sys
+import time
+from pathlib import Path
+from rko.components.solution_pool import SolutionPool
+from rko.metaheuristics import BRKGA
+from rko.metaheuristics import SA
+from rko.metaheuristics import GeneticAlgorithm
+from rko.metaheuristics import MetaheuristicBase
+from rko.orchestration.search import SearchSession
+
+
+def _decode(keys: np.ndarray) -> np.ndarray:
+    """Pass continuous random keys to a numerical objective unchanged.
+
+    Args:
+        keys (np.ndarray): Candidate chromosome.
+
+    Returns:
+        np.ndarray: Unchanged payload.
+    """
+    return keys
+
+
+def _order(keys: np.ndarray) -> np.ndarray:
+    """Decode random keys as a stable permutation.
+
+    Args:
+        keys (np.ndarray): Candidate chromosome.
+
+    Returns:
+        np.ndarray: Indices ordered by key.
+    """
+    return np.argsort(keys, kind="stable")
+
+
+def _run(
+    algorithm_type: type[MetaheuristicBase],
+    workload: str,
+    seed: int,
+    session_type: type[SearchSession] = SearchSession,
+) -> dict[str, object]:
+    """Record one deterministic full-search result after a fixed evaluation count.
+
+    Args:
+        algorithm_type (type[MetaheuristicBase]): Production search implementation.
+        workload (str): Sphere, rugged or ordering workload.
+        seed (int): Seed used for both RNG streams.
+        session_type (type[SearchSession]): Callback-boundary implementation to compare.
+
+    Returns:
+        dict[str, object]: Elapsed seconds and deterministic search fingerprints.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    evaluations = 0
+    weights = np.arange(1, 1001)
+
+    def objective(payload: np.ndarray) -> float:
+        """Evaluate a synthetic problem and stop at the next boundary after call 2,000.
+
+        Args:
+            payload (np.ndarray): Continuous keys or a decoded permutation.
+
+        Returns:
+            float: Deterministic finite minimization objective.
+        """
+        nonlocal evaluations
+        evaluations += 1
+        if evaluations == 2000:
+            session.deadline = 0.0
+        if workload == "rugged":
+            values = 10 * payload - 5
+            return float(10000 + np.sum(values**2 - 10 * np.cos(2 * np.pi * values)))
+        if workload == "ordering":
+            return float(np.dot(payload, weights))
+        return float(np.dot(payload, payload))
+
+    decoder = _order if workload == "ordering" else _decode
+    session = session_type(decoder, objective)
+    algorithm = algorithm_type(SolutionPool(), decoder, objective, 1000)
+    started = time.perf_counter()
+    result = session.solve(algorithm, 3600.0)
+    elapsed = time.perf_counter() - started
+    assert evaluations == 2000
+    assert np.isfinite(result[2])
+    assert len(result[1]) == 1000
+    return {
+        "algorithm": algorithm_type.__name__,
+        "workload": workload,
+        "seed": seed,
+        "evaluations": evaluations,
+        "seconds": elapsed,
+        "cost": result[2],
+        "keys_sha256": hashlib.sha256(np.asarray(result[1], dtype="<f8").tobytes()).hexdigest(),
+        "rng_sha256": hashlib.sha256(
+            pickle.dumps((random.getstate(), np.random.get_state()))
+        ).hexdigest(),
+    }
+
+
+def main() -> None:
+    """Run fixed work, optionally pairing a trusted baseline module in the same process.
+
+    Raises:
+        ValueError: If the supplied baseline cannot be loaded as a Python module.
+        AssertionError: If replayed baseline and production results differ.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--baseline-search", type=Path, help="Trusted baseline orchestration/search.py to execute."
+    )
+    args = parser.parse_args()
+    sessions = {"production": SearchSession}
+    if args.baseline_search is not None:
+        name = "rko.orchestration._benchmark_reference"
+        spec = importlib.util.spec_from_file_location(name, args.baseline_search)
+        if spec is None or spec.loader is None:
+            raise ValueError("Baseline must be a loadable Python source module.")
+        reference = importlib.util.module_from_spec(spec)
+        sys.modules[name] = reference
+        spec.loader.exec_module(reference)
+        sessions["reference"] = reference.SearchSession
+    saved_python, saved_numpy = random.getstate(), np.random.get_state()
+    try:
+        np.dot(np.ones(1000), np.ones(1000))
+        np.argsort(np.ones(1000), kind="stable")
+        np.cos(np.ones(1000))
+        print(json.dumps({"python": sys.version, "numpy": np.__version__}), flush=True)
+        for repeat in range(3 if len(sessions) == 2 else 1):
+            for algorithm_type in (SA, GeneticAlgorithm, BRKGA):
+                for workload in ("sphere", "rugged", "ordering"):
+                    for seed in range(200, 203):
+                        labels = list(sessions)
+                        if (repeat + seed) % 2:
+                            labels.reverse()
+                        runs = {
+                            label: _run(algorithm_type, workload, seed, sessions[label])
+                            for label in labels
+                        }
+                        expected = {k: v for k, v in runs["production"].items() if k != "seconds"}
+                        for label, row in runs.items():
+                            assert {k: v for k, v in row.items() if k != "seconds"} == expected
+                            print(
+                                json.dumps({"variant": label, "repeat": repeat, **row}), flush=True
+                            )
+    finally:
+        random.setstate(saved_python)
+        np.random.set_state(saved_numpy)
+
+
+if __name__ == "__main__":
+    main()

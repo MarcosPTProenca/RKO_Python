@@ -54,5 +54,14 @@ identical seeded objective output. This isolates an internal GA allocation path;
 it is not a whole-solver RSS claim. Reproduction and the limitations of this
 probe are in [benchmarks](../benchmarks/README.md).
 
+Shared callback sessions now retain detached NumPy incumbent snapshots until a
+public result list is needed. A 10,000-key callback allocation probe reduced
+retained traced incumbent allocation by 75.1% and peak allocation by 69.9%.
+Removing a redundant elite-pool list copy reduced a separate accepted-insertion
+allocation probe's peak by 32.4%. Callback isolation and validation are preserved;
+these are isolated allocation results, not process RSS or whole-search speedups.
+A fixed-evaluation runner now covers numerical and permutation workloads across
+SA, GA and BRKGA, with result and RNG fingerprints for cross-revision comparisons.
+
 Detailed working audits and plans are kept locally and excluded from Git. Source
 history preserves prior evidence; this page is the maintained public summary.

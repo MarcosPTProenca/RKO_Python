@@ -25,6 +25,9 @@ import numpy as np
 import pytest
 import time
 from rko import RKO
+from rko.components.solution_pool import SolutionPool
+from rko.metaheuristics.multi_start import MultiStart
+from rko.orchestration.search import SearchSession
 
 
 def decode(keys: np.ndarray) -> np.ndarray:
@@ -117,6 +120,49 @@ def test_decoder_cannot_mutate_the_search_chromosome() -> None:
     ).solve(0.01)
     assert all(0 <= key < 1 for key in result.keys)
     assert result.cost == pytest.approx(sum(key + 0.1 for key in result.keys))
+
+
+def test_incumbent_keeps_snapshot_despite_callback_mutation() -> None:
+    """Retain detached keys and materialize public lists after cooperative stopping."""
+    decoded_inputs: list[np.ndarray] = []
+
+    def mutate_decode(keys: np.ndarray) -> np.ndarray:
+        """Record original keys before mutating callback-owned storage.
+
+        Args:
+            keys (np.ndarray): Detached input belonging to the decoder.
+
+        Returns:
+            np.ndarray: Mutated payload for the objective.
+        """
+        decoded_inputs.append(keys.copy())
+        keys[:] = 9.0
+        return keys
+
+    def mutate_cost(payload: np.ndarray) -> float:
+        """Mutate the decoded payload and expire the next callback boundary.
+
+        Args:
+            payload (np.ndarray): Decoder-owned array.
+
+        Returns:
+            float: Finite completed objective.
+        """
+        payload[:] = -9.0
+        session.deadline = 0.0
+        return 1.0
+
+    session = SearchSession(mutate_decode, mutate_cost)
+    algorithm = MultiStart(SolutionPool(), mutate_decode, mutate_cost, 100)
+    result = session.solve(algorithm, 60.0)
+    assert isinstance(result[1], list)
+    assert result[2] == 1.0
+    np.testing.assert_array_equal(result[1], decoded_inputs[0])
+    assert algorithm.decoder is mutate_decode
+    assert algorithm.cost is mutate_cost
+    assert session.best is not None
+    assert isinstance(session.best[0], np.ndarray)
+    assert not np.shares_memory(session.best[0], decoded_inputs[0])
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
