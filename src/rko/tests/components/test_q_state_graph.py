@@ -7,6 +7,7 @@ Technical approach:
 - Generate expected states with itertools.product and pairwise comparisons.
 - Draw expected weights from a private Random using the production seed.
 - Exercise filtered, duplicate, non-reflexive and non-hashable inputs.
+- Count accepted-state allocations and preserve mutable predicate payloads.
 
 Flow (pseudocode):
 1. Enumerate and optionally filter the Cartesian parameter combinations.
@@ -29,6 +30,7 @@ import numpy as np
 import pickle
 import pytest
 import random
+import rko.components.adaptive_control.q_learning as q_learning
 from collections.abc import Callable
 from hypothesis import given
 from hypothesis import settings
@@ -200,6 +202,119 @@ def test_filtered_graph_can_remove_all_states() -> None:
     _assert_model([[2.0, 3.0], [2.0, 3.0]], 42, True)
     with pytest.raises(ValueError, match="no feasible states"):
         QLearningController([[2.0]], state_filter=lambda _: False)
+
+
+@pytest.mark.parametrize("accepted_axis_values", [0, 1, 3])
+def test_only_feasible_combinations_allocate_state_records(
+    monkeypatch: pytest.MonkeyPatch, accepted_axis_values: int
+) -> None:
+    """Allocate QState objects only for combinations accepted by the predicate.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Instrument the state constructor.
+        accepted_axis_values (int): Number of accepted values on the first axis.
+    """
+    constructed: list[QState] = []
+    visited: list[list[float]] = []
+    grid = [[0.0, 1.0, 2.0] for _ in range(4)]
+
+    def create(*, label: int, par: list[float]) -> QState:
+        """Record one actual state allocation without changing its representation.
+
+        Args:
+            label (int): Sequential accepted state label.
+            par (list[float]): Owned mutable parameter vector.
+
+        Returns:
+            QState: Unmodified production state record.
+        """
+        state = QState(label=label, par=par)
+        constructed.append(state)
+        return state
+
+    def feasible(values: list[float]) -> bool:
+        """Record all visits while accepting a bounded first-axis slice.
+
+        Args:
+            values (list[float]): Mutable combination supplied to the filter.
+
+        Returns:
+            bool: Whether the first coordinate belongs to the accepted slice.
+        """
+        visited.append(values.copy())
+        return values[0] < accepted_axis_values
+
+    caller = random.getstate()
+    monkeypatch.setattr(q_learning, "QState", create)
+    try:
+        states = QLearningController._create_states(grid, feasible)
+        assert visited == [list(values) for values in product(*grid)]
+        assert len(constructed) == len(states) == accepted_axis_values * 27
+        assert [state.label for state in states] == list(range(len(states)))
+    finally:
+        random.setstate(caller)
+
+
+def test_parameter_axes_are_snapshotted_before_predicate_visits() -> None:
+    """Keep future coordinates fixed when a predicate edits the original grid."""
+    grid = [[0.0, 1.0], [2.0, 3.0]]
+    visited: list[list[float]] = []
+
+    def mutate_grid(values: list[float]) -> bool:
+        """Edit an axis only after every Cartesian input has been snapshotted.
+
+        Args:
+            values (list[float]): Current owned parameter vector.
+
+        Returns:
+            bool: Always accept the combination.
+        """
+        visited.append(values.copy())
+        grid[1][:] = [8.0, 9.0]
+        return True
+
+    caller = random.getstate()
+    try:
+        states = QLearningController._create_states(grid, mutate_grid)
+        expected = [[0.0, 2.0], [0.0, 3.0], [1.0, 2.0], [1.0, 3.0]]
+        assert visited == expected
+        assert [state.par for state in states] == expected
+    finally:
+        random.setstate(caller)
+
+
+def test_predicate_retained_payloads_keep_their_identity() -> None:
+    """Preserve later edits to earlier accepted parameter lists before graph creation."""
+    grid = [[0.0, 1.0], [0.0, 1.0]]
+    retained: list[list[float]] = []
+
+    def mutate_previous(values: list[float]) -> bool:
+        """Mutate the preceding payload and retain alternating combinations.
+
+        Args:
+            values (list[float]): Parameter list owned by the eventual state.
+
+        Returns:
+            bool: Whether this combination has an odd visit number.
+        """
+        retained.append(values)
+        if len(retained) > 1:
+            retained[-2][0] = 99.0
+        return len(retained) % 2 == 1
+
+    expected_rng = random.Random(17)
+    expected = _model(grid, expected_rng, mutate_previous)
+    retained.clear()
+    caller = random.getstate()
+    try:
+        random.seed(17)
+        states = QLearningController._create_states(grid, mutate_previous)
+        assert pickle.dumps(states) == pickle.dumps(expected)
+        assert random.getstate() == expected_rng.getstate()
+        assert states[0].par is retained[0]
+        assert states[1].par is retained[2]
+    finally:
+        random.setstate(caller)
 
 
 def test_tied_weights_retain_ascending_actions_and_first_maximum(

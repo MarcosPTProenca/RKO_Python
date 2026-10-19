@@ -119,5 +119,15 @@ trials confirmed a smaller graph phase, not a reliable end-to-end startup gain:
 imports/spawn still dominate. Parent constructor validation and fresh parameter
 reads remain intact. See [benchmarks](../benchmarks/README.md) for limits.
 
+A further memory-targeted refinement constructs Q-state records only after their
+parameter combinations pass feasibility filtering. Two repeated synthetic slice
+benchmarks reduced traced graph-construction peaks by 33.7% (625 combinations,
+125 accepted states) and 44.4% (2,401 combinations, 343 accepted). All-accepted
+grids showed no meaningful peak reduction; interpreter caches affect retained
+traces, and these are not RSS measurements. Another 108 fixed-work adaptive PSO
+pairs matched exact fingerprints, but timings were mixed: this does not establish
+full-search, real adaptive-clock or cold-start gains. Predicate payload identity,
+axis snapshots, action order and initialization draws remain protected by tests.
+
 Detailed working audits and plans are kept locally and excluded from Git. Source
 history preserves prior evidence; this page is the maintained public summary.

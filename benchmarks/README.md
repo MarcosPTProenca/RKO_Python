@@ -120,6 +120,50 @@ roughly 2.07–3.41 s between manager readiness and worker entry. It did not jus
 removing fail-fast constructor validation. Import/spawn latency remains open;
 never compare Linux `/tmp` and Windows-mounted checkouts as a code speedup.
 
+## Filter-before-allocation adaptive states
+
+A follow-up preserves the indexed graph but enumerates parameter combinations
+with `itertools.product`, applying the feasibility predicate **before** creating
+a `QState`. Rejected combinations no longer allocate state records, action lists
+or Q-value lists. Axes are snapshotted before predicate visits; mutable predicate
+payloads retain their identities. Labels, graph/action order, weights and RNG
+consumption remain unchanged for valid grids. Dense accepted graphs still need
+all their output edges; predicates retaining rejected payloads keep that memory.
+
+Compare against the **indexed** implementation preceding this follow-up, rather
+than crediting the earlier pairwise-to-indexed change again:
+
+```bash
+git show 65aa389:src/rko/components/adaptive_control/q_learning.py > /tmp/rko-q-materialized.py
+uv run --locked python benchmarks/q_state_memory.py \
+  --reference /tmp/rko-q-materialized.py > /tmp/rko-q-state-memory.jsonl
+```
+
+Only execute a trusted reference file. The benchmark alternates seven seeded
+builds per synthetic grid/filter and compares every state field and RNG state.
+Reference: 2026-10-19, the same WSL2 / CPython 3.14.8 / NumPy 2.4.3 setup above.
+Two invocations reproduced these traced allocation peaks exactly:
+
+| Combinations | Accepted states | Former peak bytes | New peak bytes | Reduction |
+| ---: | ---: | ---: | ---: | ---: |
+| 625 | 125 | 243,920 | 161,696 | 33.7% |
+| 2,401 | 343 | 957,008 | 532,344 | 44.4% |
+| 15,625 | 3,125 | 6,530,080 | 5,603,360 | 14.2% |
+
+These are filtered-grid construction peaks, **not RSS or general solver memory**.
+Traces include interpreter allocation caches, not just live graph storage.
+All-accepted grids showed essentially unchanged peaks; a one-combination grid
+added 416 traced bytes. More selective filters showed larger reductions, but
+those synthetic singleton cases are not representative search-quality evidence.
+
+The same runner also completed **108 exact fixed-work adaptive PSO pairs** across
+two invocations (sphere/rugged/permutation; 32/1,000 keys). Costs, keys, evaluation
+counts, final pools and both RNG fingerprints matched. Whole-search timing was
+mixed, so **no reliable full-solver speedup is established**. Adaptive clocks are
+frozen only for this replay check; real time-based adaptation and cold process
+startup were not benchmarked by this follow-up. No parameter defaults, RNG
+implementation, callback isolation or runtime dependencies changed.
+
 ## Managed IPR selected elite transfer
 
 IPR previously fetched the whole managed elite pool and then selected two ranks.

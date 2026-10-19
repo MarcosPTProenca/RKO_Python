@@ -5,6 +5,7 @@ Objective:
 
 Technical approach:
 - Model parameter combinations as states and local transitions as actions.
+- Enumerate Cartesian coordinates and allocate state records only after filtering.
 - Index finite numeric states by all-but-one-coordinate signatures to avoid
   testing unrelated pairs; retain pairwise comparison for other scalar types.
 - Update Q-values with an epsilon-greedy policy and the Bellman equation.
@@ -30,6 +31,7 @@ import random
 from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field
+from itertools import product
 
 
 @dataclass
@@ -139,27 +141,12 @@ class QLearningController:
             return []
 
         num_par = len(parameters)
-        num_states = 1
-        for values in parameters:
-            num_states *= max(1, len(values))
-
         states: list[QState] = []
-        for i in range(num_states):
-            states.append(QState(label=i, par=[0.0] * num_par))
-
-        n_c = 1
-        for j in range(num_par):
-            n_c *= len(parameters[j])
-            for i in range(num_states):
-                column_index = i // (num_states // n_c)
-                column_index = column_index % len(parameters[j])
-                states[i].par[j] = parameters[j][column_index]
-
-        if state_filter is not None:
-            states = [state for state in states if state_filter(state.par)]
-            for label, state in enumerate(states):
-                state.label = label
-            num_states = len(states)
+        for coordinates in product(*parameters):
+            values = list(coordinates)
+            if state_filter is None or state_filter(values):
+                states.append(QState(label=len(states), par=values))
+        num_states = len(states)
 
         patterns: list[dict[tuple[float, ...], list[int]]] = []
         if num_states > 1 and all(

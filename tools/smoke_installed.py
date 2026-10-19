@@ -5,7 +5,8 @@ Objective:
 
 Technical approach:
 - Run under python -I inside an environment containing only the installed artifact.
-- Check package contents and solve a small problem with serial and spawn execution.
+- Check filtered adaptive graphs and package contents.
+- Solve a small problem with serial and spawn execution.
 
 Flow (pseudocode):
 1. Locate the installed package and assert expected data and excluded tests.
@@ -28,6 +29,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from rko import RKO
+from rko.components.adaptive_control.q_learning import QLearningController
 from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import read_kp_instance
 from rko.parameters.loader import default_params_dir
@@ -73,6 +75,11 @@ def main() -> None:
     assert read_kp_instance(default_instances_dir() / "kp50.txt").n_items == 50
     assert any("LICENSE" in path.name for path in default_instances_dir().iterdir())
     assert package.resolve() != Path(__file__).resolve().parents[1] / "src" / "rko"
+    controller = QLearningController(
+        [[0.0, 1.0], [0.0, 1.0]], state_filter=lambda values: sum(values) <= 1.0
+    )
+    assert [state.par for state in controller.states] == [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
+    assert [state.Ai for state in controller.states] == [[0, 1, 2], [0, 1], [0, 2]]
     for backend in ("serial", "process"):
         for algorithm, dimension, control in (("MultiStart", 3, 0), ("PSO", 64, 0), ("PSO", 64, 1)):
             result = RKO(
