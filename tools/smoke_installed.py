@@ -74,17 +74,20 @@ def main() -> None:
     assert any("LICENSE" in path.name for path in default_instances_dir().iterdir())
     assert package.resolve() != Path(__file__).resolve().parents[1] / "src" / "rko"
     for backend in ("serial", "process"):
-        result = RKO(
-            decode,
-            objective,
-            3,
-            algorithms=["MultiStart"],
-            control=0,
-            backend=backend,
-            random_state=42,
-        ).solve(0.02)
-        assert len(result.keys) == 3
-        assert np.isclose(result.cost, objective(np.asarray(result.keys)))
+        for algorithm, dimension in (("MultiStart", 3), ("PSO", 64)):
+            result = RKO(
+                decode,
+                objective,
+                dimension,
+                algorithms=[algorithm],
+                control=0,
+                backend=backend,
+                random_state=42,
+            ).solve(0.05)
+            keys = np.asarray(result.keys)
+            assert len(keys) == dimension
+            assert np.all((keys >= 0.0) & (keys < 1.0))
+            assert np.isclose(result.cost, objective(keys))
     executable = shutil.which("rko")
     assert executable is not None
     with tempfile.TemporaryDirectory(prefix="rko-installed-cli-") as temporary:

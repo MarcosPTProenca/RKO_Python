@@ -73,6 +73,7 @@ def _run(
     workload: str,
     seed: int,
     session_type: type[SearchSession] = SearchSession,
+    dimension: int = 1000,
 ) -> dict[str, object]:
     """Record one deterministic full-search result after a fixed evaluation count.
 
@@ -81,6 +82,7 @@ def _run(
         workload (str): Sphere, rugged or ordering workload.
         seed (int): Seed used for both RNG streams.
         session_type (type[SearchSession]): Callback-boundary implementation to compare.
+        dimension (int): Positive number of random keys.
 
     Returns:
         dict[str, object]: Elapsed seconds and deterministic search fingerprints.
@@ -88,7 +90,7 @@ def _run(
     random.seed(seed)
     np.random.seed(seed)
     evaluations = 0
-    weights = np.arange(1, 1001)
+    weights = np.arange(1, dimension + 1)
 
     def objective(payload: np.ndarray) -> float:
         """Evaluate a synthetic problem and stop at the next boundary after call 2,000.
@@ -105,26 +107,30 @@ def _run(
             session.deadline = 0.0
         if workload == "rugged":
             values = 10 * payload - 5
-            return float(10000 + np.sum(values**2 - 10 * np.cos(2 * np.pi * values)))
+            return float(10 * dimension + np.sum(values**2 - 10 * np.cos(2 * np.pi * values)))
         if workload == "ordering":
             return float(np.dot(payload, weights))
         return float(np.dot(payload, payload))
 
     decoder = _order if workload == "ordering" else _decode
     session = session_type(decoder, objective)
-    algorithm = algorithm_type(SolutionPool(), decoder, objective, 1000)
+    algorithm = algorithm_type(SolutionPool(), decoder, objective, dimension)
     started = time.perf_counter()
+    started_cpu = time.process_time()
     result = session.solve(algorithm, 3600.0)
+    cpu_seconds = time.process_time() - started_cpu
     elapsed = time.perf_counter() - started
     assert evaluations == 2000
     assert np.isfinite(result[2])
-    assert len(result[1]) == 1000
+    assert len(result[1]) == dimension
     return {
         "algorithm": algorithm_type.__name__,
+        "dimension": dimension,
         "workload": workload,
         "seed": seed,
         "evaluations": evaluations,
         "seconds": elapsed,
+        "cpu_seconds": cpu_seconds,
         "cost": result[2],
         "keys_sha256": hashlib.sha256(np.asarray(result[1], dtype="<f8").tobytes()).hexdigest(),
         "rng_sha256": hashlib.sha256(
@@ -172,9 +178,15 @@ def main() -> None:
                             label: _run(algorithm_type, workload, seed, sessions[label])
                             for label in labels
                         }
-                        expected = {k: v for k, v in runs["production"].items() if k != "seconds"}
+                        expected = {
+                            k: v
+                            for k, v in runs["production"].items()
+                            if k not in ("seconds", "cpu_seconds")
+                        }
                         for label, row in runs.items():
-                            assert {k: v for k, v in row.items() if k != "seconds"} == expected
+                            assert {
+                                k: v for k, v in row.items() if k not in ("seconds", "cpu_seconds")
+                            } == expected
                             print(
                                 json.dumps({"variant": label, "repeat": repeat, **row}), flush=True
                             )

@@ -63,5 +63,14 @@ these are isolated allocation results, not process RSS or whole-search speedups.
 A fixed-evaluation runner now covers numerical and permutation workloads across
 SA, GA and BRKGA, with result and RNG fingerprints for cross-revision comparisons.
 
+PSO batches independent genes at 32+ dimensions while preserving sequential
+particle/global-best updates and Python RNG draw order. Paired synthetic searches
+with real local search were about 1.4–1.8× faster at 32/100 keys in one reference
+run; 1,000-key gains were smaller and less consistent between runs. All 108 paired
+searches reproduced exact best keys, costs, counts and RNG states. Batching adds
+O(n) temporary scratch, not a memory benefit. These measurements do not establish
+process/portfolio speed, optimization quality or native-code parity; reproduction
+and limitations are in [benchmarks](../benchmarks/README.md).
+
 Detailed working audits and plans are kept locally and excluded from Git. Source
 history preserves prior evidence; this page is the maintained public summary.

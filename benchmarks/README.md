@@ -1,4 +1,50 @@
-# Larger Knapsack benchmark
+# Performance benchmarks
+
+Each section identifies its workload and limits. Synthetic fixed-work and
+allocation probes complement the historical Knapsack reference; no single case
+establishes general optimization quality or native-code performance parity.
+
+## PSO fixed-work searches
+
+PSO now uses NumPy for independent genes within a particle at 32+ dimensions,
+while moving particles sequentially and preserving the two Python RNG draws per
+gene, arithmetic order, boundary reversion and callback sequence. Smaller vectors
+retain scalar movement. No compiler/JIT or new runtime dependency is required.
+
+A 2026-10-19 Python 3.14.8 / NumPy 2.4.3 WSL2 reference run (four CPUs,
+GIL enabled, baseline `577b3c4`) compared the former scalar formula against batched movement using actual PSO, local search, elite exchange
+and callback isolation. Each pair has exactly 2,000 evaluations; execution order
+alternates across three seeds and three repeats. The table gives median paired
+wall-time ratios (**scalar / production**), not microkernel speedups:
+
+| Keys | Sphere | Rugged numerical | Permutation |
+| ---: | ---: | ---: | ---: |
+| 8 | 1.12× | 0.98× | 0.85× |
+| 32 | 1.67× | 1.45× | 1.77× |
+| 100 | 1.72× | 1.44× | 1.39× |
+| 1,000 | 1.12× | 1.13× | 1.10× |
+
+All 108 pairs matched exact best-key hashes, costs, evaluation counts and both RNG
+state hashes. All 54 pairs at 32/100 keys were faster in this run. Eight-key
+movement remains scalar; its variable timing is not an improvement claim. Gains
+at 1,000 keys were smaller and varied between runs, including a slower rugged
+case in an earlier run. Local-search and objective costs limit total benefit.
+No general portfolio, process-backend, expensive-callback or quality gain follows.
+
+```bash
+uv run --locked python benchmarks/pso.py > /tmp/rko-pso-paired.jsonl
+```
+
+The runner reports CPU time separately from elapsed time and traces movement
+allocations outside timing. The scalar reference overrides only movement;
+production PSO control flow is shared. This introduces the same method-call
+boundary on both sides, so tiny-dimensional comparison with the original inline
+loop is approximate. Batching needs temporary O(n) scratch: about 40.5 KB peak
+for 1,000 keys versus about 120 bytes in the isolated scalar movement probe.
+This is a runtime/scratch-allocation tradeoff, not a memory-reduction claim.
+All arrays and traces are local; no whole-process RSS measurement is implied.
+
+## Knapsack process reference
 
 Latest measurement: **2026-10-18**, starting at 15:36 UTC, on standalone solver
 revision `daa2e94fb1379994705168d5d6f3c2cc8674ba58`. Cleanup moves this runner but
@@ -6,7 +52,7 @@ does not change it or the solver. Host: WSL2/Linux, Python 3.14.8 with the GIL,
 four available CPUs. This is one reproducible reference experiment, not a
 performance guarantee or a release certification.
 
-## Reproduce
+### Reproduce
 
 The CPU-accounting runner requires Linux/WSL; the library itself is tested on
 Windows too. From the repository root:
@@ -29,7 +75,7 @@ SHA256: `8f555b2b40dff1298d841a8e5abc327a8f1135ce8188e84249cd1352f959ffed`.
 The runner verifies that fingerprint. The external instance is not redistributed
 because its licensing has not been verified.
 
-## Method
+### Method
 
 SA/BRKGA/GA/PSO, online control, pool size 10, 15 search seconds, seeds 42/43/44;
 process backend uses four workers, compared with four Python threads. The
@@ -43,7 +89,7 @@ matched. Six runs take approximately two minutes on this host.
 Exact optimum: **400811**, DP time 2.669 s. Profit/weight greedy: **400792**,
 gap **0.00474%**.
 
-## Current results
+### Current results
 
 All six trials completed without errors and returned feasible solutions with
 independently checked costs.

@@ -11,6 +11,7 @@ Technical approach:
 - Nelder-Mead local search is applied to a randomly selected Pbest each
   generation.
 - Q-Learning (control=1) adapts p_size, c1, c2, and w online.
+- Batch independent genes with NumPy at 32+ dimensions, retaining RNG draw order.
 
 Flow (pseudocode):
 1. Initialise X, V (random), Pbest = X, Gbest = argmin(X).
@@ -120,6 +121,54 @@ class PSO(MetaheuristicBase):
         )
         self._state_filter = ParameterValidator.check(self, "PSO")
 
+    @staticmethod
+    def _move_particle(
+        position: np.ndarray,
+        velocity: np.ndarray,
+        personal_best: np.ndarray,
+        global_best: np.ndarray,
+        c1: float,
+        c2: float,
+        inertia: float,
+    ) -> None:
+        """Update one particle in place, preserving scalar arithmetic and RNG order.
+
+        Args:
+            position (np.ndarray): Current random keys, mutated in place.
+            velocity (np.ndarray): Current velocities, mutated in place.
+            personal_best (np.ndarray): Detached best keys for this particle.
+            global_best (np.ndarray): Detached current swarm-best keys.
+            c1 (float): Cognitive acceleration coefficient.
+            c2 (float): Social acceleration coefficient.
+            inertia (float): Multiplier applied to the complete velocity update.
+        """
+        n = len(position)
+        if n < 32:
+            for j in range(n):
+                r1 = random.random()
+                r2 = random.random()
+                velocity[j] = inertia * (
+                    velocity[j]
+                    + c1 * r1 * (personal_best[j] - position[j])
+                    + c2 * r2 * (global_best[j] - position[j])
+                )
+                old_key = position[j]
+                position[j] = position[j] + velocity[j]
+                if position[j] < 0.0 or position[j] >= 1.0:
+                    position[j] = old_key
+                    velocity[j] = 0.0
+            return
+        draws = np.fromiter(
+            (random.random() for _ in range(2 * n)), dtype=float, count=2 * n
+        ).reshape(n, 2)
+        velocity += c1 * draws[:, 0] * (personal_best - position)
+        velocity += c2 * draws[:, 1] * (global_best - position)
+        velocity *= inertia
+        proposed = position + velocity
+        invalid = (proposed < 0.0) | (proposed >= 1.0)
+        velocity[invalid] = 0.0
+        np.copyto(position, proposed, where=~invalid)
+
     @override
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:
         """Runs PSO for at most *limit_time* seconds.
@@ -203,17 +252,7 @@ class PSO(MetaheuristicBase):
             old_gbest_cost = gbest_cost
 
             for i in range(len(x)):
-                for j in range(n):
-                    r1 = random.random()
-                    r2 = random.random()
-                    v[i][j] = w * (
-                        v[i][j] + c1 * r1 * (pbest[i][j] - x[i][j]) + c2 * r2 * (gbest[j] - x[i][j])
-                    )
-                    old_rk = x[i][j]
-                    x[i][j] = x[i][j] + v[i][j]
-                    if x[i][j] < 0.0 or x[i][j] >= 1.0:
-                        x[i][j] = old_rk
-                        v[i][j] = 0.0
+                self._move_particle(x[i], v[i], pbest[i], gbest, c1, c2, w)
 
                 x_costs[i] = self.cost(self.decoder(x[i]))
                 if x_costs[i] < best_of_current:

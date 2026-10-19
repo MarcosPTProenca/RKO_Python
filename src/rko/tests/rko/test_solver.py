@@ -73,6 +73,25 @@ def test_solver_owns_real_execution(backend: str) -> None:
         result.cost = 99.0
 
 
+@pytest.mark.parametrize("backend", ["serial", "thread", "process"])
+@pytest.mark.parametrize("control", [0, 1])
+def test_solver_runs_batched_pso(backend: str, control: int) -> None:
+    """Exercise batched particle movement through every backend and control mode.
+
+    Args:
+        backend (str): Execution backend under test.
+        control (int): Offline or adaptive parameter mode.
+    """
+    result = RKO(
+        decode, objective, 128, algorithms=["PSO"], control=control, backend=backend
+    ).solve(0.1)
+    keys = np.asarray(result.keys)
+    assert len(keys) == 128
+    assert np.all((keys >= 0.0) & (keys < 1.0))
+    assert np.isfinite(result.cost)
+    assert result.cost == pytest.approx(objective(keys))
+
+
 def test_repeated_solve_and_failure_clear_stale_result() -> None:
     """Create independent result snapshots and clear the last result on failure."""
     optimizer = RKO(decode, objective, 3, algorithms=["MultiStart"], control=0, backend="serial")
