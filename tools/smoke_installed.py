@@ -81,6 +81,9 @@ def main() -> None:
                 dimension,
                 algorithms=[algorithm],
                 control=control,
+                hyperparameters={"PSO": {"p_size": 4, "w": 0.5}}
+                if algorithm == "PSO" and control == 0
+                else None,
                 backend=backend,
                 random_state=42,
             ).solve(0.05)
@@ -94,6 +97,7 @@ def main() -> None:
         64,
         algorithms=["MultiStart", "IPR", "PSO"],
         control=0,
+        hyperparameters={"PSO": {"p_size": 4}},
         backend="process",
         n_jobs=1,
         random_state=42,

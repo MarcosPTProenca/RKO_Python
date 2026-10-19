@@ -71,6 +71,7 @@ only_mutate = [
     "src/rko/metaheuristics/grasp.py",
     "src/rko/metaheuristics/brkga_cs.py",
     "src/rko/solver.py",
+    "src/rko/orchestration/factory.py",
 ]
 mutate_only_covered_lines = true
 pytest_add_cli_args_test_selection = [
@@ -85,6 +86,7 @@ pytest_add_cli_args_test_selection = [
     "src/rko/tests/metaheuristics/test_algorithm_regressions.py",
     "src/rko/tests/metaheuristics/test_metaheuristics_pytest.py",
     "src/rko/tests/rko/test_solver.py",
+    "src/rko/tests/rko/test_hyperparameters.py",
     "src/rko/tests/rko/test_stopping.py",
     "-k",
     "not test_solution_pool_implements_search_protocols",

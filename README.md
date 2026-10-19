@@ -39,8 +39,9 @@ or starting workers. Each solve builds a fresh portfolio and returns an immutabl
 before every attempt, including failed solves.
 
 Select `algorithms`, `control` and `pool_size` directly in Python; omitted values
-use the packaged TOML defaults. `params_dir` remains available for hyperparameter
-files. Library calls are quiet by default; `verbose=True` on `RKO` prints lifecycle
+use the packaged TOML defaults. With `control=0`, `hyperparameters` supplies partial
+per-algorithm scalar overrides without editing files. `params_dir` remains
+available for custom defaults and adaptive grids. Library calls are quiet by default; `verbose=True` on `RKO` prints lifecycle
 and attributed shared-pool improvements. `rko.run(...)` retains the old tuple API
 and also accepts `verbose=True`.
 
@@ -73,13 +74,46 @@ searches that populate the pool; otherwise its slice may be spent waiting for
 searches queued behind it. Waiting uses bounded backoff, and process occupancy
 queries transfer only a count rather than the entire pool.
 
-Algorithm hyperparameters are currently in packaged `rko/parameters/` TOMLs.
+Algorithm defaults live in packaged `rko/parameters/` TOMLs.
 Use `algorithms=["SA", "GA"]` to select a smaller portfolio without copying files.
-Custom hyperparameter TOMLs can still be supplied through `params_dir`.
+Custom default TOMLs can still be supplied through `params_dir`.
 Constructors and configured runs validate scalar domains, population sizes and
 joint constraints before execution. Online grids retain named axes and exclude
 infeasible joint combinations (such as reversed perturbation bounds); an entirely
 infeasible grid is rejected. No scalar value is silently truncated.
+
+### Tuning offline parameters from Python
+
+Use the existing offline parameter names, grouped by selected algorithm:
+
+```python
+solver = RKO(
+    decode, objective, n_variables=64,
+    algorithms=["PSO", "GA"], control=0,
+    hyperparameters={
+        "PSO": {"p_size": 12, "w": 0.6},
+        "GA": {"size_pop": 20, "prob_mut": 0.1},
+    },
+    n_jobs=2, random_state=42,
+)
+```
+
+This uses the importable callbacks and guarded process entry point shown below.
+Each `solve` snapshots the mappings, resolves aliases such as `GeneticAlgorithm`
+to `GA`, and merges the values into fresh TOML defaults. Unspecified values keep
+their defaults; neither input mappings nor installed files are modified. Required
+TOMLs must still exist, including when using a custom `params_dir`.
+
+Unknown parameter names, duplicate alias mappings, unselected algorithms,
+nonfinite values, booleans and invalid scalar/joint domains raise `ValueError`
+before execution. Exact integral floats are accepted for integer parameters;
+fractional values are never truncated. Unknown-key errors list supported scalar keys.
+All backends, including grouped process workers, receive the same owned settings.
+
+Nonempty scalar overrides require **`control=0`**. Adaptive grids remain configured
+through named `[online]` TOML axes; `control=1` rejects scalar overrides rather than
+silently replacing tuned values during adaptation. Existing result fields are
+unchanged; record your tuning settings alongside results when comparing trials.
 
 Direct metaheuristic constructors use package-provided local search and shaking
 by default. Algorithms that perform local search accept a typed

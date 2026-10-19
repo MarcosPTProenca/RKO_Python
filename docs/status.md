@@ -30,9 +30,10 @@ coverage.
   neighborhood cases now match compiled C++ kernels: strategy 1 continues the
   sweep, and supplied indices are reshuffled. See [compatibility](cpp-compatibility.md).
   Corrected Q/reward/grid/IPR behavior is not a promise of unchanged C++ trajectories.
-- **Configuration/results:** programmatic hyperparameter configuration, evaluation
-  counts and explicit stop reasons are incomplete. Full API/error documentation
-  and a supported-version/release policy are still needed.
+- **Configuration/results:** named offline hyperparameters now accept validated
+  Python overrides; adaptive grids still require TOML. Evaluation counts, explicit
+  stop reasons and complete result/configuration provenance remain incomplete.
+  Full API/error documentation and a supported-version/release policy are needed.
 - **Stopping:** active callbacks cannot be interrupted cooperatively, blocked
   threads cannot be safely killed, and standalone operators receive no RKO
   deadline. A first valid evaluation may exceed the requested duration.

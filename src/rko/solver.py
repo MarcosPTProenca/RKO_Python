@@ -33,10 +33,12 @@ from .orchestration.configuration import parse_run_config
 from .orchestration.execution import run_metaheuristics_parallel
 from .orchestration.execution import select_best_result
 from .orchestration.factory import build_metaheuristic
+from .orchestration.factory import normalize_hyperparameters
 from .orchestration.processes import run_processes
 from .orchestration.search import SearchSession
 from .orchestration.types import CostFn
 from .orchestration.types import DecoderFn
+from .orchestration.types import Hyperparameters
 from .orchestration.types import RunConfig
 from .parameters.loader import load_config
 from collections.abc import Sequence
@@ -89,6 +91,7 @@ class RKO:
         n_jobs (int | None): Positive process-worker limit, excluding the pool manager.
         random_state (int | None): Nonnegative serial/process seed.
         verbose (bool): Print lifecycle and attributed shared-pool updates; default False.
+        hyperparameters (Hyperparameters | None): Partial named offline scalar overrides.
         result_ (RKOResult | None): Last successful solve; cleared before each attempt.
     """
 
@@ -106,6 +109,7 @@ class RKO:
         n_jobs: int | None = None,
         random_state: int | None = None,
         verbose: bool = False,
+        hyperparameters: Hyperparameters | None = None,
     ) -> None:
         """Store problem and solver settings without I/O or search execution.
 
@@ -122,6 +126,8 @@ class RKO:
                 Smaller limits share workers and split the common search budget.
             random_state (int | None): Nonnegative seed for serial/process modes.
             verbose (bool): Flush lifecycle and shared-pool progress to stdout.
+            hyperparameters (Hyperparameters | None): Per-algorithm offline overrides;
+                require control=0 and merge with TOML defaults without writing files.
         """
         self.decoder = decoder
         self.cost = cost
@@ -134,6 +140,7 @@ class RKO:
         self.n_jobs = n_jobs
         self.random_state = random_state
         self.verbose = verbose
+        self.hyperparameters = hyperparameters
         self.result_: RKOResult | None = None
 
     def solve(self, time_limit: float) -> RKOResult:
@@ -192,6 +199,9 @@ class RKO:
             if value is not None:
                 raw["run"][key] = value
         config = parse_run_config(raw)
+        hyperparameters = normalize_hyperparameters(
+            self.hyperparameters, config.active_metaheuristics, config.control
+        )
         if self.verbose:
             print(
                 f"RKO START backend={self.backend} "
@@ -199,7 +209,9 @@ class RKO:
                 f"search_budget={time_limit:g}s",
                 flush=True,
             )
-        keys, value = self._execute(config, time_limit, started_at=started)
+        keys, value = self._execute(
+            config, time_limit, started_at=started, hyperparameters=hyperparameters
+        )
         result = RKOResult(
             keys=tuple(float(key) for key in keys),
             cost=float(value),
@@ -217,7 +229,12 @@ class RKO:
         return result
 
     def _execute(
-        self, config: RunConfig, time_limit: float, *, started_at: float
+        self,
+        config: RunConfig,
+        time_limit: float,
+        *,
+        started_at: float,
+        hyperparameters: Hyperparameters | None = None,
     ) -> tuple[list[float], float]:
         """Dispatch a validated portfolio without retaining worker state.
 
@@ -225,6 +242,7 @@ class RKO:
             config (RunConfig): Validated selection and elite settings.
             time_limit (float): Positive search duration.
             started_at (float): Solve's monotonic origin, including configuration/startup.
+            hyperparameters (Hyperparameters | None): Owned normalized offline overrides.
 
         Returns:
             tuple[list[float], float]: Best keys and objective.
@@ -244,6 +262,7 @@ class RKO:
                 self.n_variables,
                 config.control,
                 self.params_dir,
+                (hyperparameters or {}).get(name),
             )
             for name in config.active_metaheuristics
         ]
@@ -259,6 +278,7 @@ class RKO:
                 self.random_state,
                 verbose=self.verbose,
                 started_at=started_at,
+                hyperparameters=hyperparameters,
             )
         pool.start_progress()
         try:

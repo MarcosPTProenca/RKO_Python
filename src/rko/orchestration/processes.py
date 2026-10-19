@@ -34,9 +34,11 @@ import traceback
 from ..components.solution_pool import SolutionPool
 from .execution import select_best_result
 from .factory import build_metaheuristic
+from .factory import normalize_hyperparameters
 from .search import SearchSession
 from .types import CostFn
 from .types import DecoderFn
+from .types import Hyperparameters
 from .types import RunConfig
 from .types import RunResult
 from multiprocessing.connection import Connection
@@ -164,6 +166,7 @@ def _worker(
     start: Event,
     deadline: Synchronized,
     connection: Connection,
+    hyperparameters: Hyperparameters | None = None,
 ) -> None:
     """Run assigned searches sequentially without extending the common deadline.
 
@@ -179,6 +182,7 @@ def _worker(
         start (Event): Parent-controlled simultaneous release.
         deadline (Synchronized): Common monotonic search deadline.
         connection (Connection): Dedicated result/control pipe.
+        hyperparameters (Hyperparameters | None): Normalized partial offline overrides.
     """
     name = "startup"
     try:
@@ -187,7 +191,14 @@ def _worker(
             random.seed(seed)
             np.random.seed(seed)
             mh = build_metaheuristic(
-                name, pool, decoder, cost, dimension, config.control, params_dir
+                name,
+                pool,
+                decoder,
+                cost,
+                dimension,
+                config.control,
+                params_dir,
+                (hyperparameters or {}).get(name),
             )
             prepared.append((mh, random.getstate(), np.random.get_state()))
         connection.send(("ready", None))
@@ -232,6 +243,7 @@ def run_processes(
     *,
     verbose: bool = False,
     started_at: float | None = None,
+    hyperparameters: Hyperparameters | None = None,
 ) -> tuple[list[float], float]:
     """Execute a selected portfolio with a common start and managed pool.
 
@@ -246,6 +258,7 @@ def run_processes(
         random_state (int | None): Seed used to derive independent worker seeds.
         verbose (bool): Emit pool updates from its single authoritative manager.
         started_at (float | None): Parent solve's monotonic origin for elapsed log times.
+        hyperparameters (Hyperparameters | None): Partial offline scalar mappings.
 
     Returns:
         tuple[list[float], float]: Best keys and minimization objective.
@@ -256,6 +269,7 @@ def run_processes(
         TimeoutError: If startup or search exceeds its allowed grace period.
     """
     names = config.active_metaheuristics
+    hyperparameters = normalize_hyperparameters(hyperparameters, names, config.control)
     if n_jobs is not None and (type(n_jobs) is not int or n_jobs < 1):
         raise ValueError("n_jobs must be a positive integer or None.")
     try:
@@ -306,6 +320,7 @@ def run_processes(
                         start,
                         deadline,
                         child,
+                        hyperparameters,
                     ),
                 )
                 processes.append(process)
