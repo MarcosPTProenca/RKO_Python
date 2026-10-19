@@ -32,6 +32,8 @@ rko = ["parameters/*.toml", "examples/instances/*"]
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.170.2",
+    "mutmut>=3.8.0",
     "pre-commit>=4.2.0",
     "pytest>=9.0.2",
     "ruff==0.15.7",
@@ -54,3 +56,34 @@ force-single-line = true
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["src/rko/tests"]
+
+[tool.mutmut]
+source_paths = ["src"]
+only_mutate = [
+    "src/rko/components/solution_pool.py",
+    "src/rko/components/validation.py",
+    "src/rko/components/adaptive_control/q_learning.py",
+    "src/rko/components/initialization/initialization.py",
+    "src/rko/components/shaking/random.py",
+    "src/rko/components/shaking/mirror.py",
+    "src/rko/components/shaking/neighbor_swap.py",
+    "src/rko/components/shaking/swap.py",
+    "src/rko/metaheuristics/grasp.py",
+    "src/rko/metaheuristics/brkga_cs.py",
+    "src/rko/solver.py",
+]
+mutate_only_covered_lines = true
+pytest_add_cli_args_test_selection = [
+    "src/rko/tests/test_property_invariants.py",
+    "src/rko/tests/components/test_solution_pool_pytest.py",
+    "src/rko/tests/components/test_parameter_contracts.py",
+    "src/rko/tests/components/test_q_learning_pytest.py",
+    "src/rko/tests/components/test_initialization_and_operators_pytest.py",
+    "src/rko/tests/metaheuristics/test_validation.py",
+    "src/rko/tests/metaheuristics/test_algorithm_regressions.py",
+    "src/rko/tests/metaheuristics/test_metaheuristics_pytest.py",
+    "src/rko/tests/rko/test_solver.py",
+    "src/rko/tests/rko/test_stopping.py",
+    "-k",
+    "not test_solution_pool_implements_search_protocols",
+]

@@ -209,6 +209,19 @@ uv run --locked pytest src/rko/tests -q
 GitHub Actions runs the full suite on Linux and Windows. Tests include real
 spawn execution, shared elites, independent RNG streams, algorithm execution,
 callback exceptions, abrupt exits, blocked callbacks and interruption cleanup.
+Property-based tests use deterministic generated cases for pool, key-vector,
+validation, Q-learning and solver-result invariants.
+
+Scoped mutation testing is on demand because it reruns tests for generated code
+mutations. It covers selected high-risk components listed in `pyproject.toml`;
+surviving mutants are review findings, not a CI score gate. The mutation run
+excludes the runtime-Protocol conformance test because mutmut instrumentation
+adds methods to Protocols; the test remains in the normal CI suite:
+
+```bash
+uv run --locked mutmut run
+uv run --locked mutmut results
+```
 
 ## Remaining release work
 
