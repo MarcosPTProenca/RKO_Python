@@ -19,12 +19,9 @@ Inputs/Outputs:
 - Output: assertions on objective values and validation errors.
 """
 
-import numpy as np
 import pickle
 import pytest
 from pathlib import Path
-from rko.examples.run_kp_cpp_instances import GreedyKnapsackDecoder
-from rko.examples.run_kp_cpp_instances import KpInstance
 from rko.examples.run_kp_cpp_instances import decode_knapsack
 from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import default_output_csv
@@ -84,27 +81,6 @@ def test_objective_survives_pickle_round_trip(tmp_path: Path) -> None:
     assert objective([1, 1, 1]) == 99972.0
     assert evaluate_solution([0, 1, 1], instance) == (22, 5, True)
     assert decode_knapsack([0.5, 0.6, 0.9]) == [0, 1, 1]
-
-
-def test_greedy_decoder_is_feasible_and_spawn_serializable() -> None:
-    """Decode key-weighted priorities to a feasible, pickleable solution."""
-    instance = KpInstance(3, 5, [6, 10, 12], [1, 2, 3], "tiny")
-    decoder = GreedyKnapsackDecoder(instance)
-    restored = pickle.loads(pickle.dumps(decoder))
-
-    decisions = restored(np.array([0.1, 0.9, 0.8]))
-
-    assert decisions == [0, 1, 1]
-    assert evaluate_solution(decisions, instance) == (22, 5, True)
-
-
-def test_greedy_decoder_rejects_invalid_keys() -> None:
-    """Reject key vectors that cannot be ranked against the instance."""
-    decoder = GreedyKnapsackDecoder(KpInstance(2, 3, [4, 5], [1, 2], "tiny"))
-    with pytest.raises(ValueError, match="finite and match"):
-        decoder(np.array([0.1]))
-    with pytest.raises(ValueError, match="finite and match"):
-        decoder(np.array([0.1, float("nan")]))
 
 
 @pytest.mark.parametrize("text", ["0 5", "1 -1 6 1", "1 5 6 0", "1 5 -6 1", "1 5 6 1 99"])

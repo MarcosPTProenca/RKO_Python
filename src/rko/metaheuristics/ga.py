@@ -187,6 +187,7 @@ class GeneticAlgorithm(MetaheuristicBase):
                 pop_inter.append(pop[best_t].copy())
                 selected_costs.append(pop_costs[best_t])
 
+            del pop, pop_costs
             pop_new: list[np.ndarray] = [c.copy() for c in pop_inter]
             pop_new_costs: list[float] = list(selected_costs)
 

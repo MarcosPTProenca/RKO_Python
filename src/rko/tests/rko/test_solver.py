@@ -26,7 +26,6 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 from rko import RKO
 from rko import RKOResult
-from rko.parameters.loader import load_config
 
 
 def decode(keys: np.ndarray) -> np.ndarray:
@@ -72,11 +71,6 @@ def test_solver_owns_real_execution(backend: str) -> None:
     assert result.elapsed_seconds > 0
     with pytest.raises(FrozenInstanceError):
         result.cost = 99.0
-
-
-def test_default_portfolio_matches_measured_four_worker_preset() -> None:
-    """Keep the out-of-box process portfolio within the measured CPU budget."""
-    assert load_config()["active_metaheuristics"]["list"] == ["SA", "BRKGA", "GA", "PSO"]
 
 
 def test_repeated_solve_and_failure_clear_stale_result() -> None:

@@ -71,61 +71,6 @@ Problem-aware decoding/initialization, more instance families, independent RNGs
 and fixed-work profiling remain [open work](../docs/status.md). Do not silently
 replace the reference decoder or omit negative results to improve presentation.
 
-## CPU-sized vs. ten-algorithm portfolio comparison
-
-Measurement on **2026-10-19**, same WSL2 four-CPU host, Python 3.14.8, current
-optimized blending code, pinned `s000.kp`, online control and pool size 10. Each
-portfolio ran with seeds 42/43/44 and a 10-second search budget. Search budget
-excludes worker startup, while the reported wall time includes it and callback
-overrun. The four-worker preset completed all three runs in a mean **14.06 s**
-versus **17.97 s** for ten workers (**21.8% lower elapsed time**); mean profit
-was **322,397** versus **303,548**. All six returned feasible solutions.
-This one-instance, three-seed measurement is directional, not a general quality
-or speed guarantee; it does not measure peak RSS or equal-work throughput.
-
-| Portfolio | Seeds | Mean elapsed s | Mean profit | Mean gap % | Feasible |
-| --- | --- | ---: | ---: | ---: | --- |
-| SA, BRKGA, GA, PSO (four) | 42–44 | 14.06 | 322,397 | 19.56 | 3/3 |
-| All ten configured algorithms | 42–44 | 17.97 | 303,548 | 24.27 | 3/3 |
-
-Reproduce without changing the checked-in reference CSV:
-
-```bash
-uv run --locked python benchmarks/portfolio.py /tmp/rko-s000.kp /tmp/rko-portfolio.csv
-```
-
-The runner verifies the pinned instance checksum, feasibility, objective and
-independently computed exact optimum. `config.toml` now uses the measured
-four-algorithm preset; selecting other algorithms remains explicit and supported.
-
-## Capacity-aware Knapsack decoder comparison
-
-Measurement on **2026-10-19**, same four-CPU WSL2 host and pinned 1,000-item
-instance. Both decoders used the same four-algorithm process portfolio, online
-control, pool size 10, a 15-second budget, and seeds 42/43/44. The new
-`GreedyKnapsackDecoder` ranks items by `key * profit/weight`, selecting each only
-if it fits. All six returned feasible solutions. Mean profit increased from
-**329,353** with the C++ threshold decoder to **394,957** with the capacity-aware
-decoder; mean optimality gap fell from **17.83%** to **1.46%**. The profit/weight
-greedy reference remains 400,792 (0.00474% gap), so this decoder still trails
-that baseline. It is an alternative example, not a replacement for the C++
-reference. The data is one instance and three seeds, not general proof.
-
-| Decoder | Seeds | Mean profit | Mean gap % | Feasible |
-| --- | --- | ---: | ---: | --- |
-| C++ threshold | 42–44 | 329,353 | 17.83 | 3/3 |
-| Capacity-aware | 42–44 | 394,957 | 1.46 | 3/3 |
-
-Reproduce with:
-
-```bash
-uv run --locked python benchmarks/decoders.py /tmp/rko-s000.kp /tmp/rko-decoders.csv
-```
-
-This independently checks the instance checksum, returned feasibility, objective
-accounting, and exact optimum. Elapsed durations can exceed the nominal budget
-because callbacks are only stopped at callback boundaries.
-
 ## Blending throughput comparison
 
 A five-seed, 2-second serial SA experiment on a synthetic 1,000-key sphere
@@ -144,3 +89,22 @@ uv run --locked python benchmarks/blending.py
 
 The script prints every seed and median throughput. It restores the production
 blending operator even if a search fails.
+
+## Genetic-algorithm population memory
+
+A one-generation GA allocation probe used an identity decoder and a sphere
+objective with 100 chromosomes of 5,000 keys. Peak `tracemalloc` allocation
+fell from **11.72 MiB** at `36c1b8f` to **8.08 MiB** after releasing the previous
+population once parent selection is complete (**31.0% lower**). The seeded best
+objective stayed exactly `1594.6759`. This isolates population-transition
+allocations; the benchmark stubs Nelder-Mead and is not whole-solver RSS evidence.
+
+Run from the repository root:
+
+```bash
+uv run --locked python benchmarks/ga_population_memory.py
+```
+
+To compare a baseline checkout, copy the runner into that checkout and run the
+same command there. Keep dimensions, population size, seeds, Python and NumPy
+versions fixed when comparing results.
