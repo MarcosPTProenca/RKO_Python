@@ -38,8 +38,11 @@ import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.rvnd import rvnd
 from ..components.shaking.random import shake
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
+from .base import ShakingOperator
 from collections.abc import Callable
 from typing import Any
 from typing import override
@@ -66,7 +69,7 @@ class VNS(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: ElitePool,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,
@@ -75,6 +78,8 @@ class VNS(MetaheuristicBase):
         beta_min: float = 0.10,
         control: int = 0,
         parameters: list[list[float]] | None = None,
+        local_search_operator: LocalSearchOperator | None = None,
+        shaking_operator: ShakingOperator | None = None,
         name: str = "VNS",
     ) -> None:
         """Initialises the VNS metaheuristic.
@@ -88,6 +93,8 @@ class VNS(MetaheuristicBase):
           beta_min: Base perturbation intensity (offline mode).
           control: 0 for offline fixed parameters, 1 for Q-Learning.
           parameters: Discrete grid ``[[kMax values], [beta_min values]]``.
+          local_search_operator (LocalSearchOperator | None): Optional RVND replacement.
+          shaking_operator (ShakingOperator | None): Optional shaking replacement.
           name: Human-readable identifier for logging.
 
         Returns:
@@ -96,7 +103,12 @@ class VNS(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
-        super().__init__(solution_pool=solution_pool, name=name)
+        super().__init__(
+            solution_pool=solution_pool,
+            name=name,
+            local_search_operator=local_search_operator,
+            shaking_operator=shaking_operator,
+        )
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
@@ -169,8 +181,10 @@ class VNS(MetaheuristicBase):
             k = 1
             while k <= k_max and not self.time_limit_reached(limit_time):
                 beta = random.uniform(k * beta_min, (k + 1) * beta_min)
-                s_line = shake(s.copy(), beta, beta)
-                s_line, s_line_cost = rvnd(s_line, self.decoder, self.cost, pool=self.solution_pool)
+                s_line = (self.shaking_operator or shake)(s.copy(), beta, beta)
+                s_line, s_line_cost = (self.local_search_operator or rvnd)(
+                    s_line, self.decoder, self.cost, pool=self.solution_pool
+                )
 
                 if s_line_cost < s_cost:
                     s = s_line.copy()

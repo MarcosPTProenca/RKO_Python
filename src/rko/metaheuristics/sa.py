@@ -28,9 +28,13 @@ import numpy as np
 import random
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
 from ..components.shaking.random import shake
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
+from .base import ShakingOperator
 from collections.abc import Callable
+from typing import Any
 from typing import override
 
 
@@ -73,9 +77,9 @@ class SA(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
-        decoder: Callable[[np.ndarray], object],
-        cost: Callable[[object], float],
+        solution_pool: ElitePool,
+        decoder: Callable[[np.ndarray], Any],
+        cost: Callable[[Any], float],
         tam_solution: int,
         *,
         sa_max: int = 50,
@@ -83,6 +87,8 @@ class SA(MetaheuristicBase):
         alpha: float = 0.99,
         beta_min: float = 0.05,
         beta_max: float = 0.25,
+        local_search_operator: LocalSearchOperator | None = None,
+        shaking_operator: ShakingOperator | None = None,
         name: str = "SA",
     ) -> None:
         """Initializes os parameters of Simulated Annealing.
@@ -97,6 +103,8 @@ class SA(MetaheuristicBase):
           alpha: Rate geometric of cooling.
           beta_min: Intensity mínima of perturbation.
           beta_max: Intensity máxima of perturbation.
+          local_search_operator (LocalSearchOperator | None): Optional Nelder-Mead replacement.
+          shaking_operator (ShakingOperator | None): Optional shaking replacement.
           name: Name identifier of the metaheuristic.
 
         Returns:
@@ -105,7 +113,12 @@ class SA(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
-        super().__init__(solution_pool=solution_pool, name=name)
+        super().__init__(
+            solution_pool=solution_pool,
+            name=name,
+            local_search_operator=local_search_operator,
+            shaking_operator=shaking_operator,
+        )
         self.tam_solution = tam_solution
         self.decoder = decoder
         self.cost = cost
@@ -146,7 +159,9 @@ class SA(MetaheuristicBase):
                 iter_t: int = 0
                 while iter_t < self.sa_max and not self.time_limit_reached(limit_time):
                     iter_t += 1
-                    viz_keys: np.ndarray = shake(keys.copy(), self.beta_min, self.beta_max)
+                    viz_keys: np.ndarray = (self.shaking_operator or shake)(
+                        keys.copy(), self.beta_min, self.beta_max
+                    )
                     viz_cost: float = self.cost(self.decoder(viz_keys))
                     if viz_cost < best_ofv_level:
                         best_ofv_level = viz_cost
@@ -166,7 +181,7 @@ class SA(MetaheuristicBase):
                             keys = viz_keys
                             current_cost = viz_cost
                 T *= self.alpha
-                ls_keys, ls_cost = nelder_mead_search(
+                ls_keys, ls_cost = (self.local_search_operator or nelder_mead_search)(
                     keys.copy(), self.decoder, self.cost, pool=self.solution_pool
                 )
                 if ls_cost < best_cost:

@@ -38,7 +38,9 @@ import numpy as np
 import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -67,7 +69,7 @@ class BRKGA(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: ElitePool,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,
@@ -78,6 +80,7 @@ class BRKGA(MetaheuristicBase):
         rhoe: float = 0.70,
         control: int = 0,
         parameters: list[list[float]] | None = None,
+        local_search_operator: LocalSearchOperator | None = None,
         name: str = "BRKGA",
     ) -> None:
         """Initialises the BRKGA metaheuristic.
@@ -93,6 +96,7 @@ class BRKGA(MetaheuristicBase):
           rhoe: Elite gene inheritance probability (offline mode).
           control: 0 for offline fixed parameters, 1 for Q-Learning.
           parameters: Discrete grid ``[[p values], [pe], [pm], [rhoe]]``.
+          local_search_operator (LocalSearchOperator | None): Optional local-search replacement.
           name: Human-readable identifier for logging.
 
         Returns:
@@ -101,7 +105,7 @@ class BRKGA(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
-        super().__init__(solution_pool=solution_pool, name=name)
+        super().__init__(solution_pool, name, local_search_operator=local_search_operator)
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
@@ -241,7 +245,7 @@ class BRKGA(MetaheuristicBase):
                 costs_inter.append(mutant_cost)
 
             ls_pos = random.randint(0, elite_size - 1)
-            ls_keys, ls_cost = nelder_mead_search(
+            ls_keys, ls_cost = (self.local_search_operator or nelder_mead_search)(
                 pop_inter[ls_pos].copy(), self.decoder, self.cost, pool=self.solution_pool
             )
             pop_inter[ls_pos] = ls_keys

@@ -42,6 +42,7 @@ import math
 import numpy as np
 import random
 import time
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
@@ -65,7 +66,7 @@ class IPR(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: ElitePool,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,

@@ -33,6 +33,7 @@ Inputs/Outputs:
 
 import numpy as np
 import random
+from ..solution_pool import ElitePool
 from .farey_ls import farey_ls
 from .mirror_ls import mirror_ls
 from .nelder_mead_ls import nelder_mead_search
@@ -46,7 +47,7 @@ def rvnd(
     decoder: Callable[[np.ndarray], Any],
     cost: Callable[[Any], float],
     strategy: int = 2,
-    pool: object = None,
+    pool: ElitePool | None = None,
 ) -> tuple[np.ndarray, float]:
     """Applies Random Variable Neighborhood Descent to a random-key solution.
 

@@ -28,6 +28,7 @@ Inputs/Outputs:
 import math
 import numpy as np
 from ..blending.blending import blending as _blend
+from ..solution_pool import ElitePool
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -69,7 +70,7 @@ def nelder_mead_search(
     keys: np.ndarray,
     decoder: Callable[[np.ndarray], Any],
     cost: Callable[[Any], float],
-    pool: object = None,
+    pool: ElitePool | None = None,
 ) -> tuple[np.ndarray, float]:
     """Runs Nelder-Mead local search on a random-key vector.
 

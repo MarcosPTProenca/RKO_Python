@@ -37,8 +37,11 @@ import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.rvnd import rvnd
 from ..components.shaking.random import shake
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
+from .base import ShakingOperator
 from collections.abc import Callable
 from typing import Any
 from typing import override
@@ -65,7 +68,7 @@ class ILS(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: ElitePool,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,
@@ -74,6 +77,8 @@ class ILS(MetaheuristicBase):
         beta_max: float = 0.40,
         control: int = 0,
         parameters: list[list[float]] | None = None,
+        local_search_operator: LocalSearchOperator | None = None,
+        shaking_operator: ShakingOperator | None = None,
         name: str = "ILS",
     ) -> None:
         """Initialises the ILS metaheuristic.
@@ -87,6 +92,8 @@ class ILS(MetaheuristicBase):
           beta_max: Maximum perturbation intensity (offline mode).
           control: 0 for offline fixed parameters, 1 for Q-Learning.
           parameters: Discrete grid for Q-Learning ``[[bmin...], [bmax...]]``.
+          local_search_operator (LocalSearchOperator | None): Optional RVND replacement.
+          shaking_operator (ShakingOperator | None): Optional shaking replacement.
           name: Human-readable identifier for logging.
 
         Returns:
@@ -95,7 +102,12 @@ class ILS(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
-        super().__init__(solution_pool=solution_pool, name=name)
+        super().__init__(
+            solution_pool=solution_pool,
+            name=name,
+            local_search_operator=local_search_operator,
+            shaking_operator=shaking_operator,
+        )
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
@@ -150,7 +162,9 @@ class ILS(MetaheuristicBase):
             beta_max = ql.states[st].par[1] if ql.states else beta_max
 
         keys: np.ndarray = np.random.random(n)
-        keys, current_cost = rvnd(keys, self.decoder, self.cost, pool=self.solution_pool)
+        keys, current_cost = (self.local_search_operator or rvnd)(
+            keys, self.decoder, self.cost, pool=self.solution_pool
+        )
 
         best_keys: np.ndarray = keys.copy()
         best_cost: float = current_cost
@@ -164,8 +178,10 @@ class ILS(MetaheuristicBase):
                 beta_min = ql.states[i_curr].par[0]
                 beta_max = ql.states[i_curr].par[1]
 
-            s_line = shake(best_keys.copy(), beta_min, beta_max)
-            s_line, s_line_cost = rvnd(s_line, self.decoder, self.cost, pool=self.solution_pool)
+            s_line = (self.shaking_operator or shake)(best_keys.copy(), beta_min, beta_max)
+            s_line, s_line_cost = (self.local_search_operator or rvnd)(
+                s_line, self.decoder, self.cost, pool=self.solution_pool
+            )
 
             improv = 0
             if s_line_cost < best_cost:
