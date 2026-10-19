@@ -31,6 +31,7 @@ from rko.components.solution_pool import ElitePool
 from rko.components.solution_pool import SolutionPool
 from rko.components.solution_pool import SolutionPoolWriter
 from rko.metaheuristics.base import MetaheuristicBase
+from rko.metaheuristics.brkga_cs import BRKGA_CS
 from rko.metaheuristics.grasp import GRASP
 from rko.metaheuristics.sa import SA
 from rko.orchestration.configuration import MH_SPECS
@@ -107,6 +108,38 @@ def test_grasp_rebuilds_candidates_from_committed_partial_solution(
 
     assert len(evaluated) == 4
     assert evaluated[2][1][0] == 0.5
+
+
+def test_brkga_cs_helpers_are_instance_methods(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify BRKGA-CS owns and invokes its graph and perturbation helpers.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Patches random choices for determinism.
+    """
+    algorithm = BRKGA_CS(
+        SolutionPool(capacity=4),
+        lambda keys: keys,
+        lambda decoded: float(np.sum(decoded)),
+        3,
+        sigma=0.9,
+    )
+    monkeypatch.setattr(random, "shuffle", lambda values: None)
+    monkeypatch.setattr(random, "choice", lambda values: values[0])
+
+    labels = algorithm._label_propagation([[(1, 1.0)], [(0, 1.0)], []], 3)
+    representatives = algorithm._identify_promising(
+        [np.array([0.0, 1.0, 2.0]), np.array([1.0, 3.0, 5.0])],
+        2,
+    )
+    keys = np.array([0.2, 0.4])
+    monkeypatch.setattr(random, "random", lambda: 0.9)
+
+    assert labels[0] == labels[1]
+    assert labels[2] == 2
+    assert len(representatives) == 1
+    assert representatives[0] in (0, 1)
+    assert algorithm._chaotic_ind(keys, 0.7) is keys
+    np.testing.assert_array_equal(keys, np.array([0.9, 0.9]))
 
 
 def test_sa_uses_injected_shaking_operator() -> None:

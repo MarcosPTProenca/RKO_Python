@@ -7,6 +7,7 @@ Objective:
 Technical approach:
 - Uses Parametric Uniform Crossover with per-gene mutation (pm gate applied
   before the rhoe elite/non-elite inheritance decision).
+- Private instance methods detect elite communities and perturb chromosomes.
 - After every generation (or every 10 without improvement), the elite
   population is analysed via Pearson correlation:
     * A graph is built where edge (i,j) exists if |corr(elite_i, elite_j)| >= sigma.
@@ -51,103 +52,6 @@ from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
 from typing import override
-
-
-def _label_propagation(
-    adj: list[list[tuple[int, float]]],
-    n_nodes: int,
-) -> list[int]:
-    """Run Label Propagation for community detection.
-
-    Args:
-      adj: Adjacency list where ``adj[i]`` contains ``(j, weight)`` pairs.
-      n_nodes: Total number of nodes.
-
-    Returns:
-      List of community labels, one per node.
-    """
-    labels = list(range(n_nodes))
-    max_iter = n_nodes * 10
-    for _ in range(max_iter):
-        order = list(range(n_nodes))
-        random.shuffle(order)
-        moved = False
-        for node in order:
-            if not adj[node]:
-                continue
-            label_weight: dict[int, float] = {}
-            for neighbor, weight in adj[node]:
-                lbl = labels[neighbor]
-                label_weight[lbl] = label_weight.get(lbl, 0.0) + weight
-            best_lbl = max(label_weight, key=lambda k: label_weight[k])
-            if best_lbl != labels[node]:
-                labels[node] = best_lbl
-                moved = True
-        if not moved:
-            break
-    return labels
-
-
-def _ic(
-    pop: list[np.ndarray],
-    elite_size: int,
-    sigma: float,
-) -> list[int]:
-    """Identify a promising subset of the elite via community structure.
-
-    Builds a Pearson-correlation graph over the elite chromosomes, detects
-    communities via Label Propagation, and selects one representative per
-    community.
-
-    Args:
-      pop: Full population sorted by cost (elite at front).
-      elite_size: Number of elite chromosomes.
-      sigma: Minimum absolute Pearson correlation to create a graph edge.
-
-    Returns:
-      List of indices (into *pop*) of promising representatives, one per
-      community.
-    """
-    elite = [pop[i] for i in range(elite_size)]
-    adj: list[list[tuple[int, float]]] = [[] for _ in range(elite_size)]
-    for i in range(elite_size):
-        for j in range(i + 1, elite_size):
-            corr = float(np.corrcoef(elite[i], elite[j])[0, 1])
-            if abs(corr) >= sigma:
-                weight = abs(corr)
-                adj[i].append((j, weight))
-                adj[j].append((i, weight))
-
-    labels = _label_propagation(adj, elite_size)
-
-    communities: dict[int, list[int]] = {}
-    for idx, lbl in enumerate(labels):
-        communities.setdefault(lbl, []).append(idx)
-
-    promising: list[int] = []
-    for members in communities.values():
-        rep = random.choice(members)
-        promising.append(rep)
-    return promising
-
-
-def _chaotic_ind(keys: np.ndarray, rhoe: float) -> np.ndarray:
-    """Apply a chaotic perturbation to a chromosome.
-
-    For each gene, replaces it with a uniform random value with probability
-    ``1 - rhoe``.
-
-    Args:
-      keys: Chromosome to perturb (modified in place).
-      rhoe: Probability of *keeping* the current gene value.
-
-    Returns:
-      The perturbed chromosome (same object as input).
-    """
-    for j in range(len(keys)):
-        if random.random() > rhoe:
-            keys[j] = random.random()
-    return keys
 
 
 class BRKGA_CS(MetaheuristicBase):
@@ -269,6 +173,91 @@ class BRKGA_CS(MetaheuristicBase):
                 child[j] = pop[non_elite_idx][j]
         return child
 
+    def _label_propagation(
+        self,
+        adjacency: list[list[tuple[int, float]]],
+        n_nodes: int,
+    ) -> list[int]:
+        """Assign community labels using weighted Label Propagation.
+
+        Args:
+            adjacency (list[list[tuple[int, float]]]): Weighted graph neighbors.
+            n_nodes (int): Number of graph nodes.
+
+        Returns:
+            list[int]: Community label for each node.
+
+        Raises:
+            IndexError: If adjacency references a node outside the graph.
+        """
+        labels = list(range(n_nodes))
+        for _ in range(n_nodes * 10):
+            order = list(range(n_nodes))
+            random.shuffle(order)
+            moved = False
+            for node in order:
+                if not adjacency[node]:
+                    continue
+                label_weight: dict[int, float] = {}
+                for neighbor, weight in adjacency[node]:
+                    label = labels[neighbor]
+                    label_weight[label] = label_weight.get(label, 0.0) + weight
+                best_label = max(label_weight, key=lambda label: label_weight[label])
+                if best_label != labels[node]:
+                    labels[node] = best_label
+                    moved = True
+            if not moved:
+                break
+        return labels
+
+    def _identify_promising(self, population: list[np.ndarray], elite_size: int) -> list[int]:
+        """Select one representative from each elite correlation community.
+
+        Args:
+            population (list[np.ndarray]): Population sorted by ascending cost.
+            elite_size (int): Number of elite chromosomes at the front.
+
+        Returns:
+            list[int]: Population indices of selected elite representatives.
+
+        Raises:
+            IndexError: If elite_size exceeds the population length.
+        """
+        elite = [population[index] for index in range(elite_size)]
+        adjacency: list[list[tuple[int, float]]] = [[] for _ in range(elite_size)]
+        for i in range(elite_size):
+            for j in range(i + 1, elite_size):
+                correlation = float(np.corrcoef(elite[i], elite[j])[0, 1])
+                if abs(correlation) >= self.sigma:
+                    weight = abs(correlation)
+                    adjacency[i].append((j, weight))
+                    adjacency[j].append((i, weight))
+
+        labels = self._label_propagation(adjacency, elite_size)
+        communities: dict[int, list[int]] = {}
+        for index, label in enumerate(labels):
+            communities.setdefault(label, []).append(index)
+
+        return [random.choice(members) for members in communities.values()]
+
+    def _chaotic_ind(self, keys: np.ndarray, rhoe: float) -> np.ndarray:
+        """Randomize genes with probability one minus the elite inheritance rate.
+
+        Args:
+            keys (np.ndarray): Chromosome to perturb in place.
+            rhoe (float): Probability of retaining each current gene value.
+
+        Returns:
+            np.ndarray: The perturbed input chromosome.
+
+        Raises:
+            ValueError: If a read-only array is selected for mutation.
+        """
+        for index in range(len(keys)):
+            if random.random() > rhoe:
+                keys[index] = random.random()
+        return keys
+
     @override
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:
         """Runs BRKGA-CS for at most *limit_time* seconds.
@@ -354,7 +343,7 @@ class BRKGA_CS(MetaheuristicBase):
                 costs_inter.append(self.cost(self.decoder(mutant)))
 
             if elite_size > 1 and (no_improve == 0 or no_improve % 10 == 0):
-                promising = _ic(pop_inter, elite_size, self.sigma)
+                promising = self._identify_promising(pop_inter, elite_size)
                 non_promising = [i for i in range(elite_size) if i not in promising]
                 for rank, idx in enumerate(promising):
                     if rank == 0:
@@ -375,7 +364,7 @@ class BRKGA_CS(MetaheuristicBase):
                     costs_inter[idx] = ref_cost
 
                 for idx in non_promising:
-                    perturbed = _chaotic_ind(pop_inter[idx].copy(), rhoe)
+                    perturbed = self._chaotic_ind(pop_inter[idx].copy(), rhoe)
                     pop_inter[idx] = perturbed
                     costs_inter[idx] = self.cost(self.decoder(perturbed))
 
