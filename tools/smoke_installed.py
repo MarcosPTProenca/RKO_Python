@@ -92,7 +92,7 @@ def main() -> None:
         decode,
         objective,
         64,
-        algorithms=["MultiStart", "PSO"],
+        algorithms=["MultiStart", "IPR", "PSO"],
         control=0,
         backend="process",
         n_jobs=1,

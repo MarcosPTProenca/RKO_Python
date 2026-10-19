@@ -58,7 +58,14 @@ class PoolProxy(BaseProxy):
         _exposed_ (tuple[str, ...]): Manager methods available to workers.
     """
 
-    _exposed_ = ("insert", "get_elite", "__len__", "start_progress", "stop_progress")
+    _exposed_ = (
+        "insert",
+        "get_elite",
+        "__len__",
+        "start_progress",
+        "stop_progress",
+        "_get_elite_pair",
+    )
 
     def insert(self, entry: tuple[float, list[float]], source: str = "") -> None:
         """Insert a candidate into the authoritative pool.
@@ -90,6 +97,26 @@ class PoolProxy(BaseProxy):
             list[tuple[float, list[float]]]: Cost-ordered elite snapshots.
         """
         return self._callmethod("get_elite", (k,))
+
+    def _sample_elite_pair(self, pool_size: int) -> list[tuple[float, list[float]]]:
+        """Sample client-side ranks and transfer only their two current entries.
+
+        Pool occupancy never decreases, so ranks drawn from an earlier count
+        remain valid. A single server lock selects both from the same snapshot.
+
+        Args:
+            pool_size (int): Previously observed occupancy, at least two.
+
+        Returns:
+            list[tuple[float, list[float]]]: Detached pair in random selection order.
+
+        Raises:
+            ValueError: If the supplied count or selected ranks are invalid.
+        """
+        if type(pool_size) is not int or pool_size < 2:
+            raise ValueError("Pair sampling requires an integer pool size of at least two.")
+        first, second = random.sample(list(range(pool_size)), 2)
+        return self._callmethod("_get_elite_pair", ((first, second),))
 
     @property
     def size(self) -> int:

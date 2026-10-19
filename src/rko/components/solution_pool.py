@@ -9,6 +9,7 @@ Technical approach:
 - Keep solutions sorted in ascending order of cost so index 0 is always best.
 - Expose an insert method compatible with the duck-typed pool contract already
   used by SA, and a get_elite query required by IPR and pool-aware Nelder-Mead.
+- Copy two requested ranks atomically for sparse process-client snapshots.
 
 Flow (pseudocode):
 1. Initialise an empty pool with a fixed capacity.
@@ -259,6 +260,30 @@ class SolutionPool:
         with self._lock:
             limit = min(k, len(self._pool))
             return [(cost, keys.copy()) for cost, keys, _ in self._pool[:limit]]
+
+    def _get_elite_pair(self, indices: tuple[int, int]) -> list[tuple[float, list[float]]]:
+        """Copy two requested ranks under one lock for process-client sampling.
+
+        Args:
+            indices (tuple[int, int]): Distinct nonnegative ranks in request order.
+
+        Returns:
+            list[tuple[float, list[float]]]: Two detached entries in request order.
+
+        Raises:
+            ValueError: If ranks are malformed or outside current occupancy.
+        """
+        if (
+            not isinstance(indices, tuple)
+            or len(indices) != 2
+            or any(type(index) is not int or index < 0 for index in indices)
+            or indices[0] == indices[1]
+        ):
+            raise ValueError("Elite ranks must be two distinct nonnegative integers.")
+        with self._lock:
+            if any(index >= len(self._pool) for index in indices):
+                raise ValueError("Elite rank is outside current pool occupancy.")
+            return [(self._pool[index][0], self._pool[index][1].copy()) for index in indices]
 
     def __len__(self) -> int:
         """Read current occupancy without copying key vectors.

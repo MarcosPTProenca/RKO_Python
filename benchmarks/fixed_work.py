@@ -37,6 +37,7 @@ import random
 import sys
 import time
 from pathlib import Path
+from rko.components.solution_pool import ElitePool
 from rko.components.solution_pool import SolutionPool
 from rko.metaheuristics import BRKGA
 from rko.metaheuristics import IPR
@@ -77,6 +78,7 @@ def _run(
     session_type: type[SearchSession] = SearchSession,
     dimension: int = 1000,
     evaluation_limit: int = 2000,
+    pool: ElitePool | None = None,
 ) -> dict[str, object]:
     """Record one deterministic full-search result after a fixed evaluation count.
 
@@ -87,6 +89,7 @@ def _run(
         session_type (type[SearchSession]): Callback-boundary implementation to compare.
         dimension (int): Positive number of random keys.
         evaluation_limit (int): Completed evaluations before cooperative stopping.
+        pool (ElitePool | None): Optional empty precreated pool; setup is not timed.
 
     Returns:
         dict[str, object]: Elapsed seconds and deterministic search fingerprints.
@@ -128,7 +131,7 @@ def _run(
         return score(payload)
 
     decoder = _order if workload == "ordering" else _decode
-    pool = SolutionPool()
+    pool = SolutionPool() if pool is None else pool
     if issubclass(algorithm_type, IPR):
         generator = np.random.RandomState(seed + 1000)
         for _ in range(10):

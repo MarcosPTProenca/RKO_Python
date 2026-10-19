@@ -53,6 +53,62 @@ snapshot queries faster, but corrected full-search trials did not demonstrate a
 reliable general benefit and small cases sometimes regressed. It was discarded;
 no cache or additional retained worker snapshots were shipped.
 
+## Managed IPR selected elite transfer
+
+IPR previously fetched the whole managed elite pool and then selected two ranks.
+The built-in proxy now draws the same two ranks **in the requesting process** and
+asks the server to copy only those entries under one lock. Pool occupancy never
+decreases, so ranks from the preceding count remain valid if a writer adds
+entries. Both entries come from the same current snapshot, in selection order.
+No revision cache, stale local snapshot or server-side RNG was introduced.
+
+```bash
+uv run --locked python benchmarks/elite_pair.py > /tmp/rko-elite-pair.jsonl
+```
+
+Only built-in managed proxies expose the private sampling capability. Local and
+custom pools retain full-snapshot sampling with the unchanged `ElitePool`
+protocol; two-entry pools also retain it because there is nothing to avoid
+transferring. Public `get_elite`, key types, source isolation and validation are
+unchanged. The count and pair still require **two RPCs**: this reduces their
+payload, not their number. Concurrent timed portfolios remain nondeterministic;
+sampling before instead of after a snapshot RPC can change interleavings.
+
+The runner swaps the former and production `solve` methods on the **same IPR
+class**, with the same production relinking kernel and real spawned pool server.
+Each search starts with ten fresh workload-consistent elites. Both paths warm up
+before measurement; execution order alternates and collection occurs before
+search timing. At 32 keys each search completes 20,000 evaluations; at
+1,000/10,000 it completes 2,000. Three seeds × three repeats × three workloads ×
+three dimensions yield **81 exact paired searches per invocation**. Each pair
+checks keys, costs, counts, final pool and Python/NumPy RNG fingerprints. The
+original method and caller streams are restored in `finally`.
+
+Reference: 2026-10-19, four-CPU WSL2, GIL-enabled CPython 3.14.8 / NumPy 2.4.3.
+Two production runs passed all 162 paired comparisons. The following is the last
+run's median paired snapshot/selected-transfer ratio, **wall / client CPU**:
+
+| Keys | Sphere | Rugged numerical | Stable permutation |
+| ---: | ---: | ---: | ---: |
+| 32 | 1.01 / 1.01 | 1.03 / 1.02 | 1.05 / 1.05 |
+| 1,000 | 1.45 / 1.30 | 1.16 / 1.11 | 1.15 / 1.10 |
+| 10,000 | 2.08 / 1.86 | 1.20 / 1.11 | 1.11 / 1.06 |
+
+Large-vector gains repeated; small-case timing varied in exploratory runs and
+individual paired trials can be slower. These results do not establish a
+universal gain. **Client CPU excludes server CPU**; wall time includes RPC waits.
+Server startup, pool creation/seeding and final fingerprint queries are outside
+search timing. No concurrent portfolio writers are used for this timing test;
+separate regression coverage tests spawned publication and concurrent writes.
+
+Isolated retrieval median ratios were 2.67× at 1,000 keys and 4.50× at 10,000.
+Serializing returned entries with default `pickle` measured 90,175 → 18,046 bytes
+at 1,000 keys and 900,463 → 180,100 at 10,000, approximately **80% less entry
+data** for a ten-entry pool. These are not packet sizes: RPC envelopes and
+transport overhead are excluded. There is no whole-process RSS or total-CPU
+claim, and process startup latency is **not** addressed by this change. Full
+portfolio speed and scientific solution quality require separate measurements.
+
 ## IPR fixed-work block copying
 
 IPR now assigns multi-gene guide blocks with NumPy slices instead of a Python

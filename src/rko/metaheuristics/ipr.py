@@ -6,6 +6,8 @@ Objective:
 
 Technical approach:
 - At each iteration, two solutions are drawn at random from the shared pool.
+- Managed pools with more than two entries sample ranks client-side and transfer
+  only the chosen pair; other pools retain the existing full-snapshot protocol.
 - The key vector is divided into fixed-size blocks (10 % of chromosme length).
 - A greedy block-relinking procedure selects, one block at a time, the most
   improving swap from the current position toward the guide solution.
@@ -171,9 +173,14 @@ class IPR(MetaheuristicBase):
                 time.sleep(min(0.01, max(0.0, limit_time - self.elapsed())))
                 continue
 
-            elite = self.solution_pool.get_elite(pool_size)
-            indices = list(range(len(elite)))
-            k1, k2 = random.sample(indices, 2)
+            sample_pair = getattr(self.solution_pool, "_sample_elite_pair", None)
+            if sample_pair is None or pool_size == 2:
+                elite = self.solution_pool.get_elite(pool_size)
+                indices = list(range(len(elite)))
+                k1, k2 = random.sample(indices, 2)
+            else:
+                elite = sample_pair(pool_size)
+                k1, k2 = 0, 1
             atual_keys = np.array(elite[k1][1], dtype=float)
             guia_keys = np.array(elite[k2][1], dtype=float)
 

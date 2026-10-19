@@ -95,5 +95,16 @@ Isolated traced relinking peaks were unchanged. These are serial IPR results,
 not whole-portfolio, process, quality or native-parity claims; see
 [benchmarks](../benchmarks/README.md).
 
+Managed IPR now transfers only its two sampled elite entries rather than the
+whole pool when occupancy exceeds two. Ranks are drawn in the requesting process
+using the same RNG pattern, and both entries are copied under one server lock.
+Local/custom pools retain the existing protocol and snapshot path; there is no
+cache. Two warmed production benchmark runs passed 162 fixed-work comparisons
+including final-pool/RNG fingerprints. In the latest reference, 1,000-key managed
+IPR searches were 1.15–1.45× faster and 10,000-key searches 1.11–2.08× faster;
+ten-entry returned data was about 80% smaller. These are managed-pool IPR results,
+not whole portfolios, process-startup gains, total CPU, RSS or scientific-quality
+claims. Concurrent timed trajectories can change with RPC interleavings.
+
 Detailed working audits and plans are kept locally and excluded from Git. Source
 history preserves prior evidence; this page is the maintained public summary.
