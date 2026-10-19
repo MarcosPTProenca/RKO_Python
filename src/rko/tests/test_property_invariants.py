@@ -51,6 +51,20 @@ UNIT_FLOAT = st.floats(
 )
 
 
+def test_solution_pool_default_source_is_reported_as_unknown(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Keep default source attribution stable in verbose pool output.
+
+    Args:
+        capsys (pytest.CaptureFixture[str]): Captured standard output fixture.
+    """
+    pool = SolutionPool(verbose=True)
+    pool.insert((1.0, [0.5]))
+
+    assert "algorithm=unknown" in capsys.readouterr().out
+
+
 @settings(max_examples=60, derandomize=True, deadline=None)
 @given(
     capacity=st.integers(min_value=1, max_value=8),
