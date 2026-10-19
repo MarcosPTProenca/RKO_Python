@@ -1,11 +1,95 @@
-"""Foundation of the RKO package metaheuristics."""
+"""Shared contracts and runtime support for RKO metaheuristics.
+
+Objective:
+- Define the base lifecycle and composable operator interfaces.
+
+Technical approach:
+- Use structural protocols for local-search and shaking callables.
+- Store optional operator overrides while preserving algorithm defaults.
+- Track elapsed time and cooperative cancellation through one shared base.
+
+Flow (pseudocode):
+1. Retain the shared pool and any supplied operator overrides.
+2. Let each algorithm run its solve loop using the inherited timer helpers.
+3. Return algorithm-specific results through the abstract solve contract.
+
+Important criteria:
+- Existing callers may omit optional operators and retain package defaults.
+- Time limits are cooperative and checked by concrete algorithm loops.
+
+Inputs/Outputs:
+- Input: a pool writer, optional name, and optional operator callables.
+- Output: an abstract algorithm base with timing and operator state.
+"""
 
 from __future__ import annotations
 
+import numpy as np
 import threading
 import time
+from ..components.solution_pool import ElitePool
+from ..components.solution_pool import SolutionPoolWriter
 from abc import ABC
 from abc import abstractmethod
+from collections.abc import Callable
+from typing import Any
+from typing import Protocol
+
+
+class LocalSearchOperator(Protocol):
+    """Describe a replaceable local-search strategy.
+
+    Responsibilities:
+    - Refine a random-key vector using the supplied problem callbacks.
+    - Optionally use the shared elite pool as search context.
+    """
+
+    def __call__(
+        self,
+        keys: np.ndarray,
+        decoder: Callable[[np.ndarray], Any],
+        cost: Callable[[Any], float],
+        *,
+        pool: ElitePool | None,
+    ) -> tuple[np.ndarray, float]:
+        """Apply local search to a random-key vector.
+
+        Args:
+            keys (np.ndarray): Initial random-key vector.
+            decoder (Callable[[np.ndarray], Any]): Problem decoder.
+            cost (Callable[[Any], float]): Objective function.
+            pool (ElitePool | None): Optional elite solutions.
+
+        Returns:
+            tuple[np.ndarray, float]: Refined keys and their objective value.
+        """
+        ...
+
+
+class ShakingOperator(Protocol):
+    """Describe a replaceable perturbation strategy.
+
+    Responsibilities:
+    - Perturb a random-key vector within an intensity interval.
+    """
+
+    def __call__(
+        self,
+        keys: np.ndarray,
+        beta_min: float,
+        beta_max: float,
+    ) -> np.ndarray:
+        """Perturb a random-key vector.
+
+        Args:
+            keys (np.ndarray): Input random-key vector.
+            beta_min (float): Minimum perturbation intensity.
+            beta_max (float): Maximum perturbation intensity.
+
+        Returns:
+            np.ndarray: Perturbed random-key vector.
+        """
+        ...
 
 
 class MetaheuristicBase(ABC):
@@ -22,16 +106,28 @@ class MetaheuristicBase(ABC):
           return [], [], 0.0
     """
 
-    def __init__(self, solution_pool: object, name: str = "") -> None:
+    def __init__(
+        self,
+        solution_pool: SolutionPoolWriter,
+        name: str = "",
+        local_search_operator: LocalSearchOperator | None = None,
+        shaking_operator: ShakingOperator | None = None,
+    ) -> None:
         """Initialise the metaheuristic.
 
         Args:
-          solution_pool: Shared pool used to exchange elite solutions between
-            concurrent metaheuristics.
-          name: Human-readable label used in log messages. Defaults to the class name.
+          solution_pool (SolutionPoolWriter): Pool used to exchange solutions.
+          name (str): Log label; defaults to the class name.
+          local_search_operator (LocalSearchOperator | None): Optional local-search implementation.
+          shaking_operator (ShakingOperator | None): Optional perturbation implementation.
+
+        Returns:
+          None: Initializes shared pool, operator, and lifecycle state.
         """
         self.solution_pool = solution_pool
         self.name = name or self.__class__.__name__
+        self.local_search_operator = local_search_operator
+        self.shaking_operator = shaking_operator
         self._start_time: float | None = None
         self._cancelled: threading.Event | None = None
 

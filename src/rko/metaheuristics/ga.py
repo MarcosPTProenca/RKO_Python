@@ -35,7 +35,9 @@ import numpy as np
 import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -64,7 +66,7 @@ class GeneticAlgorithm(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: ElitePool,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,
@@ -74,6 +76,7 @@ class GeneticAlgorithm(MetaheuristicBase):
         prob_mut: float = 0.02,
         control: int = 0,
         parameters: list[list[float]] | None = None,
+        local_search_operator: LocalSearchOperator | None = None,
         name: str = "GA",
     ) -> None:
         """Initialises the Genetic Algorithm metaheuristic.
@@ -88,6 +91,7 @@ class GeneticAlgorithm(MetaheuristicBase):
           prob_mut: Per-gene mutation probability (offline mode).
           control: 0 for offline fixed parameters, 1 for Q-Learning.
           parameters: Discrete grid ``[[size_pop], [prob_cros], [prob_mut]]``.
+          local_search_operator (LocalSearchOperator | None): Optional local-search replacement.
           name: Human-readable identifier for logging.
 
         Returns:
@@ -96,7 +100,7 @@ class GeneticAlgorithm(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
-        super().__init__(solution_pool=solution_pool, name=name)
+        super().__init__(solution_pool, name, local_search_operator=local_search_operator)
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
@@ -213,7 +217,7 @@ class GeneticAlgorithm(MetaheuristicBase):
                 i += 2
 
             ls_pos = random.randint(0, size_pop - 1)
-            ls_keys, ls_cost = nelder_mead_search(
+            ls_keys, ls_cost = (self.local_search_operator or nelder_mead_search)(
                 pop_new[ls_pos].copy(), self.decoder, self.cost, pool=self.solution_pool
             )
             pop_new[ls_pos] = ls_keys

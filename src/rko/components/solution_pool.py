@@ -32,17 +32,16 @@ import math
 import threading
 import time
 from typing import Protocol
+from typing import runtime_checkable
 
 
-class ElitePool(Protocol):
-    """Describe local and process-shared elite-pool access.
+@runtime_checkable
+class SolutionPoolWriter(Protocol):
+    """Describe the insertion contract shared by metaheuristic pool clients.
 
     Responsibilities:
-    - Keep search code independent of the pool transport mechanism.
-
-    Attributes:
-        size (int): Current number of entries.
-        best (tuple[float, list[float]] | None): Best detached entry.
+    - Keep algorithms independent of the concrete pool transport.
+    - Accept objective/key pairs produced by searches.
     """
 
     def insert(self, entry: tuple[float, list[float]], source: str = "") -> None:
@@ -56,6 +55,19 @@ class ElitePool(Protocol):
             ValueError: If the candidate is invalid.
         """
         ...
+
+
+@runtime_checkable
+class ElitePool(SolutionPoolWriter, Protocol):
+    """Describe a pool that also exposes elite entries for search operators.
+
+    Responsibilities:
+    - Extend the insertion contract with elite solution access.
+    - Support pool-aware local search and path relinking.
+
+    Attributes:
+        size (int): Current number of entries.
+    """
 
     def get_elite(self, k: int = 1) -> list[tuple[float, list[float]]]:
         """Read detached elite entries.
@@ -74,15 +86,6 @@ class ElitePool(Protocol):
 
         Returns:
             int: Stored entry count.
-        """
-        ...
-
-    @property
-    def best(self) -> tuple[float, list[float]] | None:
-        """Return the best entry if populated.
-
-        Returns:
-            tuple[float, list[float]] | None: Best entry or None.
         """
         ...
 

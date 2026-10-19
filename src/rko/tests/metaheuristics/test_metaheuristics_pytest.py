@@ -25,10 +25,18 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+import random
+from collections.abc import Callable
+from rko.components.solution_pool import ElitePool
 from rko.components.solution_pool import SolutionPool
+from rko.components.solution_pool import SolutionPoolWriter
 from rko.metaheuristics.base import MetaheuristicBase
+from rko.metaheuristics.grasp import GRASP
+from rko.metaheuristics.grasp import _constructive
+from rko.metaheuristics.sa import SA
 from rko.orchestration.configuration import MH_SPECS
 from rko.orchestration.factory import build_metaheuristic
+from typing import Any
 
 
 class DummyMH(MetaheuristicBase):
@@ -38,6 +46,105 @@ class DummyMH(MetaheuristicBase):
         """Run a trivial solve routine and return a fixed feasible result."""
         self._start_timer()
         return [], [0.0], 0.0
+
+
+def test_solution_pool_implements_search_protocols() -> None:
+    """Verify the built-in pool satisfies insertion and elite-access protocols."""
+    pool = SolutionPool(capacity=4)
+    assert isinstance(pool, SolutionPoolWriter)
+    assert isinstance(pool, ElitePool)
+
+
+def test_grasp_uses_injected_local_search_operator() -> None:
+    """Verify GRASP delegates refinement to a supplied operator."""
+    pool = SolutionPool(capacity=4)
+    calls: list[object] = []
+
+    def local_search(
+        keys: np.ndarray,
+        decoder: Callable[[np.ndarray], Any],
+        cost: Callable[[Any], float],
+        *,
+        pool: ElitePool,
+    ) -> tuple[np.ndarray, float]:
+        """Return the unchanged vector and record the injected pool."""
+        calls.append(pool)
+        return keys, cost(decoder(keys))
+
+    grasp = GRASP(
+        pool,
+        lambda keys: keys,
+        lambda decoded: float(np.sum(decoded)),
+        3,
+        local_search_operator=local_search,
+    )
+    grasp.solve(0.0)
+
+    assert calls == [pool]
+
+
+def test_grasp_rebuilds_candidates_from_committed_partial_solution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ensure each construction pass evaluates candidates against current keys."""
+    evaluated: list[tuple[int, np.ndarray]] = []
+
+    def line_search(
+        pos: int,
+        h: float,
+        keys: np.ndarray,
+        decoder: Callable[[np.ndarray], Any],
+        cost: Callable[[Any], float],
+    ) -> tuple[float, float]:
+        """Record the candidate context and return a tied improvement."""
+        evaluated.append((pos, keys.copy()))
+        return 0.5, 0.0
+
+    monkeypatch.setitem(_constructive.__globals__, "_line_search", line_search)
+    monkeypatch.setattr(random, "uniform", lambda lower, upper: 0.5)
+    monkeypatch.setattr(random, "shuffle", lambda values: None)
+
+    _constructive(4, 0.1, np.zeros(4), lambda keys: keys, lambda decoded: 0.0)
+
+    assert len(evaluated) == 4
+    assert evaluated[2][1][0] == 0.5
+
+
+def test_sa_uses_injected_shaking_operator() -> None:
+    """Verify SA invokes a supplied perturbation without requiring defaults."""
+    pool = SolutionPool(capacity=4)
+    calls: list[tuple[float, float]] = []
+
+    def local_search(
+        keys: np.ndarray,
+        decoder: Callable[[np.ndarray], Any],
+        cost: Callable[[Any], float],
+        *,
+        pool: ElitePool,
+    ) -> tuple[np.ndarray, float]:
+        """Return the unchanged vector and its objective value."""
+        return keys, cost(decoder(keys))
+
+    def shaking(keys: np.ndarray, beta_min: float, beta_max: float) -> np.ndarray:
+        """Return the unchanged vector and record the requested interval."""
+        calls.append((beta_min, beta_max))
+        return keys
+
+    sa = SA(
+        pool,
+        lambda keys: keys,
+        lambda decoded: float(np.sum(decoded)),
+        3,
+        sa_max=1,
+        local_search_operator=local_search,
+        shaking_operator=shaking,
+    )
+    checks = iter([False, False, False, True, True])
+    sa.time_limit_reached = lambda limit_time: next(checks)
+    sa.solve(1.0)
+
+    assert len(calls) == 1
+    assert calls[0] == (sa.beta_min, sa.beta_max)
 
 
 def test_metaheuristic_base_timer_and_repr() -> None:

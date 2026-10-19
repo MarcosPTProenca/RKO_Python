@@ -45,7 +45,9 @@ import numpy as np
 import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.rvnd import rvnd
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -150,7 +152,7 @@ class GRASP(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: ElitePool,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,
@@ -159,6 +161,7 @@ class GRASP(MetaheuristicBase):
         he: float = 0.001,
         control: int = 0,
         parameters: list[list[float]] | None = None,
+        local_search_operator: LocalSearchOperator | None = None,
         name: str = "GRASP",
     ) -> None:
         """Initialises the GRASP metaheuristic.
@@ -173,6 +176,7 @@ class GRASP(MetaheuristicBase):
           control: 0 for offline fixed parameters, 1 for Q-Learning.
           parameters: Discrete grid for Q-Learning
             ``[[alpha_grasp...], [hs...], [he...]]``.
+          local_search_operator (LocalSearchOperator | None): Optional RVND replacement.
           name: Human-readable identifier for logging.
 
         Returns:
@@ -181,7 +185,7 @@ class GRASP(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
-        super().__init__(solution_pool=solution_pool, name=name)
+        super().__init__(solution_pool, name, local_search_operator=local_search_operator)
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
@@ -229,7 +233,9 @@ class GRASP(MetaheuristicBase):
             st = random.randint(0, max(0, len(ql.states) - 1))
 
         best_keys: np.ndarray = np.random.random(n)
-        best_keys, best_cost = rvnd(best_keys, self.decoder, self.cost, pool=self.solution_pool)
+        best_keys, best_cost = (self.local_search_operator or rvnd)(
+            best_keys, self.decoder, self.cost, pool=self.solution_pool
+        )
         self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
 
         s = best_keys.copy()
@@ -255,7 +261,9 @@ class GRASP(MetaheuristicBase):
             improv = 0
             while h >= he_cur and not self.time_limit_reached(limit_time):
                 s_line, _ = _constructive(n, h, s.copy(), self.decoder, self.cost)
-                s_line, s_line_cost = rvnd(s_line, self.decoder, self.cost, pool=self.solution_pool)
+                s_line, s_line_cost = (self.local_search_operator or rvnd)(
+                    s_line, self.decoder, self.cost, pool=self.solution_pool
+                )
 
                 if s_line_cost < best_cost:
                     best_cost = s_line_cost

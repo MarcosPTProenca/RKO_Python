@@ -37,7 +37,9 @@ from .shaking.mirror import mirror_shake
 from .shaking.neighbor_swap import neighbor_swap_shake
 from .shaking.random import shake
 from .shaking.swap import swap_shake
+from .solution_pool import ElitePool
 from .solution_pool import SolutionPool
+from .solution_pool import SolutionPoolWriter
 
 __all__ = [
     "QLearningController",
@@ -56,5 +58,7 @@ __all__ = [
     "neighbor_swap_shake",
     "shake",
     "swap_shake",
+    "ElitePool",
     "SolutionPool",
+    "SolutionPoolWriter",
 ]

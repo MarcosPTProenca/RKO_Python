@@ -27,6 +27,7 @@ Inputs/Outputs:
 from __future__ import annotations
 
 import numpy as np
+from ..components.solution_pool import SolutionPoolWriter
 from ..components.validation import ParameterValidator
 from .base import MetaheuristicBase
 from collections.abc import Callable
@@ -49,7 +50,7 @@ class MultiStart(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: SolutionPoolWriter,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,

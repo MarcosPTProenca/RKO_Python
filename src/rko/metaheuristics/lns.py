@@ -47,7 +47,9 @@ import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.farey_ls import FAREY_INTERVALS
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -79,7 +81,7 @@ class LNS(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: ElitePool,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,
@@ -90,6 +92,7 @@ class LNS(MetaheuristicBase):
         alpha_lns: float = 0.95,
         control: int = 0,
         parameters: list[list[float]] | None = None,
+        local_search_operator: LocalSearchOperator | None = None,
         name: str = "LNS",
     ) -> None:
         """Initialises the LNS metaheuristic.
@@ -106,6 +109,7 @@ class LNS(MetaheuristicBase):
           control: 0 for offline fixed parameters, 1 for Q-Learning.
           parameters: Discrete grid for Q-Learning
             ``[[bmin...], [bmax...], [t0...], [alpha...]]``.
+          local_search_operator (LocalSearchOperator | None): Optional local-search replacement.
           name: Human-readable identifier for logging.
 
         Returns:
@@ -114,7 +118,7 @@ class LNS(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
-        super().__init__(solution_pool=solution_pool, name=name)
+        super().__init__(solution_pool, name, local_search_operator=local_search_operator)
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
@@ -225,7 +229,7 @@ class LNS(MetaheuristicBase):
 
         best_keys: np.ndarray = np.random.random(n)
         best_cost: float = self.cost(self.decoder(best_keys))
-        best_keys, best_cost = nelder_mead_search(
+        best_keys, best_cost = (self.local_search_operator or nelder_mead_search)(
             best_keys, self.decoder, self.cost, pool=self.solution_pool
         )
         self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
@@ -260,7 +264,7 @@ class LNS(MetaheuristicBase):
                 previous_best = best_cost
                 s_line, destroyed = self._destroy(s, beta_min, beta_max)
                 s_line, s_line_cost = self._repair(s_line, destroyed)
-                s_line, s_line_cost = nelder_mead_search(
+                s_line, s_line_cost = (self.local_search_operator or nelder_mead_search)(
                     s_line, self.decoder, self.cost, pool=self.solution_pool
                 )
 

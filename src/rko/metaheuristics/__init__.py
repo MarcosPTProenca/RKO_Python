@@ -23,7 +23,9 @@ Inputs/Outputs:
 
 from __future__ import annotations
 
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
+from .base import ShakingOperator
 from .brkga import BRKGA
 from .brkga_cs import BRKGA_CS
 from .ga import GeneticAlgorithm
@@ -37,7 +39,9 @@ from .sa import SA
 from .vns import VNS
 
 __all__ = [
+    "LocalSearchOperator",
     "MetaheuristicBase",
+    "ShakingOperator",
     "BRKGA",
     "BRKGA_CS",
     "GeneticAlgorithm",

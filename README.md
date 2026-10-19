@@ -71,6 +71,13 @@ joint constraints before execution. Online grids retain named axes and exclude
 infeasible joint combinations (such as reversed perturbation bounds); an entirely
 infeasible grid is rejected. No scalar value is silently truncated.
 
+Direct metaheuristic constructors use package-provided local search and shaking
+by default. Algorithms that perform local search accept a typed
+`local_search_operator`; SA, ILS and VNS also accept `shaking_operator`. These
+callables are optional overrides, not required problem callbacks. Their public
+contracts are `LocalSearchOperator` and `ShakingOperator` from
+`rko.metaheuristics`; local-search overrides receive `pool=` as a keyword.
+
 Only `control` and `pool_size` are supported under `[run]`. Remove the formerly
 ignored `strategy`, `max_runs` and `debug` fields from custom configurations;
 unsupported keys now raise an error. Portfolio local search currently uses

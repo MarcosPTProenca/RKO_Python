@@ -44,7 +44,9 @@ import random
 from ..components.adaptive_control.q_learning import QLearningController
 from ..components.local_search.nelder_mead_ls import nelder_mead_search
 from ..components.local_search.rvnd import rvnd
+from ..components.solution_pool import ElitePool
 from ..components.validation import ParameterValidator
+from .base import LocalSearchOperator
 from .base import MetaheuristicBase
 from collections.abc import Callable
 from typing import Any
@@ -172,7 +174,7 @@ class BRKGA_CS(MetaheuristicBase):
 
     def __init__(
         self,
-        solution_pool: object,
+        solution_pool: ElitePool,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
         tam_solution: int,
@@ -184,6 +186,7 @@ class BRKGA_CS(MetaheuristicBase):
         sigma: float = 0.60,
         control: int = 0,
         parameters: list[list[float]] | None = None,
+        local_search_operator: LocalSearchOperator | None = None,
         name: str = "BRKGA_CS",
     ) -> None:
         """Initialises the BRKGA-CS metaheuristic.
@@ -200,6 +203,7 @@ class BRKGA_CS(MetaheuristicBase):
           sigma: Minimum Pearson correlation for community graph edges.
           control: 0 for offline fixed parameters, 1 for Q-Learning.
           parameters: Discrete grid ``[[p values], [pe], [pm], [rhoe]]``.
+          local_search_operator (LocalSearchOperator | None): Optional local-search replacement.
           name: Human-readable identifier for logging.
 
         Returns:
@@ -208,7 +212,7 @@ class BRKGA_CS(MetaheuristicBase):
         Raises:
           ValueError: When required by external domain validation.
         """
-        super().__init__(solution_pool=solution_pool, name=name)
+        super().__init__(solution_pool, name, local_search_operator=local_search_operator)
         self.decoder = decoder
         self.cost = cost
         self.tam_solution = tam_solution
@@ -354,14 +358,14 @@ class BRKGA_CS(MetaheuristicBase):
                 non_promising = [i for i in range(elite_size) if i not in promising]
                 for rank, idx in enumerate(promising):
                     if rank == 0:
-                        refined, ref_cost = rvnd(
+                        refined, ref_cost = (self.local_search_operator or rvnd)(
                             pop_inter[idx].copy(),
                             self.decoder,
                             self.cost,
                             pool=self.solution_pool,
                         )
                     else:
-                        refined, ref_cost = nelder_mead_search(
+                        refined, ref_cost = (self.local_search_operator or nelder_mead_search)(
                             pop_inter[idx].copy(),
                             self.decoder,
                             self.cost,
