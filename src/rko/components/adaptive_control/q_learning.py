@@ -5,6 +5,8 @@ Objective:
 
 Technical approach:
 - Model parameter combinations as states and local transitions as actions.
+- Index finite numeric states by all-but-one-coordinate signatures to avoid
+  testing unrelated pairs; retain pairwise comparison for other scalar types.
 - Update Q-values with an epsilon-greedy policy and the Bellman equation.
 
 Flow (pseudocode):
@@ -15,6 +17,8 @@ Flow (pseudocode):
 Important criteria:
 - Cyclical epsilon control.
 - Recompute the current best action after every Q update.
+- Preserve ascending neighbor labels and the exact initialization RNG draw order.
+- Signature indexes add temporary memory; dense graphs still require quadratic output.
 
 Inputs/Outputs:
 - Input: parameter grid, rewards, and current time.
@@ -116,7 +120,10 @@ class QLearningController:
         parameters: list[list[float]],
         state_filter: Callable[[list[float]], bool] | None = None,
     ) -> list[QState]:
-        """Creates discrete states and feasible actions for the Q-structure.
+        """Create ordered states and distance-one actions without unrelated pair scans.
+
+        Exact-width finite builtin numeric vectors use signature indexes. Other
+        values or predicate-modified widths retain the legacy comparison path.
 
         Args:
           parameters (list[list[float]]): Discrete values per parameter.
@@ -154,12 +161,40 @@ class QLearningController:
                 state.label = label
             num_states = len(states)
 
+        patterns: list[dict[tuple[float, ...], list[int]]] = []
+        if num_states > 1 and all(
+            len(state.par) == num_par
+            and all(
+                type(value) is int or (type(value) is float and math.isfinite(value))
+                for value in state.par
+            )
+            for state in states
+        ):
+            patterns = [{} for _ in range(num_par)]
+            for index, state in enumerate(states):
+                values = tuple(state.par)
+                for axis, table in enumerate(patterns):
+                    signature = values[:axis] + values[axis + 1 :]
+                    table.setdefault(signature, []).append(index)
+
         for i in range(num_states):
-            for j in range(num_states):
+            candidates = range(num_states)
+            if patterns:
+                values = tuple(states[i].par)
+                candidates = sorted(
+                    set().union(
+                        *(
+                            table[values[:axis] + values[axis + 1 :]]
+                            for axis, table in enumerate(patterns)
+                        )
+                    )
+                )
+            for j in candidates:
                 distance = 0
-                for k in range(num_par):
-                    if states[i].par[k] != states[j].par[k]:
-                        distance += 1
+                if not patterns:
+                    for k in range(num_par):
+                        if states[i].par[k] != states[j].par[k]:
+                            distance += 1
 
                 if distance <= 1:
                     states[i].Ai.append(j)

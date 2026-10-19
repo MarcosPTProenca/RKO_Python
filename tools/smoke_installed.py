@@ -74,13 +74,13 @@ def main() -> None:
     assert any("LICENSE" in path.name for path in default_instances_dir().iterdir())
     assert package.resolve() != Path(__file__).resolve().parents[1] / "src" / "rko"
     for backend in ("serial", "process"):
-        for algorithm, dimension in (("MultiStart", 3), ("PSO", 64)):
+        for algorithm, dimension, control in (("MultiStart", 3, 0), ("PSO", 64, 0), ("PSO", 64, 1)):
             result = RKO(
                 decode,
                 objective,
                 dimension,
                 algorithms=[algorithm],
-                control=0,
+                control=control,
                 backend=backend,
                 random_state=42,
             ).solve(0.05)

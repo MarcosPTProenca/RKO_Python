@@ -79,6 +79,7 @@ pytest_add_cli_args_test_selection = [
     "src/rko/tests/rko/test_pool_sampling.py",
     "src/rko/tests/components/test_parameter_contracts.py",
     "src/rko/tests/components/test_q_learning_pytest.py",
+    "src/rko/tests/components/test_q_state_graph.py",
     "src/rko/tests/components/test_initialization_and_operators_pytest.py",
     "src/rko/tests/metaheuristics/test_validation.py",
     "src/rko/tests/metaheuristics/test_algorithm_regressions.py",

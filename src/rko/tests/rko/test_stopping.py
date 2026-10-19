@@ -5,6 +5,7 @@ Objective:
 
 Technical approach:
 - Run the previously overrunning ILS shape through every public backend.
+- Observe bounded callback counts independently of spawn/import latency.
 - Inject a BaseException in a thread callback and observe caller-visible failure.
 
 Flow (pseudocode):
@@ -24,6 +25,8 @@ Inputs/Outputs:
 import numpy as np
 import pytest
 import time
+from dataclasses import dataclass
+from pathlib import Path
 from rko import RKO
 from rko.components.solution_pool import SolutionPool
 from rko.metaheuristics.multi_start import MultiStart
@@ -42,17 +45,40 @@ def decode(keys: np.ndarray) -> np.ndarray:
     return keys
 
 
-def slow_cost(keys: np.ndarray) -> float:
-    """Simulate a valid objective that returns after a short evaluation.
+@dataclass
+class RecordingCost:
+    """Observe a returning objective without sharing mutable process state.
 
-    Args:
-        keys (np.ndarray): Unused candidate vector.
+    Responsibilities:
+    - Persist completed evaluation counts and fail quickly on budget regressions.
 
-    Returns:
-        float: Constant finite objective.
+    Attributes:
+        path (Path): Trial-owned byte-per-evaluation observation file.
+        calls (int): Evaluations attempted by this callback instance.
     """
-    time.sleep(0.001)
-    return 1.0
+
+    path: Path
+    calls: int = 0
+
+    def __call__(self, keys: np.ndarray) -> float:
+        """Record a finite objective requiring at least one millisecond per call.
+
+        Args:
+            keys (np.ndarray): Unused candidate vector.
+
+        Returns:
+            float: Constant finite objective.
+
+        Raises:
+            AssertionError: If a 10 ms search attempts more than twelve evaluations.
+            OSError: If the observation cannot be written.
+        """
+        self.calls += 1
+        assert self.calls <= 12, "Callback evaluation budget exceeded."
+        with self.path.open("ab") as stream:
+            stream.write(b"1")
+        time.sleep(0.001)
+        return 1.0
 
 
 def exit_cost(keys: np.ndarray) -> float:
@@ -68,16 +94,17 @@ def exit_cost(keys: np.ndarray) -> float:
 
 
 @pytest.mark.parametrize("backend", ["serial", "thread", "process"])
-def test_returning_callback_local_search_obeys_budget(backend: str) -> None:
+def test_returning_callback_local_search_obeys_budget(backend: str, tmp_path: Path) -> None:
     """Preserve an evaluated result without waiting for the full local neighborhood.
 
     Args:
         backend (str): Execution backend under test.
+        tmp_path (Path): Trial-specific callback observation directory.
     """
-    started = time.perf_counter()
+    observation = tmp_path / "evaluations.bin"
     result = RKO(
         decode,
-        slow_cost,
+        RecordingCost(observation),
         100,
         algorithms=["ILS"],
         control=0,
@@ -85,7 +112,7 @@ def test_returning_callback_local_search_obeys_budget(backend: str) -> None:
     ).solve(0.01)
     assert result.cost == 1.0
     assert len(result.keys) == 100
-    assert time.perf_counter() - started < (15.0 if backend == "process" else 1.0)
+    assert 1 <= len(observation.read_bytes()) <= 12
 
 
 def test_thread_base_exception_reaches_caller() -> None:

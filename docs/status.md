@@ -106,5 +106,17 @@ ten-entry returned data was about 80% smaller. These are managed-pool IPR result
 not whole portfolios, process-startup gains, total CPU, RSS or scientific-quality
 claims. Concurrent timed trajectories can change with RPC interleavings.
 
+Adaptive Q-state graph construction now indexes finite numeric states by
+all-but-one-coordinate signatures instead of comparing unrelated state pairs.
+Ascending actions, initial Q-values and RNG draws are preserved; exotic/nonfinite
+standalone values retain the pairwise path. Three fixed-work PSO benchmark runs
+passed 162 exact comparisons with a frozen adaptive clock; one reference measured
+2.91–3.85× at 32 keys and 1.24–1.37× at 1,000 with a 625-state grid. Isolated graph
+initialization improved substantially as grids grew, but signature memory can
+increase small-grid peaks and dense output remains quadratic. Real cold-spawn
+trials confirmed a smaller graph phase, not a reliable end-to-end startup gain:
+imports/spawn still dominate. Parent constructor validation and fresh parameter
+reads remain intact. See [benchmarks](../benchmarks/README.md) for limits.
+
 Detailed working audits and plans are kept locally and excluded from Git. Source
 history preserves prior evidence; this page is the maintained public summary.

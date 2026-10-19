@@ -53,6 +53,73 @@ snapshot queries faster, but corrected full-search trials did not demonstrate a
 reliable general benefit and small cases sometimes regressed. It was discarded;
 no cache or additional retained worker snapshots were shipped.
 
+## Adaptive state-graph initialization and startup
+
+Adaptive controllers formerly compared every state against every other state to
+find transitions differing in at most one parameter. Exact-width finite builtin
+numeric states now use all-but-one-coordinate signature indexes; candidate labels are
+sorted before weights are drawn. State/filter order, duplicate values, action
+order, initial weights and first-winner maxima are unchanged. Other scalar types
+and nonfinite standalone inputs keep the original pairwise behavior; no input
+coercion, skipped validation, grid caching or default parameter change is used.
+Dense/duplicate-heavy graphs still need all their output edges and can remain
+quadratic; indexing adds temporary memory, not a universal memory improvement.
+
+```bash
+uv run --locked python benchmarks/q_learning.py > /tmp/rko-q-learning.jsonl
+uv run --locked python benchmarks/startup.py > /tmp/rko-startup.jsonl
+```
+
+Reference: 2026-10-19, four-CPU WSL2, GIL-enabled CPython 3.14.8 / NumPy 2.4.3.
+The graph benchmark keeps the exact former builder body, warms and alternates
+both functions, and checks serialized states and final RNG state. Four-axis,
+unique-value grids in the last reference gave these median paired ratios:
+
+| States | Pairwise/indexed initialization ratio |
+| ---: | ---: |
+| 1 | 1.01× |
+| 81 | 3.12× |
+| 625 | 16.87× |
+| 2,401 | 63.28× |
+
+One-state timings varied around parity, including minor regressions in earlier
+runs; no universal gain is claimed. Separately traced graph allocation peaks
+were 68,728 → 91,864 bytes at 81 states and 938,040 → 865,280 at 625. Retained traces were 68,728 → 81,728 and
+938,040 → 790,880 respectively. Traces include interpreter allocation caches,
+exclude input grids, and are not whole-process RSS or pure live-graph sizes.
+
+The same runner swaps builders on the **same controller class** inside complete
+PSO searches, using a valid five-value-per-axis grid (625 states). Both variants
+run 2,000 evaluations, actual local search/callback isolation and final pool
+fingerprinting. Three seeds × three repeats × two dimensions × three workloads
+give **54 exact pairs per invocation**. Three runs passed all 162 pairs, including
+costs, keys, counts, final pools and both RNG fingerprints.
+
+To isolate search semantics, the adaptive elapsed clock is frozen while callback
+stopping still works. This is **not** a real adaptive time policy or whole-RKO
+speedup comparison. Latest median paired **wall / process CPU** ratios:
+
+| Keys | Sphere | Rugged numerical | Stable permutation |
+| ---: | ---: | ---: | ---: |
+| 32 | 3.85 / 3.90 | 2.91 / 3.05 | 3.77 / 3.76 |
+| 1,000 | 1.37 / 1.38 | 1.30 / 1.34 | 1.24 / 1.24 |
+
+The separate startup runner executes six real, cold-spawn PSO solves on the same
+checkout/environment, alternating original/indexed graph builders for three
+seeds. A temporary valid 625-state TOML configuration is re-read normally; the
+worker wrapper measures graph creation and the first decoder records its time
+and seeded keys. All first-key hashes and final objective accounting passed.
+The latest graph phase took 0.390–0.712 s pairwise versus 0.017–0.050 s indexed.
+**End-to-end times were mixed:** 5.81–6.66 s versus 4.75–7.06 s for 0.1-second
+budgets. Startup/import variation dominated, so these six solves do not establish
+whole-process latency gains. A first callback can still exceed its budget.
+
+A preceding instrumented default-portfolio investigation found only 0.12–0.24 s
+in parent-side algorithm construction, against 1.92–3.93 s manager startup and
+roughly 2.07–3.41 s between manager readiness and worker entry. It did not justify
+removing fail-fast constructor validation. Import/spawn latency remains open;
+never compare Linux `/tmp` and Windows-mounted checkouts as a code speedup.
+
 ## Managed IPR selected elite transfer
 
 IPR previously fetched the whole managed elite pool and then selected two ranks.
