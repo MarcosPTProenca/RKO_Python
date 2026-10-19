@@ -6,7 +6,7 @@ Objective:
 
 Technical approach:
 - Parse the C++ KP text format (`n_items`, `capacity`, then `benefit weight`).
-- Decode random keys with the same C++ threshold rule (`rk > 0.5`).
+- Provide both the C++ threshold decoder and a capacity-feasible ranked decoder.
 - Evaluate cost exactly like `Problem.h` and persist execution summaries to CSV.
 
 Flow (pseudocode):
@@ -28,9 +28,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import numpy as np
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
 from rko import RKO
 from typing import Literal
@@ -139,19 +141,75 @@ def read_kp_instance(path: Path) -> KpInstance:
     )
 
 
-def decode_knapsack(keys: list[float]) -> list[int]:
-    """Decode a random-key vector into a binary knapsack decision vector.
+def decode_knapsack(keys: list[float] | np.ndarray) -> list[int]:
+    """Decode random keys with the C++ reference threshold rule.
 
     Args:
-      keys (list[float]): Random-key chromosome.
+      keys (list[float] | np.ndarray): Random-key chromosome.
 
     Returns:
       list[int]: Binary vector where 1 means selected item.
-
-    Raises:
-      ValueError: When required by external domain validation.
     """
     return [1 if key > 0.5 else 0 for key in keys]
+
+
+@dataclass(slots=True)
+class GreedyKnapsackDecoder:
+    """Decode random keys into a capacity-feasible, profit-weighted ordering.
+
+    Responsibilities:
+    - Cache item ratios and weights for repeated candidate decoding.
+    - Select items by descending key-times-profit/weight priority when they fit.
+
+    Attributes:
+        instance (KpInstance): Knapsack data used to decode each chromosome.
+        benefit_weight_ratio (np.ndarray): Cached item profit-to-weight ratios.
+        weights (np.ndarray): Cached integer item weights.
+    """
+
+    instance: KpInstance
+    benefit_weight_ratio: np.ndarray = field(init=False, repr=False)
+    weights: np.ndarray = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Cache numeric arrays used by repeated candidate decoding."""
+        if (
+            self.instance.n_items <= 0
+            or len(self.instance.benefits) != self.instance.n_items
+            or len(self.instance.weights) != self.instance.n_items
+            or self.instance.capacity < 0
+            or any(weight <= 0 for weight in self.instance.weights)
+            or any(benefit < 0 for benefit in self.instance.benefits)
+        ):
+            raise ValueError("Knapsack decoder requires valid, dimension-matched instance data.")
+        benefits = np.asarray(self.instance.benefits, dtype=float)
+        self.weights = np.asarray(self.instance.weights, dtype=np.int64)
+        self.benefit_weight_ratio = benefits / self.weights
+
+    def __call__(self, keys: np.ndarray) -> list[int]:
+        """Greedily select fitting items by key-weighted profit density.
+
+        Args:
+            keys (np.ndarray): Finite one-dimensional random-key vector.
+
+        Returns:
+            list[int]: Capacity-feasible binary decision vector.
+
+        Raises:
+            ValueError: If key dimensions differ from the instance or keys are nonfinite.
+        """
+        values = np.asarray(keys, dtype=float)
+        if values.shape != (self.instance.n_items,) or not np.isfinite(values).all():
+            raise ValueError("Keys must be finite and match the knapsack item count.")
+        order = np.argsort(-(values * self.benefit_weight_ratio), kind="stable")
+        decisions = [0] * self.instance.n_items
+        remaining = self.instance.capacity
+        for index in order:
+            weight = int(self.weights[index])
+            if weight <= remaining:
+                decisions[index] = 1
+                remaining -= weight
+        return decisions
 
 
 @dataclass(slots=True)

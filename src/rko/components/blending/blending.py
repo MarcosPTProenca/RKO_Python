@@ -41,21 +41,25 @@ def blending(parent_a: np.ndarray, parent_b: np.ndarray, factor: float = 1.0) ->
     """
     if parent_a.shape != parent_b.shape:
         raise ValueError("parent_a and parent_b must have the same shape")
+    if parent_a.ndim != 1:
+        raise ValueError("parent vectors must be one-dimensional")
 
     n = len(parent_a)
-    child = np.empty(n, dtype=float)
+    mutation = np.zeros(n, dtype=bool)
+    use_parent_a = np.zeros(n, dtype=bool)
+    mutation_values = np.empty(n, dtype=float)
+    draw = random.random
 
     for j in range(n):
-        if random.random() < 0.02:
-            child[j] = random.random()
-            continue
-
-        if random.random() < 0.5:
-            child[j] = parent_a[j]
+        if draw() < 0.02:
+            mutation[j] = True
+            mutation_values[j] = draw()
         else:
-            if factor == -1:
-                child[j] = min(max(1.0 - float(parent_b[j]), 0.0), 0.9999999)
-            else:
-                child[j] = parent_b[j]
+            use_parent_a[j] = draw() < 0.5
 
+    child = np.where(use_parent_a, parent_a, parent_b).astype(float, copy=False)
+    if factor == -1:
+        complemented = np.clip(1.0 - child, 0.0, 0.9999999)
+        child[~use_parent_a] = complemented[~use_parent_a]
+    child[mutation] = mutation_values[mutation]
     return child

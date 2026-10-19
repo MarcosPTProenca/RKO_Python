@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import numpy as np
 from ..metaheuristics.base import MetaheuristicBase
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 RunResult = tuple[list[object], list[float], float]
-DecoderFn = Callable[[Any], Any]
+DecoderFn = Callable[[np.ndarray], Any]
 CostFn = Callable[[Any], float]
 
 

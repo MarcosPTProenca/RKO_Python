@@ -77,17 +77,47 @@ def test_update_pool_solutions_keeps_original_size() -> None:
     assert [c for c, _ in updated] == [1.0, 2.0]
 
 
-def test_blending_raises_for_shape_mismatch() -> None:
-    """Ensure blending rejects parent vectors with different shapes."""
+def test_blending_raises_for_invalid_parent_dimensions() -> None:
+    """Reject parents that cannot represent one-dimensional key vectors."""
     with pytest.raises(ValueError, match="must have the same shape"):
         blending(np.array([0.1, 0.2]), np.array([0.1]))
+    with pytest.raises(ValueError, match="one-dimensional"):
+        blending(np.array([[0.1]]), np.array([[0.2]]))
+
+
+def test_blending_preserves_random_draw_order_and_parent_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preserve the reference draw sequence, offspring values and parent arrays."""
+    draws = iter([0.01, 0.77, 0.5, 0.2, 0.01, 0.33, 0.5, 0.8])
+    parent_a = np.array([0.1, 0.2, 0.3, 0.4])
+    parent_b = np.array([0.6, 0.7, 0.8, 0.9])
+    original_a = parent_a.copy()
+    original_b = parent_b.copy()
+    monkeypatch.setattr("random.random", lambda: next(draws))
+
+    child = blending(parent_a, parent_b)
+
+    assert child == pytest.approx([0.77, 0.2, 0.33, 0.9])
+    assert parent_a == pytest.approx(original_a)
+    assert parent_b == pytest.approx(original_b)
+    with pytest.raises(StopIteration):
+        next(draws)
+
+
+def test_blending_preserves_nonfinite_complement(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the reference NaN result for a NaN parent key."""
+    monkeypatch.setattr("random.random", lambda: 0.6)
+    child = blending(np.array([0.2]), np.array([np.nan]), factor=-1)
+    assert np.isnan(child[0])
 
 
 def test_blending_with_factor_minus_one(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure complementary blending mode mirrors genes from parent B."""
+    draws = iter([0.6, 0.6, 0.6, 0.6])
     parent_a = np.array([0.2, 0.4])
     parent_b = np.array([0.1, 0.9])
-    monkeypatch.setattr("random.random", lambda: 0.6)
+    monkeypatch.setattr("random.random", lambda: next(draws))
 
     child = blending(parent_a, parent_b, factor=-1)
 

@@ -12,15 +12,4 @@ pool_size = 10
 [active_metaheuristics]
 # Algorithms dispatched through the explicitly selected backend.
 # Remove or comment out entries to disable individual algorithms.
-list = [
-    "SA",
-    "ILS",
-    "VNS",
-    "LNS",
-    "BRKGA",
-    "BRKGA_CS",
-    "PSO",
-    "GA",
-    "GRASP",
-    "IPR",
-]
+list = ["SA", "BRKGA", "GA", "PSO"]

@@ -47,10 +47,11 @@ and also accepts `verbose=True`.
 ## Execution modes
 
 - **`backend="process"` (default):** one spawned worker per selected algorithm,
-  plus one manager hosting the shared elite pool. `n_jobs=None` permits that
-  many workers, even if the selection exceeds available CPU cores. Specify a
-  budget explicitly to prevent accidental oversubscription. A portfolio larger
-  than `n_jobs` is rejected, not queued or silently truncated.
+  plus one manager hosting the shared elite pool. The packaged default is a
+  four-algorithm portfolio measured on a four-CPU workstation. `n_jobs=None`
+  permits one worker per selected algorithm; custom portfolios can still
+  oversubscribe hardware. A portfolio larger than `n_jobs` is rejected, not
+  queued or silently truncated.
 - **`backend="thread"`:** legacy shared-memory execution; arbitrary local
   callbacks work, but CPU-bound Python code is subject to the standard GIL.
 - **`backend="serial"`:** debugging/reference execution with shared elites.
@@ -105,6 +106,52 @@ if __name__ == "__main__":
     result = solver.solve(time_limit=5.0)
     print(result.keys, result.cost, result.elapsed_seconds)
 ```
+
+### Adapting a custom problem
+
+Keep instance reading, decoding, and scoring separate. The decoder receives a
+one-dimensional NumPy key array of length `n_variables` and returns the domain
+solution. The objective receives that decoded solution and returns a finite
+number to **minimize**. Put callbacks at module scope (or use pickleable callable
+objects) for the process backend; load instance-specific data once and capture
+it in a callable object such as `KnapsackCost`.
+
+This complete adapter uses the packaged reader, decoder, and objective; replace
+those three with equivalents for another problem:
+
+```python
+from pathlib import Path
+from rko import RKO
+from rko.examples.run_kp_cpp_instances import decode_knapsack
+from rko.examples.run_kp_cpp_instances import evaluate_solution
+from rko.examples.run_kp_cpp_instances import make_cost
+from rko.examples.run_kp_cpp_instances import read_kp_instance
+
+
+def main() -> None:
+    """Load one instance, solve it, and verify the decoded result."""
+    instance = read_kp_instance(Path("src/rko/examples/instances/kp50.txt"))
+    solver = RKO(
+        decoder=decode_knapsack,
+        cost=make_cost(instance),
+        n_variables=instance.n_items,
+        algorithms=["SA", "BRKGA", "GA", "PSO"],
+        n_jobs=4,
+        random_state=42,
+    )
+    result = solver.solve(time_limit=10)
+    print(evaluate_solution(decode_knapsack(result.keys), instance))
+
+
+if __name__ == "__main__":
+    main()
+```
+
+For a capacity-feasible knapsack search, the example module also provides
+`GreedyKnapsackDecoder(instance)`. It ranks by key times profit/weight and only
+accepts items that fit; the original `decode_knapsack` threshold rule remains
+unchanged for C++ comparison. The CLI is Knapsack-specific; arbitrary data
+formats use the Python adapter above.
 
 `random_state` gives distinct, repeatable seed allocation to Python and NumPy
 worker RNGs. Timed searches still depend on scheduling and elite exchange;

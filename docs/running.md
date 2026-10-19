@@ -19,9 +19,10 @@ Bash continuation backslashes with PowerShell backticks.
 `uv run --locked rko --help` lists options. The equivalent installed command is
 `rko ...`; running the Python module directly also remains supported. Startup
 is additional to the process search budget; see README for stopping limits.
-Defaults currently select ten algorithms/workers, which may oversubscribe a
-small machine. Use an explicit smaller portfolio as below rather than assuming
-`--n-jobs 4` schedules the default ten.
+Defaults select the four-algorithm portfolio measured in the larger Knapsack
+benchmark. This fits a four-core workstation; `--n-jobs 4` is therefore sufficient
+for the default selection. Custom portfolios still require at least one worker
+per selected algorithm; smaller worker counts are rejected rather than queued.
 
 ## Live progress
 
