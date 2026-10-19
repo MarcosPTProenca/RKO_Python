@@ -32,7 +32,6 @@ from rko.components.solution_pool import SolutionPool
 from rko.components.solution_pool import SolutionPoolWriter
 from rko.metaheuristics.base import MetaheuristicBase
 from rko.metaheuristics.grasp import GRASP
-from rko.metaheuristics.grasp import _constructive
 from rko.metaheuristics.sa import SA
 from rko.orchestration.configuration import MH_SPECS
 from rko.orchestration.factory import build_metaheuristic
@@ -89,22 +88,22 @@ def test_grasp_rebuilds_candidates_from_committed_partial_solution(
     """Ensure each construction pass evaluates candidates against current keys."""
     evaluated: list[tuple[int, np.ndarray]] = []
 
-    def line_search(
-        pos: int,
-        h: float,
-        keys: np.ndarray,
-        decoder: Callable[[np.ndarray], Any],
-        cost: Callable[[Any], float],
-    ) -> tuple[float, float]:
+    def line_search(pos: int, h: float, keys: np.ndarray) -> tuple[float, float]:
         """Record the candidate context and return a tied improvement."""
         evaluated.append((pos, keys.copy()))
         return 0.5, 0.0
 
-    monkeypatch.setitem(_constructive.__globals__, "_line_search", line_search)
+    grasp = GRASP(
+        SolutionPool(capacity=4),
+        lambda keys: keys,
+        lambda decoded: 0.0,
+        4,
+    )
+    monkeypatch.setattr(grasp, "_line_search", line_search)
     monkeypatch.setattr(random, "uniform", lambda lower, upper: 0.5)
     monkeypatch.setattr(random, "shuffle", lambda values: None)
 
-    _constructive(4, 0.1, np.zeros(4), lambda keys: keys, lambda decoded: 0.0)
+    grasp._constructive(0.1, np.zeros(4))
 
     assert len(evaluated) == 4
     assert evaluated[2][1][0] == 0.5
