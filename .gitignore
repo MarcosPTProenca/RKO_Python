@@ -11,6 +11,9 @@ env/
 build/
 dist/
 .pytest_cache/
+.hypothesis/
+.mutmut-cache/
+mutants/
 .ruff_cache/
 .mypy_cache/
 .coverage
