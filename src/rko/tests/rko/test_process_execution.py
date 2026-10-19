@@ -29,6 +29,7 @@ import random
 import shutil
 import time
 from dataclasses import dataclass
+from functools import partial
 from multiprocessing.connection import Connection
 from pathlib import Path
 from rko import run
@@ -124,15 +125,17 @@ def exiting_cost(keys: np.ndarray) -> float:
     os._exit(17)
 
 
-def blocking_cost(keys: np.ndarray) -> float:
+def blocking_cost(keys: np.ndarray, *, directory: Path) -> float:
     """Simulate a callback that ignores the solver's cooperative time budget.
 
     Args:
         keys (np.ndarray): Candidate vector.
+        directory (Path): Destination for callback-entry observations.
 
     Returns:
         float: Sphere objective after blocking beyond the grace period.
     """
+    directory.joinpath(str(os.getpid())).write_text("entered", encoding="utf-8")
     time.sleep(30.0)
     return sphere(keys)
 
@@ -269,16 +272,29 @@ def test_worker_failure_reaps_children(
 
 
 @pytest.mark.parametrize("n_jobs", [None, 1])
-def test_search_timeout_reaps_blocked_workers(params_dir: Path, n_jobs: int | None) -> None:
-    """Bound callbacks that fail to return within the search grace period.
+def test_search_timeout_reaps_blocked_workers(
+    params_dir: Path, tmp_path: Path, n_jobs: int | None
+) -> None:
+    """Observe blocked callback entry and reap workers after the search grace period.
 
     Args:
         params_dir (Path): Complete test portfolio configuration.
+        tmp_path (Path): Destination for callback-entry observations.
         n_jobs (int | None): Dedicated or shared worker execution.
     """
     before = {child.pid for child in mp.active_children()}
     with pytest.raises(TimeoutError, match="search timed out"):
-        run(identity, blocking_cost, 3, 0.01, params_dir=params_dir, n_jobs=n_jobs)
+        run(
+            identity,
+            partial(blocking_cost, directory=tmp_path),
+            3,
+            0.5,
+            params_dir=params_dir,
+            n_jobs=n_jobs,
+        )
+    observations = [path for path in tmp_path.iterdir() if path.is_file()]
+    assert len(observations) == (2 if n_jobs is None else 1)
+    assert all(path.read_text(encoding="utf-8") == "entered" for path in observations)
     assert {child.pid for child in mp.active_children()} == before
 
 
