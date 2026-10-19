@@ -32,8 +32,12 @@ from ..components.solution_pool import SolutionPoolWriter
 from abc import ABC
 from abc import abstractmethod
 from collections.abc import Callable
+from typing import TYPE_CHECKING
 from typing import Any
 from typing import Protocol
+
+if TYPE_CHECKING:
+    from ..orchestration.types import SearchMetadata
 
 
 class LocalSearchOperator(Protocol):
@@ -130,6 +134,7 @@ class MetaheuristicBase(ABC):
         self.shaking_operator = shaking_operator
         self._start_time: float | None = None
         self._cancelled: threading.Event | None = None
+        self._search_metadata: SearchMetadata | None = None
 
     @abstractmethod
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:

@@ -88,6 +88,8 @@ pytest_add_cli_args_test_selection = [
     "src/rko/tests/rko/test_solver.py",
     "src/rko/tests/rko/test_hyperparameters.py",
     "src/rko/tests/rko/test_stopping.py",
+    "src/rko/tests/rko/test_search_metadata.py",
+    "src/rko/tests/rko/test_result_metadata.py",
     "-k",
     "not test_solution_pool_implements_search_protocols",
 ]

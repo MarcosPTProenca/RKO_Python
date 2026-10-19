@@ -112,8 +112,8 @@ All backends, including grouped process workers, receive the same owned settings
 
 Nonempty scalar overrides require **`control=0`**. Adaptive grids remain configured
 through named `[online]` TOML axes; `control=1` rejects scalar overrides rather than
-silently replacing tuned values during adaptation. Existing result fields are
-unchanged; record your tuning settings alongside results when comparing trials.
+silently replacing tuned values during adaptation. Result reports retain the
+validated initial scalar settings and actual adaptive axes used by each search.
 
 Direct metaheuristic constructors use package-provided local search and shaking
 by default. Algorithms that perform local search accept a typed
@@ -156,6 +156,55 @@ if __name__ == "__main__":
     result = solver.solve(time_limit=5.0)
     print(result.keys, result.cost, result.elapsed_seconds)
 ```
+
+### Result accounting and configuration snapshots
+
+`RKOResult` retains its original fields and adds immutable `searches` reports in
+portfolio order, plus `n_variables`, requested `time_limit`, `control`, `pool_size`,
+`n_jobs` and runtime `versions` (RKO distribution, Python, NumPy). The derived
+`n_workers` excludes pool managers and native numeric threads; it is configured
+search concurrency, not measured CPU utilization.
+
+```python
+print(result.n_evaluations, result.stop_reason, result.n_workers)
+for search in result.searches:
+    print(search.algorithm, search.n_evaluations, search.stop_reason)
+    print(search.random_state, dict(search.parameters), search.parameter_grid)
+```
+
+`n_evaluations` counts **successfully completed finite objective callback calls**
+across every algorithm, including initialization and local search—not just
+improvements or the winning worker. Decoder calls, rejected/nonfinite objectives,
+callback-internal work and post-solve user evaluations are not counted. Failed
+solves still raise and clear `result_`; they do not publish partial success reports.
+
+Each exported `SearchMetadata` records its actual assigned seed (even when the
+requested seed was `None`), effective control, validated initial scalar parameters,
+ordered adaptive grid axes, assigned search seconds and measured session seconds.
+Adaptive grids follow the algorithm's schema order; these are input snapshots,
+not final adaptive parameters or a history of visited states. Unsupported adaptive
+algorithms report effective control zero. Workers report their own constructed
+settings rather than rereading files later in the parent. Reports contain no
+callbacks, populations or mutable RNG objects and support standard dataclass/
+pickle serialization. Aggregate properties are derived, not `dataclasses.asdict`
+fields. Legacy manually constructed six-argument results have unknown accounting
+(`n_evaluations=None`, `stop_reason="unknown"`). `run()` and CLI CSV formats remain
+unchanged.
+
+Search reasons are `completed` (returned before its deadline, **not** a convergence
+claim), `time_limit` (deadline stopping or deadline elapsed by return), `cancelled`
+(peer-failure signal), and `not_started` (queued search had no remaining budget).
+The portfolio reason is `time_limit` if any search used its budget or could not
+start; detailed reports preserve the distinction. Unstarted entries retain their
+nominal slice but have zero evaluations and zero elapsed search time. Cancelled peers normally belong
+to a failed portfolio, which raises instead of returning a result. Session elapsed
+time excludes startup and queueing; `result.elapsed_seconds` remains end-to-end.
+
+These numeric settings and runtime versions are useful provenance, not a complete
+replay artifact: callback/data identities, development commit hashes, callback RNG
+state, adaptive trajectories and cooperative scheduling are not captured. Owned
+seeds do not promise identical timed portfolio results. Callback overruns can still
+exceed a reported budget.
 
 ### Adapting a custom problem
 

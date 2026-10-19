@@ -31,6 +31,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from rko import RKO
+from rko import SearchMetadata
 from rko.components.adaptive_control.q_learning import QLearningController
 from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import read_kp_instance
@@ -101,6 +102,22 @@ def main() -> None:
             assert len(keys) == dimension
             assert np.all((keys >= 0.0) & (keys < 1.0))
             assert np.isclose(result.cost, objective(keys))
+            assert result.n_evaluations >= 1
+            assert result.stop_reason == "time_limit"
+            assert result.n_workers == 1
+            assert len(result.searches) == 1
+            report = result.searches[0]
+            assert isinstance(report, SearchMetadata)
+            assert report.n_evaluations == result.n_evaluations
+            assert report.algorithm == algorithm
+            assert report.random_state == int(
+                np.random.SeedSequence(42).spawn(1)[0].generate_state(1)[0]
+            )
+            assert dict(result.versions)["numpy"] == np.__version__
+            if algorithm == "PSO" and control == 0:
+                assert dict(report.parameters)["p_size"] == 4
+            assert bool(report.parameter_grid) == (algorithm == "PSO" and control == 1)
+            assert pickle.loads(pickle.dumps(result)) == result
     bounded = RKO(
         decode,
         objective,
@@ -114,6 +131,10 @@ def main() -> None:
     ).solve(0.1)
     assert len(bounded.keys) == 64
     assert np.isclose(bounded.cost, objective(np.asarray(bounded.keys)))
+    assert bounded.n_workers == 1
+    assert [report.algorithm for report in bounded.searches] == ["MultiStart", "IPR", "PSO"]
+    assert bounded.n_evaluations == sum(report.n_evaluations for report in bounded.searches)
+    assert dict(bounded.searches[-1].parameters)["p_size"] == 4
     assert pickle.dumps((random.getstate(), np.random.get_state())) == global_rng
     executable = shutil.which("rko")
     assert executable is not None

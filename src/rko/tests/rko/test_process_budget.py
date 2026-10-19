@@ -40,6 +40,7 @@ from rko.orchestration.types import CostFn
 from rko.orchestration.types import DecoderFn
 from rko.orchestration.types import RunConfig
 from rko.orchestration.types import RunResult
+from rko.orchestration.types import SearchMetadata
 from types import SimpleNamespace
 
 
@@ -203,11 +204,13 @@ def test_worker_limit_runs_every_seeded_algorithm(tmp_path: Path, n_jobs: int) -
         (0.0, 0.0, []),
     ],
 )
+@pytest.mark.parametrize("collect_metadata", [False, True])
 def test_worker_preserves_deadline_and_constructor_rng(
     monkeypatch: pytest.MonkeyPatch,
     overrun: float,
     duration: float,
     expected_slices: list[float],
+    collect_metadata: bool,
 ) -> None:
     """Inspect slices, constructor RNG states and exhausted-deadline behavior.
 
@@ -216,6 +219,7 @@ def test_worker_preserves_deadline_and_constructor_rng(
         overrun (float): Simulated callback overrun after each nominal slice.
         duration (float): Remaining common budget, zero simulates late startup.
         expected_slices (list[float]): Durations available to searches actually started.
+        collect_metadata (bool): Exercise both compatible and enriched pipe messages.
     """
     assignments = (("MultiStart", 11), ("SA", 22), ("PSO", 33))
     clock = [100.0]
@@ -259,7 +263,7 @@ def test_worker_preserves_deadline_and_constructor_rng(
         constructed.append(name)
         RandomStreams.python_rng().random()
         RandomStreams.numpy_rng().random()
-        return SimpleNamespace(name=name)
+        return SimpleNamespace(name=name, _search_metadata=None)
 
     class Session:
         """Simulate completed or overrunning searches at their supplied deadlines.
@@ -277,7 +281,12 @@ def test_worker_preserves_deadline_and_constructor_rng(
             """
 
         def solve(
-            self, algorithm: SimpleNamespace, limit_time: float, *, deadline: float
+            self,
+            algorithm: SimpleNamespace,
+            limit_time: float,
+            *,
+            deadline: float,
+            random_state: int | None = None,
         ) -> RunResult:
             """Check the reactivated owned stream and simulate one search slice.
 
@@ -285,12 +294,21 @@ def test_worker_preserves_deadline_and_constructor_rng(
                 algorithm (SimpleNamespace): Named prepared search.
                 limit_time (float): Supplied remaining slice duration.
                 deadline (float): Absolute deadline bounded by the portfolio.
+                random_state (int | None): Actual assigned search seed.
 
             Returns:
                 RunResult: Consistent synthetic incumbent.
             """
             assert constructed == [name for name, _ in assignments]
             seed = dict(assignments)[algorithm.name]
+            assert random_state == seed
+            self.metadata = SearchMetadata(
+                algorithm=algorithm.name,
+                random_state=seed,
+                time_limit=limit_time,
+                stop_reason="time_limit",
+                n_evaluations=2,
+            )
             python_rng = random.Random(seed)
             numpy_rng = np.random.RandomState(seed)
             python_rng.random()
@@ -323,12 +341,21 @@ def test_worker_preserves_deadline_and_constructor_rng(
             start,
             SimpleNamespace(value=100.0 + duration),
             child,
+            collect_metadata=collect_metadata,
         )
         assert random.getstate() == python_state
         assert np.array_equal(np.random.get_state()[1], numpy_state[1])
         assert np.random.get_state()[2:] == numpy_state[2:]
         assert parent.recv() == ("ready", None)
         status, payload = parent.recv()
+        if collect_metadata and expected_slices:
+            assert status == "metadata"
+            assert [report.algorithm for report in payload] == [name for name, _ in assignments]
+            assert [report.random_state for report in payload] == [seed for _, seed in assignments]
+            assert sum(report.n_evaluations for report in payload) == 2 * len(expected_slices)
+            assert all(report.stop_reason == "not_started" for report in payload[len(calls) :])
+            assert all(report.elapsed_seconds == 0 for report in payload[len(calls) :])
+            status, payload = parent.recv()
         assert calls == pytest.approx(expected_slices)
         if expected_slices:
             assert status == "result", payload

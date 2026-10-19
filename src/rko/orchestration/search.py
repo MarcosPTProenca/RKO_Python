@@ -32,7 +32,9 @@ import time
 from .types import CostFn
 from .types import DecoderFn
 from .types import RunResult
+from .types import SearchMetadata
 from dataclasses import dataclass
+from dataclasses import replace
 from typing import TYPE_CHECKING
 from typing import Any
 
@@ -73,6 +75,8 @@ class SearchSession:
         deadline (float): Absolute monotonic stop time.
         cancelled (threading.Event | None): Optional portfolio failure signal.
         best (tuple[np.ndarray, float] | None): Detached best completed evaluation.
+        n_evaluations (int): Completed finite objective evaluations in this search.
+        metadata (SearchMetadata | None): Immutable report after a successful search.
     """
 
     def __init__(self, decoder: DecoderFn, cost: CostFn) -> None:
@@ -87,6 +91,9 @@ class SearchSession:
         self.deadline = math.inf
         self.cancelled: threading.Event | None = None
         self.best: tuple[np.ndarray, float] | None = None
+        self.n_evaluations = 0
+        self.metadata: SearchMetadata | None = None
+        self._stop_reason = "completed"
 
     def _check(self) -> None:
         """Stop after a valid result exists or when another worker failed.
@@ -94,9 +101,11 @@ class SearchSession:
         Raises:
             _BudgetExpired: If cancellation or the callback deadline is reached.
         """
-        if (self.cancelled is not None and self.cancelled.is_set()) or (
-            self.best is not None and time.perf_counter() >= self.deadline
-        ):
+        if self.cancelled is not None and self.cancelled.is_set():
+            self._stop_reason = "cancelled"
+            raise _BudgetExpired
+        if self.best is not None and time.perf_counter() >= self.deadline:
+            self._stop_reason = "time_limit"
             raise _BudgetExpired
 
     def decode(self, keys: np.ndarray) -> _DecodedCandidate:
@@ -132,6 +141,7 @@ class SearchSession:
         value = float(self.cost(candidate.payload))
         if not math.isfinite(value):
             raise ValueError("Objective callbacks must return finite costs.")
+        self.n_evaluations += 1
         if self.best is None or value < self.best[1]:
             self.best = (candidate.keys, value)
         return value
@@ -143,6 +153,7 @@ class SearchSession:
         *,
         deadline: float | None = None,
         cancelled: threading.Event | None = None,
+        random_state: int | None = None,
     ) -> RunResult:
         """Execute an algorithm using budget-aware callbacks and preserve its incumbent.
 
@@ -151,6 +162,7 @@ class SearchSession:
             duration (float): Positive search seconds passed to its solve method.
             deadline (float | None): Common absolute deadline, or duration from now.
             cancelled (threading.Event | None): Shared peer-failure signal.
+            random_state (int | None): Actual assigned seed for this search report.
 
         Returns:
             RunResult: Extras, best evaluated keys and objective; an unevaluated
@@ -159,7 +171,12 @@ class SearchSession:
         Raises:
             Exception: Original decoder, objective or algorithm failure is propagated.
         """
-        self.deadline = time.perf_counter() + duration if deadline is None else deadline
+        started = time.perf_counter()
+        self.best = None
+        self.n_evaluations = 0
+        self.metadata = None
+        self._stop_reason = "completed"
+        self.deadline = started + duration if deadline is None else deadline
         self.cancelled = cancelled
         original_decoder, original_cost = algorithm.decoder, algorithm.cost
         original_cancelled = algorithm._cancelled
@@ -172,6 +189,22 @@ class SearchSession:
                 result = ([], [], math.inf)
             if self.best is not None and self.best[1] < result[2]:
                 result = (result[0], self.best[0].tolist(), self.best[1])
+            finished = time.perf_counter()
+            reason = self._stop_reason
+            if reason == "completed":
+                if cancelled is not None and cancelled.is_set():
+                    reason = "cancelled"
+                elif finished >= self.deadline:
+                    reason = "time_limit"
+            self.metadata = replace(
+                getattr(algorithm, "_search_metadata", None)
+                or SearchMetadata(algorithm=algorithm.name),
+                random_state=random_state,
+                n_evaluations=self.n_evaluations,
+                stop_reason=reason,
+                time_limit=duration,
+                elapsed_seconds=finished - started,
+            )
             return result
         finally:
             algorithm.decoder, algorithm.cost = original_decoder, original_cost

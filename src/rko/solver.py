@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import math
 import numpy as np
+import platform
 import time
 from .components.random_streams import RandomStreams
 from .components.solution_pool import SolutionPool
@@ -40,9 +41,12 @@ from .orchestration.types import CostFn
 from .orchestration.types import DecoderFn
 from .orchestration.types import Hyperparameters
 from .orchestration.types import RunConfig
+from .orchestration.types import SearchMetadata
 from .parameters.loader import load_config
 from collections.abc import Sequence
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version
 from numbers import Real
 from pathlib import Path
 from typing import Literal
@@ -62,6 +66,13 @@ class RKOResult:
         backend (str): Executed backend.
         algorithms (tuple[str, ...]): Canonical portfolio names.
         random_state (int | None): Requested seed; timed results may still vary.
+        searches (tuple[SearchMetadata, ...]): All algorithms in portfolio order.
+        n_variables (int | None): Requested dimension, when recorded.
+        time_limit (float | None): Requested search seconds, excluding startup.
+        control (int | None): Requested portfolio control; reports give effective control.
+        pool_size (int | None): Configured elite capacity.
+        n_jobs (int | None): Requested process-worker cap.
+        versions (tuple): RKO distribution, Python and NumPy runtime versions.
     """
 
     keys: tuple[float, ...]
@@ -70,6 +81,47 @@ class RKOResult:
     backend: str
     algorithms: tuple[str, ...]
     random_state: int | None
+    searches: tuple[SearchMetadata, ...] = ()
+    n_variables: int | None = None
+    time_limit: float | None = None
+    control: int | None = None
+    pool_size: int | None = None
+    n_jobs: int | None = None
+    versions: tuple[tuple[str, str], ...] = ()
+
+    @property
+    def n_evaluations(self) -> int | None:
+        """Return completed finite objectives, or unknown for legacy manual results.
+
+        Returns:
+            int | None: Total across all algorithms, not only the winning worker.
+        """
+        return sum(report.n_evaluations for report in self.searches) if self.searches else None
+
+    @property
+    def stop_reason(self) -> str:
+        """Summarize whether any search exhausted its assigned budget.
+
+        Returns:
+            str: Cancelled, time_limit, completed, or unknown without reports.
+        """
+        reasons = {report.stop_reason for report in self.searches}
+        if "cancelled" in reasons:
+            return "cancelled"
+        if reasons.intersection(("time_limit", "not_started")):
+            return "time_limit"
+        return "completed" if reasons else "unknown"
+
+    @property
+    def n_workers(self) -> int:
+        """Return search-worker concurrency, excluding managers and native threads.
+
+        Returns:
+            int: Configured execution workers rather than CPU-core utilization.
+        """
+        if self.backend == "serial":
+            return 1
+        return min(self.n_jobs or len(self.algorithms), len(self.algorithms))
 
 
 class RKO:
@@ -205,16 +257,43 @@ class RKO:
                 f"search_budget={time_limit:g}s",
                 flush=True,
             )
-        keys, value = self._execute(
-            config, time_limit, started_at=started, hyperparameters=hyperparameters
+        metadata: list[SearchMetadata] = []
+        backend, n_jobs, random_state, n_variables = (
+            self.backend,
+            self.n_jobs,
+            self.random_state,
+            self.n_variables,
         )
+        keys, value = self._execute(
+            config,
+            time_limit,
+            started_at=started,
+            hyperparameters=hyperparameters,
+            search_metadata=metadata,
+        )
+        positions = {name: index for index, name in enumerate(config.active_metaheuristics)}
+        try:
+            package_version = version("rko")
+        except PackageNotFoundError:
+            package_version = "unknown"
         result = RKOResult(
             keys=tuple(float(key) for key in keys),
             cost=float(value),
             elapsed_seconds=time.perf_counter() - started,
-            backend=self.backend,
+            backend=backend,
             algorithms=config.active_metaheuristics,
-            random_state=self.random_state,
+            random_state=random_state,
+            searches=tuple(sorted(metadata, key=lambda report: positions[report.algorithm])),
+            n_variables=n_variables,
+            time_limit=float(time_limit),
+            control=config.control,
+            pool_size=config.pool_size,
+            n_jobs=n_jobs,
+            versions=(
+                ("rko", package_version),
+                ("python", platform.python_version()),
+                ("numpy", np.__version__),
+            ),
         )
         if self.verbose:
             print(
@@ -231,6 +310,7 @@ class RKO:
         *,
         started_at: float,
         hyperparameters: Hyperparameters | None = None,
+        search_metadata: list[SearchMetadata] | None = None,
     ) -> tuple[list[float], float]:
         """Dispatch a validated portfolio without retaining worker state.
 
@@ -239,6 +319,7 @@ class RKO:
             time_limit (float): Positive search duration.
             started_at (float): Solve's monotonic origin, including configuration/startup.
             hyperparameters (Hyperparameters | None): Owned normalized offline overrides.
+            search_metadata (list[SearchMetadata] | None): Optional immutable report collector.
 
         Returns:
             tuple[list[float], float]: Best keys and objective.
@@ -279,17 +360,25 @@ class RKO:
                 verbose=self.verbose,
                 started_at=started_at,
                 hyperparameters=hyperparameters,
+                search_metadata=search_metadata,
             )
         pool.start_progress()
         try:
             if self.backend == "thread":
                 return select_best_result(
-                    run_metaheuristics_parallel(metaheuristics, time_limit, streams), pool
+                    run_metaheuristics_parallel(
+                        metaheuristics, time_limit, streams, search_metadata=search_metadata
+                    ),
+                    pool,
                 )
             results = []
             for mh, stream in zip(metaheuristics, streams, strict=True):
                 with stream.activate():
-                    results.append(SearchSession(self.decoder, self.cost).solve(mh, time_limit))
+                    session = SearchSession(self.decoder, self.cost)
+                    results.append(session.solve(mh, time_limit, random_state=stream.seed))
+                    if search_metadata is not None:
+                        assert session.metadata is not None
+                        search_metadata.append(session.metadata)
             return select_best_result(results, pool)
         finally:
             pool.stop_progress()

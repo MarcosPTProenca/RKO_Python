@@ -20,8 +20,9 @@ Inputs/Outputs:
 - Output: package-level exports.
 """
 
+from .orchestration.types import SearchMetadata
 from .rko_main import run
 from .solver import RKO
 from .solver import RKOResult
 
-__all__ = ["RKO", "RKOResult", "run"]
+__all__ = ["RKO", "RKOResult", "SearchMetadata", "run"]

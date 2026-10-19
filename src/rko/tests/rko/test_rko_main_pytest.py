@@ -71,7 +71,11 @@ def test_run_executes_orchestration_flow(monkeypatch: pytest.MonkeyPatch) -> Non
     )
 
     def _fake_parallel(
-        metaheuristics: list[object], limit_time: float, streams: list[object]
+        metaheuristics: list[object],
+        limit_time: float,
+        streams: list[object],
+        *,
+        search_metadata: list[object] | None = None,
     ) -> list[tuple[list[object], list[float], float]]:
         """Record dispatch settings and verify stream allocation cardinality.
 
@@ -79,6 +83,7 @@ def test_run_executes_orchestration_flow(monkeypatch: pytest.MonkeyPatch) -> Non
             metaheuristics (list[object]): Constructed test search labels.
             limit_time (float): Search duration supplied by the solver.
             streams (list[object]): One owned stream pair per search.
+            search_metadata (list[object] | None): Optional unused report collector.
 
         Returns:
             list[tuple]: One synthetic successful search outcome.

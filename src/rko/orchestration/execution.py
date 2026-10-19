@@ -30,12 +30,15 @@ from ..components.solution_pool import ElitePool
 from ..metaheuristics.base import MetaheuristicBase
 from .search import SearchSession
 from .types import RunResult
+from .types import SearchMetadata
 
 
 def run_metaheuristics_parallel(
     metaheuristics: list[MetaheuristicBase],
     limit_time: float,
     streams: list[RandomStreams] | None = None,
+    *,
+    search_metadata: list[SearchMetadata] | None = None,
 ) -> list[RunResult]:
     """Run thread searches with callback-budget and failure cancellation checks.
 
@@ -43,6 +46,7 @@ def run_metaheuristics_parallel(
         metaheuristics (list[MetaheuristicBase]): Fresh configured portfolio.
         limit_time (float): Search seconds per concurrently started algorithm.
         streams (list[RandomStreams] | None): Owned streams in portfolio order.
+        search_metadata (list[SearchMetadata] | None): Optional completed report collector.
 
     Returns:
         list[RunResult]: Search outcomes in portfolio order.
@@ -56,6 +60,7 @@ def run_metaheuristics_parallel(
         raise ValueError("One random stream pair is required per search.")
     results: list[RunResult | None] = [None] * len(metaheuristics)
     errors: list[BaseException | None] = [None] * len(metaheuristics)
+    reports: list[SearchMetadata | None] = [None] * len(metaheuristics)
     cancelled = threading.Event()
 
     def _worker(index: int, mh: MetaheuristicBase) -> None:
@@ -67,11 +72,14 @@ def run_metaheuristics_parallel(
         """
         try:
             with streams[index].activate():
-                results[index] = SearchSession(mh.decoder, mh.cost).solve(
+                session = SearchSession(mh.decoder, mh.cost)
+                results[index] = session.solve(
                     mh,
                     limit_time,
                     cancelled=cancelled,
+                    random_state=streams[index].seed,
                 )
+                reports[index] = session.metadata
         except BaseException as exc:
             errors[index] = exc
             cancelled.set()
@@ -98,6 +106,9 @@ def run_metaheuristics_parallel(
         raise RuntimeError("One or more metaheuristics failed: " + "; ".join(failures)) from cause
     if any(result is None for result in results):
         raise RuntimeError("A thread worker returned no outcome.")
+    if search_metadata is not None:
+        assert all(report is not None for report in reports)
+        search_metadata.extend(report for report in reports if report is not None)
     return [result for result in results if result is not None]
 
 

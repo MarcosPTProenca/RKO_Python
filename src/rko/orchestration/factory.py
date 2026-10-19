@@ -33,6 +33,7 @@ from .configuration import canonical_mh_name
 from .types import CostFn
 from .types import DecoderFn
 from .types import Hyperparameters
+from .types import SearchMetadata
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -201,4 +202,13 @@ def build_metaheuristic(
         if online_grid:
             kwargs["parameters"] = online_grid
 
-    return spec.constructor(**kwargs)
+    algorithm = spec.constructor(**kwargs)
+    algorithm._search_metadata = SearchMetadata(
+        algorithm=canonical_name,
+        control=control if spec.supports_control else 0,
+        parameters=tuple((key, kwargs[key]) for key in spec.int_params + spec.float_params),
+        parameter_grid=tuple(tuple(axis) for axis in algorithm.parameters)
+        if spec.supports_control and control == 1
+        else (),
+    )
+    return algorithm

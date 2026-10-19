@@ -28,11 +28,43 @@ from collections.abc import Callable
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from typing import Literal
 
 RunResult = tuple[list[object], list[float], float]
 DecoderFn = Callable[[np.ndarray], Any]
 CostFn = Callable[[Any], float]
 Hyperparameters = Mapping[str, Mapping[str, int | float]]
+
+
+@dataclass(frozen=True)
+class SearchMetadata:
+    """Preserve one algorithm's initial configuration and completed work.
+
+    Responsibilities:
+    - Snapshot validated initial scalar parameters and ordered adaptive axes.
+    - Report finite objective completions without retaining candidate populations.
+
+    Attributes:
+        algorithm (str): Canonical portfolio name.
+        control (int): Effective control; unsupported adaptive algorithms use zero.
+        parameters (tuple): Named initial scalars, including Python overrides.
+        parameter_grid (tuple): Adaptive axes in algorithm schema order, not a trajectory.
+        random_state (int | None): Actual assigned generator seed when known.
+        n_evaluations (int): Successfully completed finite objective evaluations.
+        stop_reason (str): Completed, time_limit, cancelled, or not_started.
+        time_limit (float): Assigned search seconds, excluding startup.
+        elapsed_seconds (float): Search/session duration, excluding startup and queueing.
+    """
+
+    algorithm: str
+    control: int = 0
+    parameters: tuple[tuple[str, int | float], ...] = ()
+    parameter_grid: tuple[tuple[int | float, ...], ...] = ()
+    random_state: int | None = None
+    n_evaluations: int = 0
+    stop_reason: Literal["completed", "time_limit", "cancelled", "not_started"] = "not_started"
+    time_limit: float = 0.0
+    elapsed_seconds: float = 0.0
 
 
 @dataclass(frozen=True)

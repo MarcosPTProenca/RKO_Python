@@ -36,8 +36,10 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   sweep, and supplied indices are reshuffled. See [compatibility](cpp-compatibility.md).
   Corrected Q/reward/grid/IPR behavior is not a promise of unchanged C++ trajectories.
 - **Configuration/results:** named offline hyperparameters now accept validated
-  Python overrides; adaptive grids still require TOML. Evaluation counts, explicit
-  stop reasons and complete result/configuration provenance remain incomplete.
+  Python overrides; adaptive grids still require TOML. Results now include finite
+  objective counts, per-search stopping classifications, actual seeds, initial
+  scalar/grid snapshots, worker settings and runtime versions across all backends.
+  Full callback/data/source provenance and adaptive trajectories are not recorded.
   Full API/error documentation and a supported-version/release policy are needed.
 - **Stopping:** active callbacks cannot be interrupted cooperatively, blocked
   threads cannot be safely killed, and standalone operators receive no RKO

@@ -40,6 +40,7 @@ class RandomStreams:
     - Restore nested contexts across normal return and exceptional exits.
 
     Attributes:
+        seed (int | None): Assigned seed for result provenance.
         python (random.Random): Private Python generator.
         numpy (np.random.RandomState): Private NumPy legacy generator.
     """
@@ -55,6 +56,7 @@ class RandomStreams:
         Raises:
             ValueError: If NumPy rejects the supplied seed.
         """
+        self.seed = seed
         self.python = random.Random(seed)
         self.numpy = np.random.RandomState(seed)
 

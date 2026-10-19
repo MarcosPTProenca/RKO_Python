@@ -41,6 +41,8 @@ from .types import DecoderFn
 from .types import Hyperparameters
 from .types import RunConfig
 from .types import RunResult
+from .types import SearchMetadata
+from dataclasses import replace
 from multiprocessing.connection import Connection
 from multiprocessing.connection import wait
 from multiprocessing.managers import BaseManager
@@ -167,6 +169,7 @@ def _worker(
     deadline: Synchronized,
     connection: Connection,
     hyperparameters: Hyperparameters | None = None,
+    collect_metadata: bool = False,
 ) -> None:
     """Run assigned searches sequentially without extending the common deadline.
 
@@ -183,6 +186,7 @@ def _worker(
         deadline (Synchronized): Common monotonic search deadline.
         connection (Connection): Dedicated result/control pipe.
         hyperparameters (Hyperparameters | None): Normalized partial offline overrides.
+        collect_metadata (bool): Send compact reports, including unstarted queued searches.
     """
     name = "startup"
     try:
@@ -204,19 +208,37 @@ def _worker(
         connection.send(("ready", None))
         start.wait()
         best: RunResult | None = None
-        for mh, streams in prepared:
+        reports: list[SearchMetadata] = []
+        for index, (mh, streams) in enumerate(prepared):
             name = mh.name
             search_deadline = min(deadline.value, time.perf_counter() + slice_seconds)
             remaining = search_deadline - time.perf_counter()
             if remaining <= 0:
+                if collect_metadata:
+                    reports.extend(
+                        replace(
+                            queued._search_metadata or SearchMetadata(algorithm=queued.name),
+                            random_state=queued_streams.seed,
+                            time_limit=slice_seconds,
+                        )
+                        for queued, queued_streams in prepared[index:]
+                    )
                 break
             with streams.activate():
-                result = SearchSession(decoder, cost).solve(mh, remaining, deadline=search_deadline)
+                session = SearchSession(decoder, cost)
+                result = session.solve(
+                    mh, remaining, deadline=search_deadline, random_state=streams.seed
+                )
+            if collect_metadata:
+                assert session.metadata is not None
+                reports.append(session.metadata)
             if best is None or result[2] < best[2]:
                 best = result
             del result
         if best is None:
             raise TimeoutError("Search deadline elapsed before worker execution.")
+        if collect_metadata:
+            connection.send(("metadata", reports))
         connection.send(("result", best))
     except BaseException as exc:
         details = f"{name}:\n{traceback.format_exc()}"
@@ -243,6 +265,7 @@ def run_processes(
     verbose: bool = False,
     started_at: float | None = None,
     hyperparameters: Hyperparameters | None = None,
+    search_metadata: list[SearchMetadata] | None = None,
 ) -> tuple[list[float], float]:
     """Execute a selected portfolio with a common start and managed pool.
 
@@ -258,6 +281,7 @@ def run_processes(
         verbose (bool): Emit pool updates from its single authoritative manager.
         started_at (float | None): Parent solve's monotonic origin for elapsed log times.
         hyperparameters (Hyperparameters | None): Partial offline scalar mappings.
+        search_metadata (list[SearchMetadata] | None): Optional collector for all algorithms.
 
     Returns:
         tuple[list[float], float]: Best keys and minimization objective.
@@ -320,6 +344,7 @@ def run_processes(
                         deadline,
                         child,
                         hyperparameters,
+                        search_metadata is not None,
                     ),
                 )
                 processes.append(process)
@@ -347,6 +372,9 @@ def run_processes(
                         raise RuntimeError(f"{name}: worker failed.\n{details}") from cause
                     if status == "ready":
                         ready.add(connection)
+                    elif status == "metadata":
+                        assert search_metadata is not None
+                        search_metadata.extend(payload)
                     else:
                         results.append(payload)
                         del pending[connection]
