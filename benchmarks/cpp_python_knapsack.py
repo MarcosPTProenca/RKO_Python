@@ -195,9 +195,7 @@ class TargetTrackingCost:
             else []
         )
         if reached:
-            elapsed = (
-                time.clock_gettime_ns(time.CLOCK_MONOTONIC) - self.started_ns
-            ) / 1_000_000_000
+            elapsed = (time.perf_counter_ns() - self.started_ns) / 1_000_000_000
             for gap in reached:
                 self.reported.add(gap)
                 message = f"RKO_BENCH_TARGET gap={gap} elapsed_seconds={elapsed:.9f}\n"
@@ -1055,7 +1053,7 @@ class KnapsackBenchmark:
         Returns:
             SolverOutput: Parsed keys, metrics, target events, and child status.
         """
-        started_ns = time.clock_gettime_ns(time.CLOCK_MONOTONIC)
+        started_ns = time.perf_counter_ns()
         target_profits = self._target_profits(case.optimum)
         payload = {
             "instance_path": str(case.path),
@@ -1102,7 +1100,7 @@ class KnapsackBenchmark:
             path = results_dir / filename
             if path.exists():
                 path.unlink()
-        started_ns = time.clock_gettime_ns(time.CLOCK_MONOTONIC)
+        started_ns = time.perf_counter_ns()
         environment = os.environ.copy()
         environment["RKO_BENCH_TARGETS"] = ",".join(
             str(profit) for _, profit in self._target_profits(case.optimum)
@@ -1173,7 +1171,7 @@ class KnapsackBenchmark:
                 timeout=max(90, self.budget_seconds * 2),
             )
         except subprocess.TimeoutExpired as error:
-            elapsed = (time.clock_gettime_ns(time.CLOCK_MONOTONIC) - started_ns) / 1_000_000_000
+            elapsed = (time.perf_counter_ns() - started_ns) / 1_000_000_000
             stderr = self._process_text(error.stderr)
             return SolverOutput(
                 None,
@@ -1184,7 +1182,7 @@ class KnapsackBenchmark:
                 None,
                 f"Child process timed out: {stderr[-1200:]}",
             )
-        elapsed = (time.clock_gettime_ns(time.CLOCK_MONOTONIC) - started_ns) / 1_000_000_000
+        elapsed = (time.perf_counter_ns() - started_ns) / 1_000_000_000
         try:
             events = self.parse_target_events(process.stderr)
         except ValueError as error:
@@ -1719,7 +1717,7 @@ class KnapsackBenchmark:
             backend=backend,
             random_state=int(payload["seed"]),
         )
-        cost.started_ns = time.clock_gettime_ns(time.CLOCK_MONOTONIC)
+        cost.started_ns = time.perf_counter_ns()
         result = solver.solve(float(payload["budget_seconds"]))
         print(
             "RKO_BENCH_RESULT "
