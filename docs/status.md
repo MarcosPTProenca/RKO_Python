@@ -126,6 +126,17 @@ trials confirmed a smaller graph phase, not a reliable end-to-end startup gain:
 imports/spawn still dominate. Parent constructor validation and fresh parameter
 reads remain intact. See [benchmarks](../benchmarks/README.md) for limits.
 
+A separate 18-solve installation-layout comparison identified substantial WSL
+startup overhead from Windows-mounted dependencies and editable source. With
+identical locked versions and verified source/TOML bytes, Linux-local non-editable
+installation reduced one/four-worker end-to-end medians from 5.51/6.17 seconds to
+1.56/1.79 seconds. Moving only dependencies to Linux gave 3.55/4.26 seconds. These
+are environment-specific setup gains, NOT library-code, steady-state throughput,
+RSS or quality improvements; imports/spawn and callback overruns remain. No worker
+architecture or validation was changed. See the identified reference in
+[benchmarks](../benchmarks/README.md#spawn-startup-and-installation-layout) and
+[WSL setup](running.md#wsl-startup-and-virtual-environment-placement).
+
 A further memory-targeted refinement constructs Q-state records only after their
 parameter combinations pass feasibility filtering. Two repeated synthetic slice
 benchmarks reduced traced graph-construction peaks by 33.7% (625 combinations,

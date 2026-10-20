@@ -4,6 +4,49 @@ Each section identifies its workload and limits. Synthetic fixed-work and
 allocation probes complement the historical Knapsack reference; no single case
 establishes general optimization quality or native-code performance parity.
 
+## Spawn startup and installation layout
+
+```bash
+uv run --locked python benchmarks/startup_stages.py
+```
+
+This guarded benchmark instruments real parent validation, manager startup,
+worker entry/preparation and first decoder calls. It checks every observed
+worker's first keys against its reported execution seed, validates final keys/
+objective and reports environment/source paths. `--repeats 1` supports alternating
+separate interpreter environments; the default runs three one/four-worker pairs.
+
+Explicit reference: [startup-layout-reference.jsonl](startup-layout-reference.jsonl),
+2026-10-19 WSL2, four available CPUs, CPython 3.14.8 / NumPy 2.4.3, baseline
+`efc40e3`. Eighteen solves alternated three installation layouts, using the same
+32 installed distribution name/version pairs and byte-identical 55 installed
+Python/TOML files. All used the full ten-algorithm online portfolio, 128 keys,
+seed 42 and a 0.2-second common search budget. The checkout, benchmark script,
+working directory and temporary observation filesystem stayed fixed.
+
+| Installation layout | Workers | End-to-end median (s) | Manager-start median (s) | Latest first-callback median (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Windows-mounted environment + editable Windows-mounted source | 1 | 5.507 | 2.336 | 5.116 |
+| Linux-local environment + same editable source | 1 | 3.550 | 1.468 | 3.192 |
+| Linux-local environment + non-editable Linux-local installation | 1 | 1.559 | 0.494 | 1.115 |
+| Windows-mounted environment + editable Windows-mounted source | 4 | 6.174 | 2.298 | 5.746 |
+| Linux-local environment + same editable source | 4 | 4.262 | 1.585 | 3.840 |
+| Linux-local environment + non-editable Linux-local installation | 4 | 1.786 | 0.493 | 1.363 |
+
+The last layout reduced these environment-specific end-to-end medians by about
+71–72%. This is **installation/filesystem evidence, not a library optimization**.
+Latest first callback means the maximum across workers in each trial, then the
+median across three trials. Parent construction medians were 0.111–0.129 s for
+the mounted installation and 0.009–0.014 s for the local non-editable installation;
+removing fail-fast validation would miss most of the observed delay.
+
+Fresh processes do not imply cold OS caches. Instrumentation, WSL storage and host
+load affect timings; preliminary runs varied substantially. Budgets differ by
+worker cap and timed trajectories may differ: these are not equal-work throughput,
+RSS, quality or native-Windows results. Imports and spawn remain nonzero even in
+the fastest layout. No import protocol, worker architecture or validation was
+changed. See [WSL setup guidance](../docs/running.md#wsl-startup-and-virtual-environment-placement).
+
 ## Bounded process-worker resources
 
 A positive `n_jobs` now keeps the complete selected portfolio while limiting

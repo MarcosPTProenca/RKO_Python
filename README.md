@@ -233,8 +233,10 @@ for stochastic callbacks. Standalone built-in operators called outside RKO keep
 their existing global-RNG behavior. A single mutable RKO instance is not intended
 for simultaneous `solve` calls.
 
-Process startup is excluded from the requested search duration. Workers start
-searching together after construction. A per-search callback session carries the
+Process startup is excluded from the requested search duration. On WSL,
+Windows-mounted virtual environments and editable source can dominate short runs;
+see [tested Linux-local setup guidance](docs/running.md#wsl-startup-and-virtual-environment-placement).
+Workers start searching together after construction. A per-search callback session carries the
 same deadline through initialization and every nested operator, stopping between
 decoder/objective calls and preserving the best completed evaluation. A first
 valid evaluation is allowed even if initialization used the budget. User callbacks

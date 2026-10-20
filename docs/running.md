@@ -30,6 +30,49 @@ Callback overruns can consume later searches' slices. This changes timed search
 trajectories and cooperation, not the configured algorithm selection or seed
 assignment. Native-library threads are not capped by `--n-jobs`.
 
+## WSL startup and virtual-environment placement
+
+On WSL, putting `.venv` under `/mnt/c/...` also puts NumPy and many Python imports
+on the Windows-mounted filesystem. Every spawned manager/worker reimports its
+entry module. For short solves, this can dominate actual search work.
+
+Keep the existing checkout and environment intact while testing an additional
+Linux-local environment. From the repository root in a WSL shell:
+
+```bash
+RKO_ENV="$HOME/.cache/rko-python-venv"
+UV_PROJECT_ENVIRONMENT="$RKO_ENV" uv sync --locked
+UV_PROJECT_ENVIRONMENT="$RKO_ENV" uv run --locked python benchmarks/startup_stages.py
+```
+
+This remains an **editable development installation**: dependencies are local to
+Linux, but Python still reads RKO source and parameter files from the checkout.
+Keep using the environment prefix on subsequent commands; plain `uv run` selects
+the normal project environment again. No global setting or existing `.venv` needs
+to be removed. Use a dedicated path for this project, not a shared environment
+for unrelated repositories.
+
+For installed-package measurements, also place the installed RKO files on Linux:
+
+```bash
+UV_PROJECT_ENVIRONMENT="$RKO_ENV" uv sync --locked --no-editable
+UV_PROJECT_ENVIRONMENT="$RKO_ENV" uv run --locked --no-editable \
+  python benchmarks/startup_stages.py
+```
+
+A non-editable installation is a built package, not a live source view. Do not
+assume source edits are visible there: rebuild/reinstall for a new artifact, or
+return to editable development with `uv sync --locked` using the same environment
+prefix. Retain `--no-editable` on installed-package runs so project synchronization
+does not silently switch the installation mode back.
+
+The [identified 18-solve WSL reference](../benchmarks/README.md#spawn-startup-and-installation-layout)
+reduced end-to-end medians from 5.51–6.17 seconds to 1.56–1.79 seconds by changing
+installation layout while preserving source bytes and locked versions. That is
+not a code speedup, a portable latency guarantee or steady-state throughput/quality
+evidence. Startup remains additional to `time_limit`, and callback imports/data
+can add their own cost. Native Windows behavior was not measured by this comparison.
+
 ## Live progress
 
 The same short command now shows progress automatically:
