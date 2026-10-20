@@ -19,7 +19,7 @@ Technical approach:
   deterministic once the pair of solutions is chosen.
 
 Flow (pseudocode):
-1. Wait until pool contains at least two solutions.
+1. If fewer than two elites exist, insert the initial candidate and at most one fresh seed.
 2. Draw ``atual`` and ``guia`` randomly from the pool.
 3. Divide the chromosome into ceil(n / block_size) blocks.
 4. Repeat max(1, num_blocks-1) times:
@@ -31,6 +31,9 @@ Important criteria:
 - Block size is at least 1 gene; include any partial final block.
 - For multiple blocks, stop before the full guide to preserve path diversity.
 - A one-block chromosome evaluates the guide rather than an empty block.
+- Initialization uses the existing callbacks and search deadline, with at most two seed evaluations.
+- An already usable elite pool keeps its original initialization RNG draw order.
+- Pools unable to retain a pair still use bounded waiting rather than repeated seed retries.
 - The routine repeats continuously until the time budget is exhausted,
   drawing a fresh pair from the pool at each IPR call.
 
@@ -169,6 +172,15 @@ class IPR(MetaheuristicBase):
 
         best_keys: np.ndarray = numpy_rng.random(self.tam_solution)
         best_cost: float = self.cost(self.decoder(best_keys))
+
+        if getattr(self.solution_pool, "size", 0) < 2:
+            self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
+            if not self.time_limit_reached(limit_time):
+                seed_keys = numpy_rng.random(self.tam_solution)
+                seed_cost = self.cost(self.decoder(seed_keys))
+                self.solution_pool.insert((seed_cost, seed_keys.tolist()), self.name)
+                if seed_cost < best_cost:
+                    best_keys, best_cost = seed_keys, seed_cost
 
         while not self.time_limit_reached(limit_time):
             pool_size: int = getattr(self.solution_pool, "size", 0)

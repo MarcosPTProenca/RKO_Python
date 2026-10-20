@@ -73,12 +73,14 @@ and also accepts `verbose=True`.
   algorithm count times `limit_time`. This is not an equal-wall-time benchmark
   against concurrent modes.
 
-IPR consumes elite pairs from other searches. Running it alone returns an initial
-candidate without meaningful relinking; select another search alongside it and
-use a pool capacity of at least two. With a single worker, schedule IPR after
-searches that populate the pool; otherwise its slice may be spent waiting for
-searches queued behind it. Waiting uses bounded backoff, and process occupancy
-queries transfer only a count rather than the entire pool.
+IPR consumes elite pairs. If fewer than two elites exist at startup, it inserts
+its initial evaluated candidate and tries at most one additional random seed,
+using the same decoder/objective and assigned deadline. This makes standalone or
+first-in-group IPR able to relink without waiting for a producer queued behind it.
+An already usable pool retains its initialization draw order. Use a pool capacity
+of at least two; a pool unable to retain a pair still uses bounded waiting after
+those seed attempts. Seeds are not domain-specific feasibility repairs. Process
+occupancy queries transfer only a count rather than the entire pool.
 
 Algorithm defaults live in packaged `rko/parameters/` TOMLs.
 Use `algorithms=["SA", "GA"]` to select a smaller portfolio without copying files.

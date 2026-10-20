@@ -58,9 +58,12 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
 - **Stopping:** active callbacks cannot be interrupted cooperatively, blocked
   threads cannot be safely killed, and standalone operators receive no RKO
   deadline. A first valid evaluation may exceed the requested duration.
-- **Scientific quality:** the C++ threshold decoder remains substantially worse
-  than greedy. More instance families, seeds, fixed-work measurements and
-  domain-specific validation are needed.
+- **Scientific quality:** matching algorithm names and decoder rules does not
+  establish comparable initialization or search work. IPR now bootstraps a missing
+  elite pair instead of returning its only random evaluation when no peer produces
+  elites; this is domain-neutral and does not guarantee feasibility or C++ quality.
+  Full-driver initialization parity, more instance families, seeds, fixed-work
+  measurements and domain-specific validation remain necessary.
 - **Licensing:** confirm imported-code ownership/terms before release; see
   [NOTICE](../NOTICE). An existing license file does not settle that review.
 
