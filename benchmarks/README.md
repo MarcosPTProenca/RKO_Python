@@ -4,6 +4,260 @@ Each section identifies its workload and limits. Synthetic fixed-work and
 allocation probes complement the historical Knapsack reference; no single case
 establishes general optimization quality or native-code performance parity.
 
+## Python versus C++ Knapsack comparison
+
+This benchmark compares the standalone Python RKO library with the pinned C++
+reference on the same 500-item 0/1 Knapsack inputs. It measures each of the 11
+single algorithms (BRKGA, BRKGA-CS, GA, GRASP, ILS, IPR, LNS, MultiStart,
+PSO, SA, and VNS) and the default 10-algorithm portfolio separately. The
+portfolio is SA, ILS, VNS, BRKGA, BRKGA-CS, PSO, GA, LNS, GRASP, and IPR; it
+excludes MultiStart. The benchmark does not form a composite score or claim
+algorithmic equivalence.
+
+### Reproduce
+
+From the repository root, Python downloads and verifies the KPLIB inputs, computes
+exact dynamic-programming optima, extracts and builds the pinned C++ source in a
+temporary directory, then appends every trial to a raw CSV. No C++ source or
+instance data is committed or changed in the historical checkout.
+
+```bash
+uv run --locked python -m benchmarks.cpp_python_knapsack \
+  --output benchmarks/cpp-python-knapsack-reference.csv \
+  --cache-dir /tmp/rko-cpp-python-knapsack-cache
+```
+
+The approved main run uses a **2-second search budget** and **30 repetitions per
+implementation, solver configuration, and instance**. The pilot option runs
+BRKGA, BRKGA-CS, and the full portfolio on one instance for one second; pilot output is
+excluded from analysis.
+
+```bash
+uv run --locked python -m benchmarks.cpp_python_knapsack --pilot \
+  --output /tmp/rko-cpp-python-knapsack-pilot.csv \
+  --cache-dir /tmp/rko-cpp-python-knapsack-cache
+```
+
+Interrupted main runs can continue with `--resume` only when the raw CSV has the
+same source/configuration hash and schema. The runner writes a companion
+`*-summary.csv`; that generated file is ignored because the summary is regenerated
+from the retained raw reference data.
+
+### Fixed workload and provenance
+
+The sample is pinned to KPLIB commit
+`c5bea0df8169749caaba5ce7dfcf21437aa1ca5c`. Three IDs were selected from each
+family's 100 `R01000` files using Python seed `20261019`; the selector and SHA-256
+checks are in the runner. The paths below are relative to the KPLIB repository;
+all are under `n00500/R01000`.
+
+| Family | File | SHA-256 |
+| --- | --- | --- |
+| `00Uncorrelated` | `s041.kp` | `b764f09ca075cb3b05c9704a7ff57a23a33d73816d0fe7758d3ea34f91a20655` |
+| `00Uncorrelated` | `s075.kp` | `6512ca8db5837337ae58a867e88d41be74d61689bdded3b9db54dc7829ea11fc` |
+| `00Uncorrelated` | `s092.kp` | `28c37692613a1e3af6b0979f2e27d19b3c0e5d32cec4eb7866c0b87f8cc59f45` |
+| `01WeaklyCorrelated` | `s015.kp` | `a5b3f5c82db8f0f6ae3d5790a2ec1aa39573be6e435b44762a84961c45a727c2` |
+| `01WeaklyCorrelated` | `s027.kp` | `5009309ca808e864b6c9cc604281e06934cd55f79cf681e41c57a5cbc0eb480f` |
+| `01WeaklyCorrelated` | `s060.kp` | `bd44328fd09454961870c69a3b9e7b8d975491584f20245d0287bb3767e4fd65` |
+| `02StronglyCorrelated` | `s034.kp` | `d840a1121e0d29e99554ed95267558247180397877c1ea73e4e02cb9da01c6f9` |
+| `02StronglyCorrelated` | `s037.kp` | `26e58386ea06bb4eeb0a70dd189dc51c04261c652fe4ae8de49b3e3181519d20` |
+| `02StronglyCorrelated` | `s069.kp` | `bf043da2b0ef25e44ade43c55cfcb00365dbe9dfe5db73d59f706a110d0deb96` |
+| `05SubsetSum` | `s003.kp` | `1b0783a6ffa08b616b2ff6cf8ebbecce4e10905060abd1b4702f449663aaec97` |
+| `05SubsetSum` | `s044.kp` | `951803299442fab73f11adf98f6a06f25599433ea3f0f06baba6ecc104ec8ba4` |
+| `05SubsetSum` | `s091.kp` | `04a7bdc7d87ad555d8eb7d776fd521eca6f02c247f7397e485045deb8f635495` |
+| `07SpannerUncorrelated` | `s000.kp` | `3dd36adec09e23cbf24b71d1663c315fb5cd7c0456f846b23cd95abd1a3b85dd` |
+| `07SpannerUncorrelated` | `s017.kp` | `ee673cd708aba7046f9cbacbf60aaa1ba70d20e0811746d8c0999d9a5aee2ab4` |
+| `07SpannerUncorrelated` | `s092.kp` | `f574a32e6b87a832c9c70bc70bb7e2b73567caa3615c7ebb173fb7a075d45652` |
+
+The raw CSV includes each input hash, capacity, exact optimum, Python seed, C++
+seed when available, execution mode, compiler flags, source fingerprints, and
+host/runtime versions. Exact optimum computation is outside solver timing. The
+KPLIB data is downloaded to an external cache and is not redistributed here;
+attribute the instances to KPLIB (Kellerer, Pferschy, and Pisinger). The
+[official README](https://github.com/likr/kplib/tree/c5bea0df8169749caaba5ce7dfcf21437aa1ca5c)
+states CC BY 4.0.
+
+### Method and interpretation
+
+Python solo algorithms run serially; the Python default portfolio uses one process
+per algorithm. C++ solo algorithms use one OpenMP thread, while its ten-member
+portfolio uses ten OpenMP threads. These execution models and checked-in
+parameters are not equivalent. Python uses online control, pool size 10, and its
+default local search. C++ uses `control=1`, pool size 10, `strategy=1`, and its
+reference first-improvement behavior. The comparison is of the tested configured
+implementations, not a conformance or parameter-parity test.
+
+The temporary C++ copy is built with `g++` and OpenMP using the exact flags
+recorded in each row. Its only evaluator correction changes the knapsack cost
+and penalty multiplication to 64-bit arithmetic. The historical C++ evaluator
+uses signed 32-bit `int`; a UBSan run overflowed during actual search on the
+selected 500-item workload. Results are therefore labeled **C++ (64-bit objective
+fix)**, not an untouched C++ build. No algorithm or random-draw code is changed.
+
+Time-to-target starts immediately before Python `RKO.solve()` or at the C++
+search-start marker, and misses are right-censored at the common 2-second search
+budget. Targets are feasible profits within 10%, 1%, and 0% of the exact optimum;
+first feasible candidate evaluations trigger benchmark-only telemetry. The raw
+CSV separately records process-launch-to-exit time, including process startup and
+orchestration but excluding post-run verification and analysis. The pilot validates
+build, input, telemetry, and runner behavior; its measurements are not pooled with
+the main sample. Algorithms may finish a generation after the configured budget;
+raw elapsed time exposes this overrun, and capped target times never count hits
+beyond the budget.
+
+C++ clock-derived engine seeds are recorded, but exact replay is not guaranteed:
+the reference creates additional `std::random_device` engines for GRASP and
+BRKGA-CS shuffles. Python trials use recorded independent seeds. Trials alternate
+Python/C++ order within each cell and run sequentially, with no concurrent
+benchmark job.
+
+For each solver and metric, the summary first reduces 30 repetitions within each
+instance (median for objective/time, mean for feasibility/success rates), then
+compares the 15 paired instance summaries using an exact two-sided sign test. It
+reports the median paired difference and a deterministic 95% bootstrap percentile
+interval over instances (10,000 resamples). Failed trials count as misses for
+feasibility and target success, and are censored at the budget for target latency;
+objective summaries use verified successful outputs. The summary reports success
+and failure counts for each implementation. Holm correction is applied separately
+across the 12 solver configurations for each of five reported endpoints:
+normalized reference-objective difference, feasibility rate, 1%-target success
+rate, capped search-time-to-1%, and process-launch-to-exit latency. Search-time
+latency is capped at the common budget; process latency exposes startup and
+algorithm overruns. Ties are excluded from the sign-test
+binomial count and reported. A nonsignificant result is inconclusive, not proof of
+equivalence. These 15 selected instances do not establish general Knapsack or
+hardware performance. For background, see [COCO performance assessment](https://numbbo.github.io/coco-doc/perf-assessment/)
+and [García and Herrera (2008)](https://jmlr.csail.mit.edu/papers/volume9/garcia08a/garcia08a.pdf).
+
+### Main-run results
+
+The approved run completed all **10,800/10,800 trials**: 12 configurations × 15
+instances × 30 repetitions × two implementations. All trials returned valid
+records (zero failures), with one source/run signature and no target time beyond
+the 2-second censoring budget. Each table reports the median of 15 per-instance
+summaries; `Δ` is the median paired Python-minus-C++ difference, with a
+10,000-resample bootstrap 95% CI over instances. `p` is the exact paired sign-test
+p-value after Holm correction across 12 configurations for that metric. At α=.05,
+positive `Δ` favors C++ for lower-is-better metrics and negative `Δ` favors C++
+for higher-is-better rates. These results compare the tested configurations, not
+algorithmic equivalence.
+
+Penalized objective difference is `100 × (returned minimization objective + exact
+optimum) / exact optimum`; it includes the historical overweight penalty, so the
+very large Python IPR value reflects infeasible terminal solutions and is
+interpreted alongside feasibility. Target-time values are capped at 2 seconds,
+with misses scored as 2 seconds. Process latency is measured from process launch
+to exit, not just search time.
+
+#### Penalized objective difference from exact optimum (%)
+
+| Solver | Python | C++ (64-bit fix) | Paired Δ Python−C++ (95% CI), pp | Holm p |
+|---|---:|---:|---:|---:|
+| BRKGA | 5.9 | 2.6 | +2.4 [+1.2, +7.1] | 0.0007324 |
+| BRKGA-CS | 8.1 | 0.9 | +7.7 [+1.7, +24.8] | 0.0009766 |
+| GA | 5.8 | 4.5 | +1.0 [+0.6, +3.3] | 0.0007324 |
+| GRASP | 8.6 | 1.0 | +8.2 [+1.4, +28.5] | 0.0007324 |
+| ILS | 9.0 | 0.7 | +8.3 [+2.9, +29.4] | 0.0007324 |
+| IPR | 105537.0 | 7.5 | +105526.7 [+37676.1, +119582.6] | 0.0007324 |
+| LNS | 6.6 | 2.9 | +3.0 [+2.0, +5.0] | 0.0007324 |
+| MultiStart | 7.8 | 7.3 | +0.4 [+0.2, +0.6] | 0.0007324 |
+| PSO | 5.9 | 3.4 | +1.7 [+1.2, +3.1] | 0.0007324 |
+| SA | 6.8 | 4.0 | +1.9 [+1.4, +3.2] | 0.0007324 |
+| VNS | 9.3 | 0.7 | +8.5 [+1.9, +11.7] | 0.0007324 |
+| RKO-default | 6.9 | 1.0 | +6.1 [+2.4, +7.3] | 0.0009766 |
+
+#### Feasible terminal solutions (%)
+
+| Solver | Python | C++ (64-bit fix) | Paired Δ Python−C++ (95% CI), pp | Holm p |
+|---|---:|---:|---:|---:|
+| BRKGA | 100.0 | 100.0 | +0.0 [+0.0, +0.0] | 1 |
+| BRKGA-CS | 100.0 | 100.0 | +0.0 [+0.0, +0.0] | 1 |
+| GA | 100.0 | 100.0 | +0.0 [+0.0, +0.0] | 1 |
+| GRASP | 73.3 | 100.0 | -26.7 [-30.0, -23.3] | 0.0007324 |
+| ILS | 73.3 | 100.0 | -26.7 [-33.3, -16.7] | 0.0007324 |
+| IPR | 36.7 | 100.0 | -63.3 [-66.7, -50.0] | 0.0007324 |
+| LNS | 100.0 | 100.0 | +0.0 [+0.0, +0.0] | 1 |
+| MultiStart | 100.0 | 100.0 | +0.0 [+0.0, +0.0] | 1 |
+| PSO | 100.0 | 100.0 | +0.0 [+0.0, +0.0] | 1 |
+| SA | 100.0 | 100.0 | +0.0 [+0.0, +0.0] | 1 |
+| VNS | 73.3 | 100.0 | -26.7 [-30.0, -20.0] | 0.0007324 |
+| RKO-default | 100.0 | 100.0 | +0.0 [+0.0, +0.0] | 1 |
+
+#### Runs reaching the 1%-optimality-gap target within 2 seconds (%)
+
+| Solver | Python | C++ (64-bit fix) | Paired Δ Python−C++ (95% CI), pp | Holm p |
+|---|---:|---:|---:|---:|
+| BRKGA | 0.0 | 0.0 | +0.0 [+0.0, +0.0] | 1 |
+| BRKGA-CS | 0.0 | 66.7 | +0.0 [-66.7, +0.0] | 0.125 |
+| GA | 0.0 | 0.0 | +0.0 [+0.0, +0.0] | 1 |
+| GRASP | 0.0 | 46.7 | -43.3 [-100.0, +0.0] | 0.009766 |
+| ILS | 0.0 | 70.0 | -56.7 [-96.7, +0.0] | 0.009766 |
+| IPR | 0.0 | 0.0 | +0.0 [+0.0, +0.0] | 1 |
+| LNS | 0.0 | 0.0 | +0.0 [+0.0, +0.0] | 1 |
+| MultiStart | 0.0 | 0.0 | +0.0 [+0.0, +0.0] | 1 |
+| PSO | 0.0 | 0.0 | +0.0 [+0.0, +0.0] | 1 |
+| SA | 0.0 | 0.0 | +0.0 [+0.0, +0.0] | 1 |
+| VNS | 0.0 | 63.3 | -40.0 [-96.7, -3.3] | 0.005859 |
+| RKO-default | 0.0 | 53.3 | -36.7 [-60.0, -20.0] | 0.005859 |
+
+#### Capped time-to-1%-gap (seconds)
+
+| Solver | Python | C++ (64-bit fix) | Paired Δ Python−C++ (95% CI), s | Holm p |
+|---|---:|---:|---:|---:|
+| BRKGA | 2.000 | 2.000 | +0.000 [+0.000, +0.017] | 0.875 |
+| BRKGA-CS | 2.000 | 1.411 | +0.018 [+0.000, +0.870] | 0.07031 |
+| GA | 2.000 | 2.000 | +0.000 [+0.000, +0.000] | 1 |
+| GRASP | 2.000 | 2.000 | +0.000 [+0.000, +1.505] | 0.125 |
+| ILS | 2.000 | 0.640 | +0.777 [+0.000, +1.510] | 0.04297 |
+| IPR | 2.000 | 2.000 | +0.000 [+0.000, +0.000] | 1 |
+| LNS | 2.000 | 2.000 | +0.000 [+0.000, +0.013] | 0.875 |
+| MultiStart | 2.000 | 2.000 | +0.000 [+0.000, +0.000] | 1 |
+| PSO | 2.000 | 2.000 | +0.000 [+0.000, +0.000] | 1 |
+| SA | 2.000 | 2.000 | +0.000 [+0.000, +0.000] | 1 |
+| VNS | 2.000 | 0.714 | +0.546 [+0.000, +1.392] | 0.04297 |
+| RKO-default | 2.000 | 1.949 | +0.051 [+0.000, +0.611] | 0.02344 |
+
+#### Process launch-to-exit latency (seconds)
+
+| Solver | Python | C++ (64-bit fix) | Paired Δ Python−C++ (95% CI), s | Holm p |
+|---|---:|---:|---:|---:|
+| BRKGA | 2.400 | 2.013 | +0.387 [+0.340, +0.651] | 0.0007324 |
+| BRKGA-CS | 2.405 | 3.018 | -0.490 [-1.366, -0.430] | 0.00293 |
+| GA | 2.384 | 2.019 | +0.363 [+0.313, +0.456] | 0.0007324 |
+| GRASP | 2.340 | 2.369 | -0.006 [-0.109, +0.026] | 0.3018 |
+| ILS | 2.339 | 2.598 | -0.208 [-0.347, -0.190] | 0.0007324 |
+| IPR | 2.304 | 2.004 | +0.300 [+0.281, +0.351] | 0.0007324 |
+| LNS | 2.334 | 2.009 | +0.324 [+0.278, +0.392] | 0.0007324 |
+| MultiStart | 2.357 | 2.004 | +0.353 [+0.323, +0.426] | 0.0007324 |
+| PSO | 2.351 | 2.013 | +0.337 [+0.285, +0.377] | 0.0007324 |
+| SA | 2.352 | 2.011 | +0.342 [+0.293, +0.458] | 0.0007324 |
+| VNS | 2.336 | 2.528 | -0.192 [-0.413, -0.074] | 0.2369 |
+| RKO-default | 4.555 | 2.014 | +2.541 [+2.365, +3.872] | 0.0007324 |
+
+The strongest within-sample signal is lower penalized objective difference for C++
+in all 12 configurations after Holm correction. C++ also returned feasible
+solutions more often for GRASP, ILS, IPR, and VNS, and reached the 1%-gap target
+more often within budget for GRASP, ILS, VNS, and the default portfolio. Only ILS,
+VNS, and RKO-default had Holm-significant lower time-to-target; many other
+configurations never attained that target within 2 seconds. These conclusions are
+limited to this workload and the configured implementations.
+
+The process-latency table includes launch and runtime startup. C++ BRKGA-CS and
+ILS had higher median process latency than Python, while Python RKO-default had
+higher latency than the ten-thread C++ portfolio. Because stopping is cooperative,
+returned terminal quality can reflect work completed after the nominal budget;
+search-time target results are censored at 2 seconds, while process latency and
+this caveat should be considered when interpreting quality comparisons.
+
+The raw reference measurement is
+[`cpp-python-knapsack-reference.csv`](cpp-python-knapsack-reference.csv), with
+10,800 trial rows and full per-trial provenance. The measured Python baseline
+is commit `759309a0d8a74324806faba6b41f806eb3721dbc`; its exact source-state hash
+is `30ec92bcaaa681be0b7e2f841e997c44d39d263a141a0b667cff1c42b745c142`. Later
+changes on `main` are not represented, so this is a historical snapshot rather
+than a performance claim about newer revisions. The companion summary is
+regenerated from the raw CSV and is not committed.
+
 ## Bounded process-worker resources
 
 A positive `n_jobs` now keeps the complete selected portfolio while limiting

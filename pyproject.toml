@@ -54,7 +54,7 @@ no-sections = true
 force-single-line = true
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["src/rko/tests"]
 
 [tool.mutmut]
