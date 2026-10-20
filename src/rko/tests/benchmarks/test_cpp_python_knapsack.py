@@ -28,8 +28,20 @@ from benchmarks.cpp_python_knapsack import InstanceCase
 from benchmarks.cpp_python_knapsack import KnapsackBenchmark
 from benchmarks.cpp_python_knapsack import SolverOutput
 from benchmarks.cpp_python_knapsack import TrialRecord
+from benchmarks.knapsack_utils import exact_profit
 from pathlib import Path
 from rko.examples.run_kp_cpp_instances import KpInstance
+
+
+def test_exact_profit_oracle_handles_capacity_constraints() -> None:
+    """Compute a feasible optimum while selecting each item at most once.
+
+    Returns:
+        None: Verifies the exact profit for a small independent instance.
+    """
+    instance = KpInstance(3, 5, [3, 4, 5], [2, 3, 4], "toy")
+
+    assert exact_profit(instance) == 7
 
 
 def test_instance_selection_is_stable_and_spans_each_family() -> None:

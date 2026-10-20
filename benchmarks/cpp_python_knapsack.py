@@ -43,7 +43,7 @@ import tarfile
 import tempfile
 import time
 import urllib.request
-from benchmarks.knapsack import exact_profit
+from benchmarks.knapsack_utils import exact_profit
 from collections.abc import Mapping
 from collections.abc import Sequence
 from dataclasses import asdict

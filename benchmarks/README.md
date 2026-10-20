@@ -251,12 +251,15 @@ this caveat should be considered when interpreting quality comparisons.
 
 The raw reference measurement is
 [`cpp-python-knapsack-reference.csv`](cpp-python-knapsack-reference.csv), with
-10,800 trial rows and full per-trial provenance. The measured Python baseline
-is commit `759309a0d8a74324806faba6b41f806eb3721dbc`; its exact source-state hash
-is `30ec92bcaaa681be0b7e2f841e997c44d39d263a141a0b667cff1c42b745c142`. Later
-changes on `main` are not represented, so this is a historical snapshot rather
-than a performance claim about newer revisions. The companion summary is
-regenerated from the raw CSV and is not committed.
+10,800 trial rows and full per-trial provenance. The measured Python baseline is commit
+`759309a0d8a74324806faba6b41f806eb3721dbc`; its exact source-state hash is
+`30ec92bcaaa681be0b7e2f841e997c44d39d263a141a0b667cff1c42b745c142`. After the
+run, the exact-profit DP helper was moved unchanged into portable
+`benchmarks/knapsack_utils.py` so Windows CI can import the runner; the raw hash
+still records the measured pre-move source. Later changes on `main` are also not
+represented, so this is a historical snapshot rather than a performance claim
+about newer revisions. The companion summary is regenerated from the raw CSV and
+is not committed.
 
 ## Bounded process-worker resources
 
