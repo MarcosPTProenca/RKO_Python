@@ -22,6 +22,7 @@ Inputs/Outputs:
 
 import csv
 import pytest
+import subprocess
 from benchmarks.cpp_python_knapsack import CPP_PORTFOLIO
 from benchmarks.cpp_python_knapsack import PYTHON_ALGORITHMS
 from benchmarks.cpp_python_knapsack import InstanceCase
@@ -31,6 +32,7 @@ from benchmarks.cpp_python_knapsack import TrialRecord
 from benchmarks.knapsack_utils import exact_profit
 from pathlib import Path
 from rko.examples.run_kp_cpp_instances import KpInstance
+from unittest.mock import Mock
 
 
 def test_exact_profit_oracle_handles_capacity_constraints() -> None:
@@ -225,6 +227,31 @@ def test_trial_record_recomputes_objective_and_retains_provenance(tmp_path: Path
     assert record.execution_mode == "python-serial"
     assert record.memory_total_gib == "16.00"
     assert record.cpp_flags == "-O3"
+
+
+def test_process_timeout_scales_with_search_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Allow a budget-length trial plus bounded cooperative-stop overrun.
+
+    Args:
+        tmp_path (Path): Isolated working directory for the child process.
+        monkeypatch (pytest.MonkeyPatch): Replaces the subprocess runner.
+
+    Returns:
+        None: Verifies the child timeout accommodates a 120-second trial.
+    """
+    benchmark = KnapsackBenchmark(tmp_path / "trials.csv", tmp_path, budget_seconds=120)
+    process = subprocess.CompletedProcess(
+        args=["fake"], returncode=0, stdout="", stderr="RKO_BENCH_SEED=17\n"
+    )
+    run = Mock(return_value=process)
+    monkeypatch.setattr("benchmarks.cpp_python_knapsack.subprocess.run", run)
+
+    result = benchmark._execute_process(["fake"], tmp_path, {}, started_ns=0)
+
+    assert run.call_args.kwargs["timeout"] == 240
+    assert result.return_code == 0
 
 
 def test_cpp_configuration_uses_reference_algorithm_identifiers(tmp_path: Path) -> None:

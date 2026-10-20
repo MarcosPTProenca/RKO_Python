@@ -64,8 +64,8 @@ CPP_REVISION = "126e35873e50dc308795b58b8c75d37f8de4c857"
 CPP_REPOSITORY = "https://github.com/RKO-solver/RKO_Cpp_v2.0.git"
 KPLIB_RAW = "https://raw.githubusercontent.com/likr/kplib"
 SAMPLE_SEED = 20261019
-DEFAULT_BUDGET_SECONDS = 2
-DEFAULT_REPETITIONS = 30
+DEFAULT_BUDGET_SECONDS = 120
+DEFAULT_REPETITIONS = 5
 TARGET_GAPS = (10, 1, 0)
 CPP_FLAGS = "-fopenmp -O3 -Wall -std=c++2a -Wno-unused-but-set-variable"
 FAMILIES = (
@@ -1170,7 +1170,7 @@ class KnapsackBenchmark:
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=90,
+                timeout=max(90, self.budget_seconds * 2),
             )
         except subprocess.TimeoutExpired as error:
             elapsed = (time.clock_gettime_ns(time.CLOCK_MONOTONIC) - started_ns) / 1_000_000_000
@@ -1770,13 +1770,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--budget-seconds",
         type=int,
         default=DEFAULT_BUDGET_SECONDS,
-        help="Integer search budget per trial; default 2 seconds.",
+        help="Integer search budget per trial; default 120 seconds.",
     )
     parser.add_argument(
         "--repetitions",
         type=int,
         default=DEFAULT_REPETITIONS,
-        help="Independent trials per implementation/configuration/instance.",
+        help="Independent repetitions per implementation/configuration/instance; default 5.",
     )
     parser.add_argument("--resume", action="store_true", help="Continue a matching partial CSV.")
     parser.add_argument(

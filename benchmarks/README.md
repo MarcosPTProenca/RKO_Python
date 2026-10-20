@@ -27,8 +27,9 @@ uv run --locked python -m benchmarks.cpp_python_knapsack \
   --cache-dir /tmp/rko-cpp-python-knapsack-cache
 ```
 
-The approved main run uses a **2-second search budget** and **30 repetitions per
-implementation, solver configuration, and instance**. The pilot option runs
+The approved main run uses a **120-second search budget** and **5 repetitions per
+implementation, solver configuration, and instance**, for 1,800 trials. At the
+measured runtime this is expected to take about 60 hours. The pilot option runs
 BRKGA, BRKGA-CS, and the full portfolio on one instance for one second; pilot output is
 excluded from analysis.
 
@@ -95,8 +96,8 @@ selected 500-item workload. Results are therefore labeled **C++ (64-bit objectiv
 fix)**, not an untouched C++ build. No algorithm or random-draw code is changed.
 
 Time-to-target starts immediately before Python `RKO.solve()` or at the C++
-search-start marker, and misses are right-censored at the common 2-second search
-budget. Targets are feasible profits within 10%, 1%, and 0% of the exact optimum;
+search-start marker, and misses are right-censored at the common 120-second search
+budget in the approved run. Targets are feasible profits within 10%, 1%, and 0% of the exact optimum;
 first feasible candidate evaluations trigger benchmark-only telemetry. The raw
 CSV separately records process-launch-to-exit time, including process startup and
 orchestration but excluding post-run verification and analysis. The pilot validates
@@ -111,8 +112,8 @@ BRKGA-CS shuffles. Python trials use recorded independent seeds. Trials alternat
 Python/C++ order within each cell and run sequentially, with no concurrent
 benchmark job.
 
-For each solver and metric, the summary first reduces 30 repetitions within each
-instance (median for objective/time, mean for feasibility/success rates), then
+For each solver and metric, the approved summary first reduces 5 repetitions
+within each instance (median for objective/time, mean for feasibility/success rates), then
 compares the 15 paired instance summaries using an exact two-sided sign test. It
 reports the median paired difference and a deterministic 95% bootstrap percentile
 interval over instances (10,000 resamples). Failed trials count as misses for
@@ -129,9 +130,20 @@ equivalence. These 15 selected instances do not establish general Knapsack or
 hardware performance. For background, see [COCO performance assessment](https://numbbo.github.io/coco-doc/perf-assessment/)
 and [García and Herrera (2008)](https://jmlr.csail.mit.edu/papers/volume9/garcia08a/garcia08a.pdf).
 
-### Main-run results
+### Approved 120-second run
 
-The approved run completed all **10,800/10,800 trials**: 12 configurations × 15
+The approved 120-second × 5-repetition run covers 12 configurations × 15 instances
+× 5 repetitions × two implementations (1,800 trials) and is underway. Its results
+will replace the preliminary tables below after all trials complete.
+
+### Preliminary 2-second run (superseded)
+
+**Do not treat the following tables as the requested comparison.** They summarize
+an earlier 2-second × 30-repetition experiment; the budget was too short to answer
+the intended question. The raw file is retained only as a diagnostic. The approved
+120-second run uses five repetitions per cell and will receive separate results.
+
+The preliminary run completed all **10,800/10,800 trials**: 12 configurations × 15
 instances × 30 repetitions × two implementations. All trials returned valid
 records (zero failures), with one source/run signature and no target time beyond
 the 2-second censoring budget. Each table reports the median of 15 per-instance
@@ -146,7 +158,7 @@ Penalized objective difference is `100 × (returned minimization objective + exa
 optimum) / exact optimum`; it includes the historical overweight penalty, so the
 very large Python IPR value reflects infeasible terminal solutions and is
 interpreted alongside feasibility. Target-time values are capped at 2 seconds,
-with misses scored as 2 seconds. Process latency is measured from process launch
+with misses scored at the 2-second cap used in this preliminary run. Process latency is measured from process launch
 to exit, not just search time.
 
 #### Penalized objective difference from exact optimum (%)
@@ -249,8 +261,8 @@ returned terminal quality can reflect work completed after the nominal budget;
 search-time target results are censored at 2 seconds, while process latency and
 this caveat should be considered when interpreting quality comparisons.
 
-The raw reference measurement is
-[`cpp-python-knapsack-reference.csv`](cpp-python-knapsack-reference.csv), with
+The preliminary raw diagnostic is
+[`cpp-python-knapsack-2s-preliminary.csv`](cpp-python-knapsack-2s-preliminary.csv), with
 10,800 trial rows and full per-trial provenance. The measured Python baseline is commit
 `759309a0d8a74324806faba6b41f806eb3721dbc`; its exact source-state hash is
 `30ec92bcaaa681be0b7e2f841e997c44d39d263a141a0b667cff1c42b745c142`. After the
