@@ -4,7 +4,7 @@ Objective:
 - Quantify resource use without confusing a search budget with end-to-end time.
 
 Technical approach:
-- Run the unchanged ten-algorithm selection with four or dedicated workers.
+- Run the unchanged ten-algorithm selection with automatic or dedicated workers.
 - Identify seeded first decodes and sample parent/child RSS through Linux procfs.
 
 Flow (pseudocode):
@@ -13,7 +13,7 @@ Flow (pseudocode):
 3. Emit JSON measurements without asserting timed convergence or speedups.
 
 Important criteria:
-- Four workers give each algorithm a nominal one-third slice, not a full budget.
+- N algorithms on W workers receive at most budget/ceil(N/W) each, not full budgets.
 - RSS sums count shared pages multiple times; sampling is not an exact high-water mark.
 - Procfs memory measurements are unavailable on non-Linux hosts.
 
@@ -209,7 +209,7 @@ def main() -> None:
     )
     for workload in ("sphere", "ordering"):
         for trial, seed in enumerate((42, 43, 44)):
-            limits = (4, None) if trial % 2 == 0 else (None, 4)
+            limits = (None, len(names)) if trial % 2 == 0 else (len(names), None)
             initial_keys = [
                 np.random.RandomState(int(stream.generate_state(1)[0])).random_sample(dimension)
                 for stream in np.random.SeedSequence(seed).spawn(len(names))
@@ -243,7 +243,10 @@ def main() -> None:
                         for index in range(len(names))
                     ]
                     pids = {row["pid"] for row in records}
-                    assert len(pids) == (len(names) if limit is None else limit)
+                    expected_workers = min(limit or max(1, os.process_cpu_count() or 1), len(names))
+                    assert len(pids) == expected_workers == result.n_workers
+                    assert result.n_jobs == limit
+                    assert result.available_cpus == max(1, os.process_cpu_count() or 1)
                     assert all(0.0 <= key < 1.0 for key in result.keys)
                     keys = np.asarray(result.keys)
                     decoded = np.argsort(keys, kind="stable") if objective.ordering else keys
@@ -265,6 +268,8 @@ def main() -> None:
                                 "seed": seed,
                                 "n_jobs": limit,
                                 "search_workers": len(pids),
+                                "available_cpus": result.available_cpus,
+                                "n_evaluations": result.n_evaluations,
                                 "elapsed_seconds": result.elapsed_seconds,
                                 "first_decode_seconds": first - started,
                                 "last_first_decode_seconds": last - started,

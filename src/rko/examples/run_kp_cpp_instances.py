@@ -75,7 +75,7 @@ class KpRunResult:
       weight (int): Decoded total weight of the best solution.
       feasible (bool): Feasibility flag relative to capacity.
       backend (str): Selected execution backend.
-      n_jobs (int | None): Requested process budget, or default portfolio size.
+      n_jobs (int | None): Requested process budget, or automatic usable-CPU cap.
       random_state (int | None): Requested worker-seed source.
       elapsed_seconds (float): End-to-end solver time including process startup.
     """
@@ -411,7 +411,12 @@ def parse_args() -> argparse.Namespace:
         help="Destination CSV path for execution results.",
     )
     parser.add_argument("--backend", choices=("process", "thread", "serial"), default="process")
-    parser.add_argument("--n-jobs", type=int, default=None, help="Maximum process worker budget.")
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=None,
+        help="Explicit search-worker limit (default: available logical CPUs, capped by portfolio).",
+    )
     parser.add_argument("--random-state", type=int, default=None, help="Worker seed source.")
     parser.add_argument(
         "--quiet",

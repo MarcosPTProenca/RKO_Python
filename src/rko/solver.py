@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import math
 import numpy as np
+import os
 import platform
 import time
 from .components.random_streams import RandomStreams
@@ -73,6 +74,7 @@ class RKOResult:
         pool_size (int | None): Configured elite capacity.
         n_jobs (int | None): Requested process-worker cap.
         versions (tuple): RKO distribution, Python and NumPy runtime versions.
+        available_cpus (int | None): Usable logical CPUs snapshotted for process execution.
     """
 
     keys: tuple[float, ...]
@@ -88,6 +90,7 @@ class RKOResult:
     pool_size: int | None = None
     n_jobs: int | None = None
     versions: tuple[tuple[str, str], ...] = ()
+    available_cpus: int | None = None
 
     @property
     def n_evaluations(self) -> int | None:
@@ -121,7 +124,10 @@ class RKOResult:
         """
         if self.backend == "serial":
             return 1
-        return min(self.n_jobs or len(self.algorithms), len(self.algorithms))
+        limit = self.n_jobs
+        if limit is None and self.backend == "process":
+            limit = self.available_cpus
+        return min(limit or len(self.algorithms), len(self.algorithms))
 
 
 class RKO:
@@ -174,8 +180,9 @@ class RKO:
             pool_size (int | None): Elite capacity, or configured default.
             params_dir (Path | None): Optional parameter TOML directory.
             backend (Literal): Process, legacy thread or serial execution.
-            n_jobs (int | None): Positive worker limit; None allows one per algorithm.
-                Smaller limits share workers and split the common search budget.
+            n_jobs (int | None): Positive worker limit; None uses available logical CPUs.
+                Missing CPU discovery falls back to one worker. Smaller limits share
+                workers and split the common search budget; explicit limits override CPUs.
             random_state (int | None): Nonnegative seed for owned library RNG streams.
             verbose (bool): Flush lifecycle and shared-pool progress to stdout.
             hyperparameters (Hyperparameters | None): Per-algorithm offline overrides;
@@ -264,12 +271,14 @@ class RKO:
             self.random_state,
             self.n_variables,
         )
+        available_cpus = max(1, os.process_cpu_count() or 1) if backend == "process" else None
         keys, value = self._execute(
             config,
             time_limit,
             started_at=started,
             hyperparameters=hyperparameters,
             search_metadata=metadata,
+            process_worker_limit=n_jobs if n_jobs is not None else available_cpus,
         )
         positions = {name: index for index, name in enumerate(config.active_metaheuristics)}
         try:
@@ -289,6 +298,7 @@ class RKO:
             control=config.control,
             pool_size=config.pool_size,
             n_jobs=n_jobs,
+            available_cpus=available_cpus,
             versions=(
                 ("rko", package_version),
                 ("python", platform.python_version()),
@@ -311,6 +321,7 @@ class RKO:
         started_at: float,
         hyperparameters: Hyperparameters | None = None,
         search_metadata: list[SearchMetadata] | None = None,
+        process_worker_limit: int | None = None,
     ) -> tuple[list[float], float]:
         """Dispatch a validated portfolio without retaining worker state.
 
@@ -320,6 +331,7 @@ class RKO:
             started_at (float): Solve's monotonic origin, including configuration/startup.
             hyperparameters (Hyperparameters | None): Owned normalized offline overrides.
             search_metadata (list[SearchMetadata] | None): Optional immutable report collector.
+            process_worker_limit (int | None): Resolved per-solve process cap.
 
         Returns:
             tuple[list[float], float]: Best keys and objective.
@@ -355,7 +367,7 @@ class RKO:
                 self.n_variables,
                 time_limit,
                 self.params_dir,
-                self.n_jobs,
+                process_worker_limit if process_worker_limit is not None else self.n_jobs,
                 self.random_state,
                 verbose=self.verbose,
                 started_at=started_at,

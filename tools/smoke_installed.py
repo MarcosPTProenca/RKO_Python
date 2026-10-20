@@ -24,6 +24,7 @@ Inputs/Outputs:
 
 import csv
 import numpy as np
+import os
 import pickle
 import random
 import shutil
@@ -105,6 +106,9 @@ def main() -> None:
             assert result.n_evaluations >= 1
             assert result.stop_reason == "time_limit"
             assert result.n_workers == 1
+            assert result.available_cpus == (
+                max(1, os.process_cpu_count() or 1) if backend == "process" else None
+            )
             assert len(result.searches) == 1
             report = result.searches[0]
             assert isinstance(report, SearchMetadata)
@@ -118,6 +122,21 @@ def main() -> None:
                 assert dict(report.parameters)["p_size"] == 4
             assert bool(report.parameter_grid) == (algorithm == "PSO" and control == 1)
             assert pickle.loads(pickle.dumps(result)) == result
+    automatic = RKO(
+        decode,
+        objective,
+        64,
+        algorithms=["MultiStart", "PSO"],
+        control=0,
+        hyperparameters={"PSO": {"p_size": 4}},
+        random_state=42,
+    ).solve(0.2)
+    assert automatic.n_jobs is None
+    assert automatic.available_cpus == max(1, os.process_cpu_count() or 1)
+    assert automatic.n_workers == min(2, automatic.available_cpus)
+    assert [report.algorithm for report in automatic.searches] == ["MultiStart", "PSO"]
+    assert np.isclose(automatic.cost, objective(np.asarray(automatic.keys)))
+    assert pickle.loads(pickle.dumps(automatic)) == automatic
     bounded = RKO(
         decode,
         objective,

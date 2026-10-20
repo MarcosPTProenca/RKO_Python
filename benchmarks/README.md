@@ -52,15 +52,42 @@ changed. See [WSL setup guidance](../docs/running.md#wsl-startup-and-virtual-env
 A positive `n_jobs` now keeps the complete selected portfolio while limiting
 search processes. Assignments are round-robin; each gets a nominal slice of
 `time_limit / ceil(N / W)`, bounded by the original common deadline. No extra
-full-duration budgets are granted to queued searches. `n_jobs=None` retains the
-previous one-worker-per-algorithm default. One additional process hosts the pool;
+full-duration budgets are granted to queued searches. `n_jobs=None` now defaults to
+process-usable logical CPUs, capped by portfolio size (one if discovery is unavailable).
+Explicit positive limits override CPU discovery. One additional process hosts the pool;
 BLAS/OpenMP threads are outside the search-worker limit.
 
 ```bash
 uv run --locked python benchmarks/process_budget.py > /tmp/rko-process-budget.jsonl
 ```
 
-Reference: 2026-10-19, four-CPU WSL2, CPython 3.14.8 / NumPy 2.4.3, GIL enabled,
+The updated script compares automatic defaults against an explicit full-portfolio
+worker limit and verifies every seeded initial candidate, worker count and result.
+An identified [automatic-default reference](process-auto-reference.jsonl),
+2026-10-20, uses the same Linux-local editable source/dependency environment for
+both variants: four available CPUs, CPython 3.14.8 / NumPy 2.4.3, ten algorithms,
+offline control, 128 keys and a one-second common budget. Three seeds per neutral
+adapter, with alternating trial order, gave these medians:
+
+| Adapter | Requested workers | Observed workers | End-to-end (s) | Sampled parent/children RSS sum (MiB) |
+| --- | --- | ---: | ---: | ---: |
+| Sphere | Automatic (`None`) | 4 | 2.550 | 287.03 |
+| Sphere | Explicit 10 | 10 | 3.856 | 560.58 |
+| Ordering | Automatic (`None`) | 4 | 2.413 | 287.19 |
+| Ordering | Explicit 10 | 10 | 3.432 | 560.41 |
+
+Two earlier complete repetitions also verified all initial vectors and worker
+counts, with sampled RSS medians around 287/560 MiB and variable latency medians.
+This is a worker-resource comparison within one source/environment, NOT a
+filesystem migration or fixed-work throughput/quality result. All 36 solves
+retained the full selection; different slices and live cooperation change search
+work/results. RSS sums double-count shared pages and are sampled, not unique
+physical memory or exact peaks. No native-thread cap or machine-wide admission
+control is implied. See [migration/limits](../docs/process-workers.md).
+
+The historical reference below predates automatic defaults and compares explicit
+four-worker scheduling against the then-default ten dedicated workers:
+2026-10-19, four-CPU WSL2, CPython 3.14.8 / NumPy 2.4.3, GIL enabled,
 packaged ten-algorithm portfolio, offline control, 128 keys and a one-second
 common search budget. Three seeds per numerical sphere/permutation adapter,
 alternating dedicated/limited execution order, produced these medians:

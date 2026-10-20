@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import numpy as np
+import os
 import pickle
 import time
 import traceback
@@ -276,7 +277,8 @@ def run_processes(
         dimension (int): Number of random keys.
         limit_time (float): Search seconds excluding process startup.
         params_dir (Path | None): Optional parameter directory.
-        n_jobs (int | None): Positive worker limit; None allows one per algorithm.
+        n_jobs (int | None): Positive override; None uses process-usable logical CPUs,
+            falling back to one if discovery is unavailable.
         random_state (int | None): Seed used to derive independent worker seeds.
         verbose (bool): Emit pool updates from its single authoritative manager.
         started_at (float | None): Parent solve's monotonic origin for elapsed log times.
@@ -309,7 +311,9 @@ def run_processes(
         (name, int(sequence.generate_state(1)[0]))
         for name, sequence in zip(names, seeds, strict=True)
     )
-    worker_count = len(names) if n_jobs is None else min(n_jobs, len(names))
+    worker_count = min(
+        max(1, os.process_cpu_count() or 1) if n_jobs is None else n_jobs, len(names)
+    )
     groups = [assignments[index::worker_count] for index in range(worker_count)]
     slice_seconds = limit_time / max(len(group) for group in groups)
     with PoolManager(ctx=context) as manager:

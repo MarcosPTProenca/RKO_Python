@@ -1,6 +1,6 @@
 # Current limitations
 
-Status reviewed on 2026-10-19. This development version is **not release-ready**.
+Status reviewed on 2026-10-20. This development version is **not release-ready**.
 Removing internal audit documents does not mean their outstanding work is done.
 
 ## Delivered
@@ -24,12 +24,20 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   callback draws are neither implicitly seeded nor rolled back. Independent
   solver instances may overlap; simultaneous calls on the same mutable instance
   are not supported.
-- **Worker scheduling:** positive `n_jobs` now caps search workers without dropping
-  the portfolio. Round-robin groups get equal nominal search slices under the
-  original deadline. Defaults can still oversubscribe hardware, shorter groups'
-  unused time is not redistributed, and callbacks may exhaust later slices.
-  Native-thread limits, adaptive load balancing and broad RSS/IPC profiles remain
-  open; one sampled Linux memory/latency reference is available in benchmarks.
+- **Worker scheduling:** omitted/`None` `n_jobs` now caps process search workers to
+  affinity-aware usable logical CPUs (one if unavailable); explicit positive caps
+  still override discovery. Every selected algorithm remains assigned. CPU capacity
+  is recorded once per solve for immutable result accounting. Round-robin groups
+  keep equal nominal slices under the common deadline; unused time is not
+  redistributed, and callbacks may exhaust later slices. Native threads,
+  concurrent solver instances and container quotas not reflected by discovery can
+  still oversubscribe hardware. Native-thread controls, adaptive load balancing and
+  broader RSS/IPC profiles remain open. A controlled Linux comparison across 36
+  solves verified all seeded initial candidates; the identified reference measured
+  sampled summed RSS around 287 versus 560 MiB for four automatic versus ten
+  dedicated workers. This is not unique physical memory, fixed-work throughput or
+  scientific-quality evidence. See [migration/limits](process-workers.md) and
+  [benchmarks](../benchmarks/README.md#bounded-process-worker-resources).
 - **Algorithm contracts:** complete C++ parity/deviation specifications and
   scientific invariants remain, including SA/GRASP adaptive behavior. Six local
   neighborhood cases now match compiled C++ kernels: strategy 1 continues the

@@ -272,16 +272,16 @@ def test_worker_failure_reaps_children(
     assert {child.pid for child in mp.active_children()} == before
 
 
-@pytest.mark.parametrize("n_jobs", [None, 1])
+@pytest.mark.parametrize("n_jobs", [2, 1])
 def test_search_timeout_reaps_blocked_workers(
-    params_dir: Path, tmp_path: Path, n_jobs: int | None
+    params_dir: Path, tmp_path: Path, n_jobs: int
 ) -> None:
     """Observe blocked callback entry and reap workers after the search grace period.
 
     Args:
         params_dir (Path): Complete test portfolio configuration.
         tmp_path (Path): Destination for callback-entry observations.
-        n_jobs (int | None): Dedicated or shared worker execution.
+        n_jobs (int): Explicit dedicated or shared worker count.
     """
     before = {child.pid for child in mp.active_children()}
     with pytest.raises(TimeoutError, match="search timed out"):
@@ -294,7 +294,7 @@ def test_search_timeout_reaps_blocked_workers(
             n_jobs=n_jobs,
         )
     observations = [path for path in tmp_path.iterdir() if path.is_file()]
-    assert len(observations) == (2 if n_jobs is None else 1)
+    assert len(observations) == n_jobs
     assert all(path.read_text(encoding="utf-8") == "entered" for path in observations)
     assert {child.pid for child in mp.active_children()} == before
 
@@ -337,7 +337,15 @@ def test_seed_allocates_stable_distinct_streams(params_dir: Path, tmp_path: Path
     for trial in range(2):
         directory = tmp_path / str(trial)
         directory.mkdir()
-        run(identity, RecordingCost(directory), 4, 0.05, params_dir=params_dir, random_state=42)
+        run(
+            identity,
+            RecordingCost(directory),
+            4,
+            0.05,
+            params_dir=params_dir,
+            random_state=42,
+            n_jobs=2,
+        )
         samples.append(sorted(path.read_text() for path in directory.iterdir()))
     assert samples[0] == samples[1]
     assert len(set(samples[0])) == 2

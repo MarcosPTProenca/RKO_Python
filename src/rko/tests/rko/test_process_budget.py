@@ -159,14 +159,27 @@ def test_queued_failure_is_not_hidden_by_completed_result() -> None:
     assert {child.pid for child in mp.active_children()} == before
 
 
-@pytest.mark.parametrize("n_jobs", [1, 2, 8])
-def test_worker_limit_runs_every_seeded_algorithm(tmp_path: Path, n_jobs: int) -> None:
+@pytest.mark.parametrize(
+    "n_jobs,cpus,expected_workers",
+    [(1, 2, 1), (2, 1, 2), (8, 1, 5), (None, 1, 1), (None, 2, 2), (None, 64, 5), (None, None, 1)],
+)
+def test_worker_limit_runs_every_seeded_algorithm(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    n_jobs: int | None,
+    cpus: int | None,
+    expected_workers: int,
+) -> None:
     """Execute uneven groups and retain independent per-algorithm random streams.
 
     Args:
         tmp_path (Path): Destination for first-candidate observations.
-        n_jobs (int): Requested process limit, including surplus capacity.
+        monkeypatch (pytest.MonkeyPatch): Parent-side CPU discovery replacement.
+        n_jobs (int | None): Explicit or automatic worker limit.
+        cpus (int | None): Simulated process-usable CPU discovery.
+        expected_workers (int): Independently expected search process count.
     """
+    monkeypatch.setattr(os, "process_cpu_count", lambda: cpus)
     names = ("MultiStart", "SA", "PSO", "GA", "BRKGA")
     seeds = [int(seed.generate_state(1)[0]) for seed in np.random.SeedSequence(42).spawn(5)]
     expected = tuple(tuple(np.random.RandomState(seed).random_sample(2)) for seed in seeds)
@@ -183,7 +196,10 @@ def test_worker_limit_runs_every_seeded_algorithm(tmp_path: Path, n_jobs: int) -
     observations = [
         json.loads(tmp_path.joinpath(f"{index}.json").read_text()) for index in range(5)
     ]
-    assert len({row["pid"] for row in observations}) == min(n_jobs, len(names))
+    assert len({row["pid"] for row in observations}) == expected_workers
+    assert result.n_workers == expected_workers
+    assert result.n_jobs == n_jobs
+    assert result.available_cpus == max(1, cpus or 1)
     assert all(row["pid"] != os.getpid() for row in observations)
     assert [row["sample"] for row in observations] == [
         random.Random(seed).random() for seed in seeds
@@ -192,6 +208,43 @@ def test_worker_limit_runs_every_seeded_algorithm(tmp_path: Path, n_jobs: int) -
     assert len(result.keys) == 2
     assert all(0 <= key < 1 for key in result.keys)
     assert result.cost == pytest.approx(np.dot(result.keys, result.keys))
+    assert {child.pid for child in mp.active_children()} == before
+
+
+@pytest.mark.parametrize("cpus", [1, None])
+def test_direct_process_dispatch_resolves_cpu_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cpus: int | None
+) -> None:
+    """Keep the internal dispatcher safe when called without a pre-resolved cap.
+
+    Args:
+        tmp_path (Path): Destination for independent per-algorithm observations.
+        monkeypatch (pytest.MonkeyPatch): Parent CPU discovery replacement.
+        cpus (int | None): One usable CPU or unavailable discovery.
+    """
+    monkeypatch.setattr(os, "process_cpu_count", lambda: cpus)
+    names = ("MultiStart", "SA")
+    seeds = [int(seed.generate_state(1)[0]) for seed in np.random.SeedSequence(42).spawn(2)]
+    expected = tuple(tuple(np.random.RandomState(seed).random_sample(2)) for seed in seeds)
+    before = {child.pid for child in mp.active_children()}
+    keys, value = processes.run_processes(
+        RunConfig(control=0, pool_size=3, active_metaheuristics=names),
+        decode,
+        InitialCost(tmp_path, expected, names),
+        2,
+        0.9,
+        None,
+        None,
+        42,
+    )
+    observations = [
+        json.loads(tmp_path.joinpath(f"{index}.json").read_text()) for index in range(2)
+    ]
+    assert len({row["pid"] for row in observations}) == 1
+    assert [row["sample"] for row in observations] == [
+        random.Random(seed).random() for seed in seeds
+    ]
+    assert value == pytest.approx(np.dot(keys, keys))
     assert {child.pid for child in mp.active_children()} == before
 
 

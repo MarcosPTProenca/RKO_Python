@@ -19,16 +19,22 @@ Bash continuation backslashes with PowerShell backticks.
 `uv run --locked rko --help` lists options. The equivalent installed command is
 `rko ...`; running the Python module directly also remains supported. Startup
 is additional to the process search budget; see README for stopping limits.
-The packaged default selects ten algorithms and can oversubscribe a small
-machine. `--n-jobs 4` keeps the full portfolio but uses at most four search
-workers plus the pool manager. Assignments are round-robin; each worker executes
+The packaged default selects ten algorithms. Without `--n-jobs`, process mode
+uses at most the smaller of portfolio size and `os.process_cpu_count()` usable
+logical CPUs (one if discovery is unavailable). `--n-jobs 4` explicitly requests
+up to four search workers plus the pool manager, even if fewer CPUs are available. Assignments are round-robin; each worker executes
 its group sequentially, with every search capped at `limit_time / ceil(N / W)`
 seconds and the original common deadline. Ten algorithms on four workers therefore
 receive at most one third of the search budget each. Startup remains additional.
 Workers with shorter groups may finish early; unused time is not redistributed.
 Callback overruns can consume later searches' slices. This changes timed search
 trajectories and cooperation, not the configured algorithm selection or seed
-assignment. Native-library threads are not capped by `--n-jobs`.
+assignment. Native-library threads are not capped by `--n-jobs`, and concurrent
+RKO instances do not share a global worker budget. CPU discovery is affinity-aware,
+not a guarantee of honoring every container quota; choose an explicit budget when
+needed. Serial and thread modes are unchanged. For the historical dedicated-worker
+behavior with the shipped ten algorithms, use `--n-jobs 10`.
+See [migration and resource limits](process-workers.md).
 
 ## WSL startup and virtual-environment placement
 

@@ -47,10 +47,12 @@ and also accepts `verbose=True`.
 
 ## Execution modes
 
-- **`backend="process"` (default):** one spawned worker per selected algorithm
-  when `n_jobs=None`, plus one manager hosting the shared elite pool. The default
-  can exceed available CPU cores. A positive `n_jobs` caps search workers without
-  dropping algorithms: assignments are round-robin and each worker runs its
+- **`backend="process"` (default):** `n_jobs=None` uses at most
+  `min(number_of_algorithms, os.process_cpu_count() or 1)` search workers,
+  plus one manager hosting the shared elite pool. CPU discovery is affinity-aware;
+  unavailable discovery falls back to one. A positive `n_jobs` overrides this
+  automatic cap, even above available CPUs, without dropping algorithms:
+  assignments are round-robin and each worker runs its
   assigned searches sequentially. With N algorithms and W workers, each search
   gets at most `time_limit / ceil(N / W)` seconds, all within one common deadline.
   For example, ten algorithms with `n_jobs=4` use four search workers, three
@@ -161,7 +163,9 @@ if __name__ == "__main__":
 
 `RKOResult` retains its original fields and adds immutable `searches` reports in
 portfolio order, plus `n_variables`, requested `time_limit`, `control`, `pool_size`,
-`n_jobs` and runtime `versions` (RKO distribution, Python, NumPy). The derived
+`n_jobs`, process-only `available_cpus` and runtime `versions` (RKO distribution,
+Python, NumPy). CPU capacity is snapshotted once per process solve, so changing
+affinity later does not rewrite earlier resource accounting. The derived
 `n_workers` excludes pool managers and native numeric threads; it is configured
 search concurrency, not measured CPU utilization.
 
@@ -283,7 +287,9 @@ The decoder uses `key > 0.5`. Cost is negative profit with a penalty of 100000
 per excess unit of weight, matching the reference example. Independently
 computed exact optima are **31** for `kp10.txt` and **149** for `kp50.txt`. The
 CSV records feasibility, objective, backend, requested worker budget, seed and
-end-to-end elapsed time. A blank budget means one worker per selected algorithm.
+end-to-end elapsed time. A blank budget requests automatic affinity-aware process
+workers; it is not a measured worker count. To retain dedicated workers, explicitly
+request the selected portfolio size. See [default-worker migration](docs/process-workers.md).
 These two small instances are correctness checks, not production-scale evidence.
 
 The [larger benchmark](benchmarks/README.md) includes a runnable experiment and
