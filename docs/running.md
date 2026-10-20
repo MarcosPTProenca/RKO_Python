@@ -34,7 +34,9 @@ RKO instances do not share a global worker budget. CPU discovery is affinity-awa
 not a guarantee of honoring every container quota; choose an explicit budget when
 needed. Serial and thread modes are unchanged. For the historical dedicated-worker
 behavior with the shipped ten algorithms, use `--n-jobs 10`.
-See [migration and resource limits](process-workers.md).
+See [migration and resource limits](process-workers.md). For BLAS-heavy callbacks,
+[native-thread launch settings](native-threads.md) configure fresh interpreters and
+their spawned workers without mutating the parent application's native pools.
 
 ## WSL startup and virtual-environment placement
 

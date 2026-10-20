@@ -31,8 +31,10 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   keep equal nominal slices under the common deadline; unused time is not
   redistributed, and callbacks may exhaust later slices. Native threads,
   concurrent solver instances and container quotas not reflected by discovery can
-  still oversubscribe hardware. Native-thread controls, adaptive load balancing and
-  broader RSS/IPC profiles remain open. A controlled Linux comparison across 36
+  still oversubscribe hardware. [Native-thread launch guidance](native-threads.md)
+  now has verified spawned-worker limits and a controlled dense-callback reference;
+  RKO does not silently reconfigure native pools. Automatic native-thread policies,
+  adaptive load balancing and broader RSS/IPC profiles remain open. A controlled Linux comparison across 36
   solves verified all seeded initial candidates; the identified reference measured
   sampled summed RSS around 287 versus 560 MiB for four automatic versus ten
   dedicated workers. This is not unique physical memory, fixed-work throughput or

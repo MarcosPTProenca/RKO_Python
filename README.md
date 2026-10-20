@@ -61,7 +61,8 @@ and also accepts `verbose=True`.
   promise of better optimization quality. Active callbacks can overrun a slice
   and leave later searches less time or no time. Algorithms sharing a worker
   also share its callback instances; mutable callback state is not reset between
-  searches. Native BLAS/OpenMP threads are separate from this worker limit.
+  searches. Native BLAS/OpenMP threads are separate from this worker limit;
+  use the [native-thread launch guide](docs/native-threads.md) for numerical callbacks.
 - **`backend="thread"`:** legacy shared-memory execution; arbitrary local
   callbacks work, but CPU-bound Python code is subject to the standard GIL.
 - **`backend="serial"`:** debugging/reference execution with shared elites.

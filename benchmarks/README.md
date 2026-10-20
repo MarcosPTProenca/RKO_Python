@@ -123,6 +123,45 @@ snapshot queries faster, but corrected full-search trials did not demonstrate a
 reliable general benefit and small cases sometimes regressed. It was discarded;
 no cache or additional retained worker snapshots were shipped.
 
+## Native-thread launch controls
+
+```bash
+uv run --locked --with threadpoolctl==3.7.0 python benchmarks/native_threads.py
+```
+
+This diagnostic-only dependency is not added to RKO runtime or dev dependencies.
+The runner launches fresh interpreters using copied inherited/one-thread native
+environments and leaves its own environment/runtime limits unchanged. Three repeats
+cover sphere, matrix-vector and dense matrix-matrix callbacks with one/four actual
+spawned population searches. Oversized populations stop at 64 finite evaluations,
+before full generations or asynchronous elite feedback. Assigned initial keys,
+complete candidate fingerprints, counts and independent costs are checked; native
+teams are inspected IN workers, not inferred from a parent-only controller.
+
+[Identified reference](native-threads-reference.jsonl): 2026-10-20, CPython 3.14.8,
+NumPy 2.4.3 / OpenBLAS 0.3.31.dev, four usable CPUs, 512 keys, same Linux-local
+source/dependency environment for both variants. The final dense four-worker prefix
+measured slowest-search medians **6.016 vs 3.491 s**, end-to-end **7.564 vs 4.860 s**
+and summed callback process CPU **18.574 vs 7.967 s**, inherited four-thread teams
+versus one per worker. Two complete passes preserve all 36 paired candidate/count
+comparisons (72 primary solves) plus four parent-only negative controls. The earlier
+pass also improved dense callbacks, with variable absolute timings. Cheap/vector
+search timings were mixed. Parent-only negative controls kept workers at four
+threads even while the parent reported one.
+
+This is a fixed initialization-prefix/workload-specific result, not a full-solver,
+quality or native-language parity claim. Callback CPU includes native worker threads
+but excludes manager/coordinator CPU. Warm-up is excluded from callback timing but
+included in search/end-to-end timing. BLAS roundoff is checked tolerantly. The private
+benchmark stop signal is not a supported callback protocol. Windows CI runs only:
+
+```bash
+uv run --locked --with threadpoolctl==3.7.0 python benchmarks/native_threads.py --repeats 1 --dimension 8 --evaluations 2 --workers 1
+```
+
+No Windows performance comparison or automatic library-level native cap is claimed.
+See [launch recipes, scope and sources](../docs/native-threads.md).
+
 ## Adaptive state-graph initialization and startup
 
 Adaptive controllers formerly compared every state against every other state to
