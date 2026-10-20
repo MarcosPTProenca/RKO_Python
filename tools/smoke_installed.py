@@ -137,6 +137,25 @@ def main() -> None:
     assert [report.algorithm for report in automatic.searches] == ["MultiStart", "PSO"]
     assert np.isclose(automatic.cost, objective(np.asarray(automatic.keys)))
     assert pickle.loads(pickle.dumps(automatic)) == automatic
+    uneven = RKO(
+        decode,
+        objective,
+        16,
+        algorithms=["MultiStart", "PSO", "GA"],
+        control=0,
+        hyperparameters={"PSO": {"p_size": 4}, "GA": {"size_pop": 12}},
+        backend="process",
+        n_jobs=2,
+        random_state=42,
+    ).solve(0.2)
+    assert uneven.n_workers == 2
+    assert [report.algorithm for report in uneven.searches] == ["MultiStart", "PSO", "GA"]
+    assert 0 < uneven.searches[0].time_limit <= 0.1
+    assert 0 <= uneven.searches[1].time_limit <= 0.2
+    assert all(0 <= report.time_limit <= 0.2 for report in uneven.searches)
+    assert uneven.n_evaluations == sum(report.n_evaluations for report in uneven.searches)
+    assert np.isclose(uneven.cost, objective(np.asarray(uneven.keys)))
+    assert pickle.loads(pickle.dumps(uneven)) == uneven
     bounded = RKO(
         decode,
         objective,

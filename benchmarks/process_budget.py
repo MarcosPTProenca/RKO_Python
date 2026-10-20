@@ -13,7 +13,8 @@ Flow (pseudocode):
 3. Emit JSON measurements without asserting timed convergence or speedups.
 
 Important criteria:
-- N algorithms on W workers receive at most budget/ceil(N/W) each, not full budgets.
+- Workers divide remaining common-deadline time among their own remaining searches.
+- Historical references used fixed longest-group slices, not this allocation policy.
 - RSS sums count shared pages multiple times; sampling is not an exact high-water mark.
 - Procfs memory measurements are unavailable on non-Linux hosts.
 

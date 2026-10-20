@@ -10,10 +10,11 @@ Technical approach:
 Flow (pseudocode):
 1. Assign a five-algorithm portfolio to one, two or dedicated workers.
 2. Check first-candidate streams, result accounting and child cleanup.
-3. Simulate overrun and startup delay without timing-sensitive assertions.
+3. Simulate early completion, shorter groups, overruns and exhausted deadlines.
 
 Important criteria:
-- Queued searches never receive a fresh full portfolio budget.
+- Queued search deadlines never extend the original common deadline.
+- Time left at dispatch is shared among the same worker's remaining searches.
 - Constructor RNG consumption must survive preparing several algorithms.
 
 Inputs/Outputs:
@@ -249,19 +250,28 @@ def test_direct_process_dispatch_resolves_cpu_default(
 
 
 @pytest.mark.parametrize(
-    "overrun, duration, expected_slices",
+    "group_size, overrun, duration, first_fraction, expected_slices",
     [
-        (0.0, 12.0, [4.0, 4.0, 4.0]),
-        (1.0, 12.0, [4.0, 4.0, 2.0]),
-        (7.0, 12.0, [4.0, 1.0]),
-        (0.0, 0.0, []),
+        (3, 0.0, 12.0, 1.0, [4.0, 4.0, 4.0]),
+        (3, 1.0, 12.0, 1.0, [4.0, 3.5, 2.5]),
+        (3, 7.0, 12.0, 1.0, [4.0, 0.5]),
+        (3, 0.0, 0.0, 1.0, []),
+        (3, 0.0, 1e-15, 1.0, []),
+        (3, 0.0, 6.0, 1.0, [2.0, 2.0, 2.0]),
+        (3, 0.0, 12.0, 0.0, [4.0, 6.0, 6.0]),
+        (3, 0.0, 12.0, 0.25, [4.0, 5.5, 5.5]),
+        (2, 0.0, 12.0, 1.0, [6.0, 6.0]),
+        (2, 0.0, 12.0, 0.0, [6.0, 12.0]),
+        (1, 0.0, 12.0, 1.0, [12.0]),
     ],
 )
 @pytest.mark.parametrize("collect_metadata", [False, True])
 def test_worker_preserves_deadline_and_constructor_rng(
     monkeypatch: pytest.MonkeyPatch,
+    group_size: int,
     overrun: float,
     duration: float,
+    first_fraction: float,
     expected_slices: list[float],
     collect_metadata: bool,
 ) -> None:
@@ -269,12 +279,14 @@ def test_worker_preserves_deadline_and_constructor_rng(
 
     Args:
         monkeypatch (pytest.MonkeyPatch): Replace construction, session and clock.
+        group_size (int): Searches assigned to this worker, including shorter groups.
         overrun (float): Simulated callback overrun after each nominal slice.
         duration (float): Remaining common budget, zero simulates late startup.
+        first_fraction (float): Fraction of the first allocation consumed before returning.
         expected_slices (list[float]): Durations available to searches actually started.
         collect_metadata (bool): Exercise both compatible and enriched pipe messages.
     """
-    assignments = (("MultiStart", 11), ("SA", 22), ("PSO", 33))
+    assignments = (("MultiStart", 11), ("SA", 22), ("PSO", 33))[:group_size]
     clock = [100.0]
     calls: list[float] = []
     constructed: list[str] = []
@@ -371,7 +383,7 @@ def test_worker_preserves_deadline_and_constructor_rng(
             assert deadline <= 100.0 + duration
             assert deadline == pytest.approx(clock[0] + limit_time)
             calls.append(limit_time)
-            clock[0] += limit_time + overrun
+            clock[0] += limit_time * (first_fraction if len(calls) == 1 else 1.0) + overrun
             return [], [seed / 100], 0.25 if seed >= 22 else 1.0
 
     python_state, numpy_state = random.getstate(), np.random.get_state()
@@ -390,7 +402,6 @@ def test_worker_preserves_deadline_and_constructor_rng(
             float,
             1,
             None,
-            4.0,
             start,
             SimpleNamespace(value=100.0 + duration),
             child,
@@ -408,11 +419,15 @@ def test_worker_preserves_deadline_and_constructor_rng(
             assert sum(report.n_evaluations for report in payload) == 2 * len(expected_slices)
             assert all(report.stop_reason == "not_started" for report in payload[len(calls) :])
             assert all(report.elapsed_seconds == 0 for report in payload[len(calls) :])
+            assert all(report.time_limit == 0 for report in payload[len(calls) :])
+            assert [report.time_limit for report in payload[: len(calls)]] == pytest.approx(
+                expected_slices
+            )
             status, payload = parent.recv()
         assert calls == pytest.approx(expected_slices)
         if expected_slices:
             assert status == "result", payload
-            assert payload == ([], [0.22], 0.25)
+            assert payload == (([], [0.22], 0.25) if len(calls) > 1 else ([], [0.11], 1.0))
         else:
             assert status == "error"
             assert isinstance(payload[0], TimeoutError)

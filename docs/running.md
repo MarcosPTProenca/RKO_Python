@@ -23,10 +23,14 @@ The packaged default selects ten algorithms. Without `--n-jobs`, process mode
 uses at most the smaller of portfolio size and `os.process_cpu_count()` usable
 logical CPUs (one if discovery is unavailable). `--n-jobs 4` explicitly requests
 up to four search workers plus the pool manager, even if fewer CPUs are available. Assignments are round-robin; each worker executes
-its group sequentially, with every search capped at `limit_time / ceil(N / W)`
-seconds and the original common deadline. Ten algorithms on four workers therefore
-receive at most one third of the search budget each. Startup remains additional.
-Workers with shorter groups may finish early; unused time is not redistributed.
+its group sequentially. At each dispatch its remaining common-deadline time is
+shared equally among that worker's remaining searches. Ten algorithms on four
+workers form groups of 3, 3, 2 and 2: initial shares are approximately one third
+or one half of the budget, rather than the previous fixed one-third cap for all.
+Early returns leave more time for the same worker's queued searches; no search
+receives a new portfolio deadline. Startup remains additional. There is no
+cross-worker stealing or restart of completed searches; if a worker's final search
+finishes early, its remaining time is still unused.
 Callback overruns can consume later searches' slices. This changes timed search
 trajectories and cooperation, not the configured algorithm selection or seed
 assignment. Native-library threads are not capped by `--n-jobs`, and concurrent

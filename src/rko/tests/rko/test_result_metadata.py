@@ -149,11 +149,13 @@ def test_metadata_counts_all_searches(
     assert bool(pso.parameter_grid) == bool(control)
     for report in result.searches:
         assert report.elapsed_seconds >= 0
-        assert 0 < report.time_limit <= result.time_limit
+        assert 0 <= report.time_limit <= result.time_limit
         if report.stop_reason == "not_started":
+            assert report.time_limit == 0
             assert report.n_evaluations == 0
             assert report.elapsed_seconds == 0
         else:
+            assert report.time_limit > 0
             assert report.n_evaluations >= 1
             assert report.stop_reason in ("completed", "time_limit")
 

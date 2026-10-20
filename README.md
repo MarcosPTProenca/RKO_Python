@@ -53,10 +53,13 @@ and also accepts `verbose=True`.
   unavailable discovery falls back to one. A positive `n_jobs` overrides this
   automatic cap, even above available CPUs, without dropping algorithms:
   assignments are round-robin and each worker runs its
-  assigned searches sequentially. With N algorithms and W workers, each search
-  gets at most `time_limit / ceil(N / W)` seconds, all within one common deadline.
-  For example, ten algorithms with `n_jobs=4` use four search workers, three
-  slices and one manager—not ten workers or ten fresh full-duration searches.
+  assigned searches sequentially. Before each search, that worker divides the
+  time left before the common deadline by its number of remaining searches.
+  For example, ten algorithms with `n_jobs=4` form groups of 3, 3, 2 and 2;
+  their initial shares are approximately one third or one half of the budget.
+  Early completion leaves more time for queued searches in the same worker;
+  no search extends the original deadline. This replaces the previous fixed
+  longest-group slice; shorter groups no longer deliberately finish early.
   Smaller limits change cooperation and per-algorithm budgets; they are not a
   promise of better optimization quality. Active callbacks can overrun a slice
   and leave later searches less time or no time. Algorithms sharing a worker
@@ -198,7 +201,9 @@ unchanged.
 
 Search reasons are `completed` (returned before its deadline, **not** a convergence
 claim), `time_limit` (deadline stopping or deadline elapsed by return), `cancelled`
-(peer-failure signal), and `not_started` (queued search had no remaining budget).
+(peer-failure signal), and `not_started` (queued search had no remaining budget;
+its assigned `time_limit` is zero). Process search limits are actual allocations
+computed at dispatch, not equal fixed fractions or the requested portfolio budget.
 The portfolio reason is `time_limit` if any search used its budget or could not
 start; detailed reports preserve the distinction. Unstarted entries retain their
 nominal slice but have zero evaluations and zero elapsed search time. Cancelled peers normally belong

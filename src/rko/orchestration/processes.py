@@ -6,7 +6,7 @@ Objective:
 Technical approach:
 - Host SolutionPool in a manager and exchange control/results through pipes.
 - Construct searches in bounded worker groups and release ready workers together.
-- Divide the common budget into equal per-search slices when algorithms share workers.
+- Divide each worker's remaining common time among its queued searches at dispatch.
 
 Flow (pseudocode):
 1. Validate serialization and start the managed pool and workers.
@@ -14,7 +14,8 @@ Flow (pseudocode):
 3. Collect results or propagate failures, then close all child resources.
 
 Important criteria:
-- No queued search may receive a fresh full-duration budget.
+- Every allocation ends no later than the original common deadline.
+- Early completion leaves more time for queued searches in the same worker.
 - Startup is bounded to 60 seconds; search overrun grace is five seconds.
 - Arbitrary callbacks cannot be interrupted cooperatively.
 
@@ -165,7 +166,6 @@ def _worker(
     cost: CostFn,
     dimension: int,
     params_dir: Path | None,
-    slice_seconds: float,
     start: Event,
     deadline: Synchronized,
     connection: Connection,
@@ -182,7 +182,6 @@ def _worker(
         cost (CostFn): Pickleable objective callback.
         dimension (int): Number of random keys.
         params_dir (Path | None): Optional parameter directory.
-        slice_seconds (float): Maximum seconds per assigned search.
         start (Event): Parent-controlled simultaneous release.
         deadline (Synchronized): Common monotonic search deadline.
         connection (Connection): Dedicated result/control pipe.
@@ -212,15 +211,20 @@ def _worker(
         reports: list[SearchMetadata] = []
         for index, (mh, streams) in enumerate(prepared):
             name = mh.name
-            search_deadline = min(deadline.value, time.perf_counter() + slice_seconds)
-            remaining = search_deadline - time.perf_counter()
+            now = time.perf_counter()
+            common_deadline = deadline.value
+            search_deadline = min(
+                common_deadline,
+                now + (common_deadline - now) / (len(prepared) - index),
+            )
+            remaining = search_deadline - now
             if remaining <= 0:
                 if collect_metadata:
                     reports.extend(
                         replace(
                             queued._search_metadata or SearchMetadata(algorithm=queued.name),
                             random_state=queued_streams.seed,
-                            time_limit=slice_seconds,
+                            time_limit=0.0,
                         )
                         for queued, queued_streams in prepared[index:]
                     )
@@ -315,7 +319,6 @@ def run_processes(
         max(1, os.process_cpu_count() or 1) if n_jobs is None else n_jobs, len(names)
     )
     groups = [assignments[index::worker_count] for index in range(worker_count)]
-    slice_seconds = limit_time / max(len(group) for group in groups)
     with PoolManager(ctx=context) as manager:
         pool = manager.SolutionPool(config.pool_size, verbose=verbose, started_at=started_at)
         start = context.Event()
@@ -343,7 +346,6 @@ def run_processes(
                         cost,
                         dimension,
                         params_dir,
-                        slice_seconds,
                         start,
                         deadline,
                         child,

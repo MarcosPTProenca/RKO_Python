@@ -50,9 +50,10 @@ changed. See [WSL setup guidance](../docs/running.md#wsl-startup-and-virtual-env
 ## Bounded process-worker resources
 
 A positive `n_jobs` now keeps the complete selected portfolio while limiting
-search processes. Assignments are round-robin; each gets a nominal slice of
-`time_limit / ceil(N / W)`, bounded by the original common deadline. No extra
-full-duration budgets are granted to queued searches. `n_jobs=None` now defaults to
+search processes. Assignments are round-robin. At dispatch, a worker divides its
+remaining common-deadline time among its remaining searches. Shorter groups can
+use their entire budget; early completion benefits searches queued in that worker.
+No new deadline, cross-worker work stealing or restart of finished searches is added. `n_jobs=None` now defaults to
 process-usable logical CPUs, capped by portfolio size (one if discovery is unavailable).
 Explicit positive limits override CPU discovery. One additional process hosts the pool;
 BLAS/OpenMP threads are outside the search-worker limit.
@@ -64,7 +65,8 @@ uv run --locked python benchmarks/process_budget.py > /tmp/rko-process-budget.js
 The updated script compares automatic defaults against an explicit full-portfolio
 worker limit and verifies every seeded initial candidate, worker count and result.
 An identified [automatic-default reference](process-auto-reference.jsonl),
-2026-10-20, uses the same Linux-local editable source/dependency environment for
+2026-10-20, **predates remaining-time scheduling** and retains fixed longest-group
+slices. It uses the same Linux-local editable source/dependency environment for
 both variants: four available CPUs, CPython 3.14.8 / NumPy 2.4.3, ten algorithms,
 offline control, 128 keys and a one-second common budget. Three seeds per neutral
 adapter, with alternating trial order, gave these medians:
@@ -111,17 +113,62 @@ all six final limited/dedicated trial pairs used less RSS and elapsed time with
 four workers, but do not treat these times as portable startup guarantees.
 
 **These are different budget allocations**, not equal-work speedups. Ten searches
-on four workers receive at most a nominal one-third slice each, and shorter
-groups finish early without redistributing idle time. First-decode latency is an
+on four workers in these HISTORICAL references received at most a nominal one-third
+slice each, and shorter groups finished early without redistributing idle time. First-decode latency is an
 observable startup bound, not pure import time. Neither long-budget performance
 nor better optimization quality is established. Active callback overruns can leave
-queued algorithms less time or no time. Native thread limits and adaptive load
-balancing are still separate work.
+queued algorithms less time or no time. Native thread policy and cross-worker load
+balancing remain separate work; local remaining-time allocation is measured below.
 
 An exploratory versioned elite-snapshot cache made repeated unchanged large
 snapshot queries faster, but corrected full-search trials did not demonstrate a
 reliable general benefit and small cases sometimes regressed. It was discarded;
 no cache or additional retained worker snapshots were shipped.
+
+## Remaining-time worker scheduling
+
+```bash
+uv run --locked python benchmarks/scheduling.py --baseline-source /absolute/path/to/trusted-baseline/src
+```
+
+Use an archived **ff70a92** checkout as the baseline. This executes trusted local
+source in fresh interpreters; do not point it at untrusted downloaded Python.
+Place both source trees on the same filesystem and use one interpreter/dependency
+environment. The runner verifies the actual imported source paths and copies the
+same one-thread native launch settings into both policies without mutating itself.
+
+[Identified reference](worker-scheduling-reference.jsonl): four usable CPUs,
+CPython 3.14.8 / NumPy 2.4.3, Linux-local sources/dependencies, offline parameters,
+64 keys, 1.2-second common budgets. Two balanced-order repeats over three seeds,
+sphere/ordering objectives and three portfolios produced **72 real spawned solves**.
+All algorithm seeds, initial keys, worker counts and independent result costs passed;
+none reported `not_started`. No full-trajectory equivalence is implied.
+
+| Portfolio / workers | Median unused session time, fixed | Remaining-time policy |
+| --- | ---: | ---: |
+| Four searches / two workers, sphere | 0.0017 s | 0.0017 s |
+| Five searches / two workers, sphere | 0.4015 s | 0.0021 s |
+| Five searches / two workers, ordering | 0.4003 s | 0.0018 s |
+| Default ten / four workers, sphere | 0.7972 s | 0.0024 s |
+| Default ten / four workers, ordering | 0.7989 s | 0.0061 s |
+
+Unused time is summed per worker as max(0, budget minus its search-session wall
+seconds). The ten-search cases have 4.8 worker-seconds available. Sessions include
+waiting and callback overruns; this is **not a CPU-utilization measurement**.
+Dispatch/collection overhead is outside session timing. Dedicated and balanced
+workers do not inherently gain extra time from this policy.
+
+The measured benefit is reclaiming a known idle tail in uneven groups, not lower
+end-to-end latency or universal evaluation throughput. Paired evaluation ratios
+(current/fixed) ranged **0.918–1.063** across the six case/workload medians. Costs
+were mixed: uneven ordering's median was 43707 versus 43719 (known minimum 43680),
+while the default portfolio sphere reached zero under both policies. More allocated
+work is not necessarily better search quality; live elite cooperation and unequal
+algorithm budgets change trajectories. Broader scientific-quality validation remains
+open. Early-return reuse is covered by deterministic worker tests; built-in searches
+generally consume their limit, so these real measurements primarily test shorter groups.
+
+See [allocation contract and migration limits](../docs/process-workers.md).
 
 ## Native-thread launch controls
 

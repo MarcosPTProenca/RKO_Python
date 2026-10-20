@@ -11,13 +11,27 @@ including limits greater than the detected CPU count. Zero, negative, boolean an
 non-integer limits remain invalid. Serial and thread execution are unchanged.
 
 Every selected algorithm remains assigned in portfolio order, round-robin across
-workers. Existing common-deadline semantics remain: each search gets at most
-`time_limit / ceil(number_of_algorithms / number_of_workers)` seconds. Unused slices
-are not redistributed. Callbacks can overrun their slice and starve later searches;
-queued algorithms may consequently report `not_started`.
+workers. The original common deadline remains, but the former fixed
+`time_limit / ceil(number_of_algorithms / number_of_workers)` cap is replaced by
+**remaining worker time / remaining worker searches**, recomputed at dispatch.
+Thus groups of three and two start with approximately one third and one half of
+the common budget, respectively. Early completion benefits later searches in the
+same group, and overruns reduce the remaining shares. This prioritizes using each
+worker's budget, not equal time for every algorithm across differently sized groups.
 
-**Changing the default worker count changes timed trajectories and per-algorithm
-budgets.** This is not a promise of equal-work speedups or better solution quality.
+There is no cross-worker work stealing, search resumption/restart, or new deadline.
+If the last search finishes early, remaining time cannot be reclaimed by a finished
+search. Built-in searches generally run until their assigned limit; shorter groups
+are the measured source of reclaimable time. Callbacks can overrun their share and
+starve later searches; queued algorithms may consequently report `not_started`.
+Their `SearchMetadata.time_limit` is zero because no search allocation was granted;
+started reports retain the actual dispatch-time allocation, excluding queueing.
+These are maxima, not consumed time: after an early return, the sum of reported
+limits may exceed the worker's total budget even though its actual elapsed searches
+remain within the common deadline. Use `elapsed_seconds` to account for time spent.
+
+**Changing worker counts or the allocation policy changes timed trajectories,
+cooperation and per-algorithm budgets.** This is not a promise of equal-work speedups or better solution quality.
 Sequential algorithms in a worker share callback instances without resetting
 mutable state; with one worker, place elite-dependent IPR after pool-populating
 searches. Owned library RNG seeds remain assigned by portfolio position, not by
@@ -34,7 +48,21 @@ optimizer = RKO(decoder, objective, dimension, algorithms=algorithms,
 ```
 
 For the current shipped ten-algorithm CLI portfolio, use `--n-jobs 10`.
-No `-1`/`all` sentinel or new CLI flag is introduced.
+A one-search worker still receives the time left until the common deadline.
+No legacy fixed-slice switch, `-1`/`all` sentinel or new CLI flag is introduced.
+Serial and thread scheduling are unchanged.
+
+## Scheduling measurements
+
+The [remaining-time reference](../benchmarks/README.md#remaining-time-worker-scheduling)
+compares the previous policy with the new one under the same search budget and
+worker counts. For ten searches/four workers, median unused worker-session time
+fell from about 0.80 seconds to 0.002–0.006 seconds out of 4.8 available worker-seconds.
+This is search-session wall-time accounting, **not CPU utilization or a general
+speed/quality improvement**. Evaluation counts and costs were mixed across neutral
+problems; do not reinterpret prior worker-count references as equal-work gains.
+Formerly shorter groups now stay alive longer within the allowed budget; this is
+not a measured reduction in CPU consumption, energy or resident-memory lifetime.
 
 ## Resource accounting
 

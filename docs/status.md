@@ -28,13 +28,17 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   affinity-aware usable logical CPUs (one if unavailable); explicit positive caps
   still override discovery. Every selected algorithm remains assigned. CPU capacity
   is recorded once per solve for immutable result accounting. Round-robin groups
-  keep equal nominal slices under the common deadline; unused time is not
-  redistributed, and callbacks may exhaust later slices. Native threads,
+  now divide remaining common time among their own remaining searches, reclaiming
+  the former fixed-cap idle tail in shorter groups. Early completion benefits queued
+  searches in that worker; callbacks may still exhaust later shares. Native threads,
   concurrent solver instances and container quotas not reflected by discovery can
   still oversubscribe hardware. [Native-thread launch guidance](native-threads.md)
   now has verified spawned-worker limits and a controlled dense-callback reference;
   RKO does not silently reconfigure native pools. Automatic native-thread policies,
-  adaptive load balancing and broader RSS/IPC profiles remain open. A controlled Linux comparison across 36
+  cross-worker load balancing and broader RSS/IPC profiles remain open. A controlled
+  72-solve scheduling comparison reduced unused session time but showed mixed
+  evaluation counts/costs; it does not establish a general speed or quality gain.
+  A prior controlled Linux worker-count comparison across 36
   solves verified all seeded initial candidates; the identified reference measured
   sampled summed RSS around 287 versus 560 MiB for four automatic versus ten
   dedicated workers. This is not unique physical memory, fixed-work throughput or

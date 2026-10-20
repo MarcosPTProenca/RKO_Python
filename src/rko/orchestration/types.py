@@ -52,7 +52,7 @@ class SearchMetadata:
         random_state (int | None): Actual assigned generator seed when known.
         n_evaluations (int): Successfully completed finite objective evaluations.
         stop_reason (str): Completed, time_limit, cancelled, or not_started.
-        time_limit (float): Assigned search seconds, excluding startup.
+        time_limit (float): Assigned search seconds excluding startup; zero if not started.
         elapsed_seconds (float): Search/session duration, excluding startup and queueing.
     """
 
