@@ -89,6 +89,8 @@ def main() -> None:
         for algorithm, dimension, control in (
             ("MultiStart", 3, 0),
             ("IPR", 64, 0),
+            ("SA", 64, 0),
+            ("SA", 64, 1),
             ("PSO", 64, 0),
             ("PSO", 64, 1),
         ):
@@ -125,7 +127,7 @@ def main() -> None:
             assert dict(result.versions)["numpy"] == np.__version__
             if algorithm == "PSO" and control == 0:
                 assert dict(report.parameters)["p_size"] == 4
-            assert bool(report.parameter_grid) == (algorithm == "PSO" and control == 1)
+            assert bool(report.parameter_grid) == (algorithm in ("SA", "PSO") and control == 1)
             assert pickle.loads(pickle.dumps(result)) == result
     automatic = RKO(
         decode,

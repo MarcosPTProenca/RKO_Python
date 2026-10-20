@@ -1,6 +1,6 @@
 # Parameters for Simulated Annealing (SA).
-# SA does not yet use Q-Learning; [online] values are reserved for a future
-# control mode upgrade.  Edit [offline] values to tune the algorithm.
+# control=0 uses [offline]; control=1 activates the named [online] grid.
+# A selected t0 applies to the next cooling/reannealing schedule.
 
 [offline]
 sa_max   = 1000        # neighbourhood evaluations per temperature level

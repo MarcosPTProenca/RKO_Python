@@ -633,7 +633,10 @@ native-code parity.
 streams against a **trusted pre-isolation source package** loaded under a separate
 namespace. It warms each case, balances execution order over two repeats and
 three seeds, and checks 1,000 evaluations at 64 keys for all eleven algorithms,
-with adaptive control where supported. Costs, keys, final elites and both final
+with adaptive control where supported by BOTH constructors. SA now has an adaptive
+path absent from the historical pre-isolation baseline; such cases are explicitly
+reported as `not_comparable`, never silently labeled as equivalent online runs.
+Offline SA remains comparable. Costs, keys, final elites and both final
 RNG states must match exactly. Adaptive policy clocks are frozen, not real timed
 cooperation. The reference package executes Python code and must be trusted.
 

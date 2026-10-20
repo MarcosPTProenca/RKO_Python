@@ -55,7 +55,13 @@ def replay_type(algorithm: type, control: int) -> type:
 
     Returns:
         type: Compatible search constructor with a frozen policy clock.
+
+    Raises:
+        ValueError: If adaptive control is requested from an offline-only baseline.
     """
+    supports_control = "control" in inspect.signature(algorithm).parameters
+    if control == 1 and not supports_control:
+        raise ValueError("Reference constructor does not implement adaptive control.")
 
     class Replay(algorithm):
         """Use real search operations with deterministic policy time.
@@ -75,9 +81,7 @@ def replay_type(algorithm: type, control: int) -> type:
                 cost (CostFn): Fixed-work objective.
                 dimension (int): Number of keys.
             """
-            settings = (
-                {"control": control} if "control" in inspect.signature(algorithm).parameters else {}
-            )
+            settings = {"control": control} if supports_control else {}
             super().__init__(pool, decoder, cost, dimension, **settings)
 
         def elapsed(self) -> float:
@@ -147,7 +151,20 @@ def main() -> None:
                 ),
                 current.__name__,
             )
-            for control in (0, 1) if settings.supports_control else (0,):
+            reference_adaptive = "control" in inspect.signature(reference).parameters
+            if settings.supports_control and not reference_adaptive:
+                print(
+                    json.dumps(
+                        {
+                            "algorithm": name,
+                            "control": 1,
+                            "status": "not_comparable",
+                            "reason": "reference constructor has no adaptive control",
+                        }
+                    ),
+                    flush=True,
+                )
+            for control in (0, 1) if settings.supports_control and reference_adaptive else (0,):
                 classes = {
                     "global": replay_type(reference, control),
                     "owned": replay_type(current, control),

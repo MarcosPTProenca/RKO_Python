@@ -25,6 +25,7 @@ MH_SPECS: dict[str, MhSpec] = {
         constructor=SA,
         int_params=("sa_max",),
         float_params=("t0", "alpha", "beta_min", "beta_max"),
+        supports_control=True,
     ),
     "MultiStart": MhSpec(constructor=MultiStart),
     "ILS": MhSpec(
