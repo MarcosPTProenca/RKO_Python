@@ -33,8 +33,9 @@ remain within the common deadline. Use `elapsed_seconds` to account for time spe
 **Changing worker counts or the allocation policy changes timed trajectories,
 cooperation and per-algorithm budgets.** This is not a promise of equal-work speedups or better solution quality.
 Sequential algorithms in a worker share callback instances without resetting
-mutable state; with one worker, place elite-dependent IPR after pool-populating
-searches. Owned library RNG seeds remain assigned by portfolio position, not by
+mutable state. IPR now seeds a missing elite pair within its own allocation, so it
+need not wait for a producer queued behind it. A pool must still retain at least
+two entries for actual relinking; initialization does not repair domain constraints. Owned library RNG seeds remain assigned by portfolio position, not by
 worker count, but timed/cooperative final results need not match.
 
 ## Preserve dedicated workers

@@ -86,7 +86,12 @@ def main() -> None:
     assert [state.Ai for state in controller.states] == [[0, 1, 2], [0, 1], [0, 2]]
     global_rng = pickle.dumps((random.getstate(), np.random.get_state()))
     for backend in ("serial", "thread", "process"):
-        for algorithm, dimension, control in (("MultiStart", 3, 0), ("PSO", 64, 0), ("PSO", 64, 1)):
+        for algorithm, dimension, control in (
+            ("MultiStart", 3, 0),
+            ("IPR", 64, 0),
+            ("PSO", 64, 0),
+            ("PSO", 64, 1),
+        ):
             result = RKO(
                 decode,
                 objective,
