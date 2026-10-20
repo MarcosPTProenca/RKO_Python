@@ -39,7 +39,10 @@ or starting workers. Each solve builds a fresh portfolio and returns an immutabl
 before every attempt, including failed solves.
 
 Select `algorithms`, `control` and `pool_size` directly in Python; omitted values
-use the packaged TOML defaults. With `control=0`, `hyperparameters` supplies partial
+use the packaged TOML defaults. SA now implements its requested online control
+rather than falling back to offline parameters; use `control=0` for its legacy
+fixed-parameter path. See [adaptive SA and migration](docs/sa-control.md).
+With `control=0`, `hyperparameters` supplies partial
 per-algorithm scalar overrides without editing files. `params_dir` remains
 available for custom defaults and adaptive grids. Library calls are quiet by default; `verbose=True` on `RKO` prints lifecycle
 and attributed shared-pool improvements. `rko.run(...)` retains the old tuple API

@@ -62,9 +62,40 @@ locally in IPR. Global initialization, random engines, block-path transitions an
 throughput still require separate matched comparisons. Random seeds are not generic
 feasibility repairs; no C++-matching quality claim follows from this correction.
 
+## SA adaptive and GRASP construction audit
+
+SA now implements online actions rather than silently falling back to fixed
+settings. [The SA control contract](sa-control.md) describes actual parameter
+application and migration to `control=0` for the legacy path. Python uses the
+sampled initial Q state, credits completed levels including refinement with the
+shared sign-safe reward, and applies selected t0 to the next schedule. C++ leaves
+its initial Q source at zero and never applies later t0 selections. These are
+explicit corrections, not claims of identical trajectories or scientific quality.
+Python's legacy refinement/current-incumbent transition is retained; full SA
+transition parity remains unproven.
+
+The read-only GRASP audit identified these differences, **not corrected yet**:
+
+| Contract | Pinned C++ | Current Python |
+| --- | --- | --- |
+| Line candidate universe | Bounded lattice around the gene, then randomized subset | Nearby plus/minus shifts up to a logarithmic radius |
+| Candidate evaluation count | At most `ceil(log2(int(1/h)))+1` sampled lattice values | Current value plus both signs of each logarithmic shift when valid |
+| Small unfixed sets | Search every remaining coordinate when the 10% subset is below two | Search at most two |
+| Construction intensity | Integer loop against a real bound (effectively ceiling) | Truncated integer count |
+| Improving fine-grid step | Keep the current h | Reset h to hs |
+| Initial refinement | Score the initial vector before construction | Apply initial RVND |
+| Alpha parameter | Read/selected but unused by construction | Adaptive axis selected but unused by construction |
+
+A dense-step line search can therefore miss candidates available to C++ while
+making more callback evaluations. This is a contract finding, not evidence that
+all reference choices should replace Python's behavior. Isolate candidate-coverage
+correction from alpha policy, initialization and refinement changes, and validate
+without editing or competing with the ongoing paired benchmark.
+
 ## Still to resolve
 
-- SA's C++ online-control path and GRASP's reference candidate grid/unused alpha.
+- GRASP candidate-coverage/subset semantics and an explicit unused-alpha decision.
+- Full SA/GRASP transition and refinement comparisons beyond adaptive plumbing.
 - Full per-algorithm initialization, transition, restart and stopping contracts.
 - Full-driver population initialization and comparable timing/work accounting;
   owned search RNGs and CPU-bounded remaining-time process scheduling are implemented.
