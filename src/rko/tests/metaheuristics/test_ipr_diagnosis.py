@@ -109,17 +109,103 @@ def test_distinct_control_keeps_different_tied_vectors(diagnosis: ModuleType) ->
 
 
 def test_single_differing_block_has_only_two_unique_vectors(diagnosis: ModuleType) -> None:
-    """Reproduce actual redundant work, not merely an analytical callback estimate.
+    """Check the actual pruned kernel, not merely an analytical callback estimate.
 
     Args:
         diagnosis (ModuleType): Probe implementation.
     """
     row = diagnosis.single_block_path()
-    assert row["evaluations"] == 55
+    assert row["evaluations"] == 2
     assert row["unique_vectors"] == 2
-    assert row["start_evaluations"] == 10
-    assert row["guide_evaluations"] == 45
+    assert row["start_evaluations"] == 1
+    assert row["guide_evaluations"] == 1
     assert row["returned_guide"]
+
+
+def test_pruned_path_stops_at_next_changed_callback(diagnosis: ModuleType) -> None:
+    """Preserve the callback deadline boundary after virtual no-op decisions.
+
+    Args:
+        diagnosis (ModuleType): Production session and algorithm definitions.
+    """
+
+    def score(keys: np.ndarray) -> float:
+        """Expire after the first finite result without allowing another objective call.
+
+        Args:
+            keys (np.ndarray): Initial observed chromosome.
+
+        Returns:
+            float: Squared norm.
+        """
+        session.deadline = -1.0
+        return float(np.dot(keys, keys))
+
+    session = diagnosis.SearchSession(lambda keys: keys, score)
+    algorithm = diagnosis.IPR(diagnosis.SolutionPool(), session.decode, session.evaluate, 20)
+    start = np.full(20, 0.8)
+    guide = start.copy()
+    guide[-2:] = 0.2
+    with pytest.raises(diagnosis._BudgetExpired):
+        algorithm._relink(start, guide)
+    assert session.n_evaluations == 1 and session.best is not None
+    assert np.array_equal(session.best[0], start)
+    assert np.array_equal(start, np.full(20, 0.8))
+
+
+def test_unpruned_ipr_is_not_an_rng_only_baseline(diagnosis: ModuleType) -> None:
+    """Classify intentional callback-budget changes separately from RNG isolation.
+
+    Args:
+        diagnosis (ModuleType): Current production constructor.
+    """
+
+    class Unpruned:
+        """Represent an old constructor without the pruned-path compatibility token.
+
+        Responsibilities:
+        - Supply historical diagnostic identity, not an executable solver.
+        """
+
+    replay = importlib.import_module("random_streams")
+    assert replay.replay_modes(diagnosis.IPR, Unpruned) == ()
+    assert replay.replay_modes(diagnosis.IPR, diagnosis.IPR) == (0,)
+
+
+def test_scalar_copy_control_uses_same_pruned_policy(diagnosis: ModuleType) -> None:
+    """Keep copy-kernel comparisons separate from changes to evaluated candidates.
+
+    Args:
+        diagnosis (ModuleType): Probe module with the production algorithm.
+    """
+    scalar = importlib.import_module("ipr").ScalarIPR
+    traces: list[list[bytes]] = []
+    results = []
+    start = np.full(20, 0.8)
+    guide = start.copy()
+    guide[:2] = 0.2
+    for constructor in (diagnosis.IPR, scalar):
+        trace: list[bytes] = []
+
+        def score(keys: np.ndarray, captured: list[bytes] = trace) -> float:
+            """Capture callback representations while evaluating a deterministic norm.
+
+            Args:
+                keys (np.ndarray): Actual copy-kernel candidate.
+                captured (list[bytes]): Snapshot list bound to this copy-kernel run.
+
+            Returns:
+                float: Squared norm.
+            """
+            captured.append(keys.tobytes())
+            return float(np.dot(keys, keys))
+
+        algorithm = constructor(diagnosis.SolutionPool(), lambda keys: keys, score, 20)
+        keys, cost = algorithm._relink(start, guide)
+        results.append((keys.tobytes(), cost))
+        traces.append(trace)
+    assert results[0] == results[1]
+    assert traces[0] == traces[1] and len(traces[0]) == 2
 
 
 def test_probe_detects_stalled_callback_progress(

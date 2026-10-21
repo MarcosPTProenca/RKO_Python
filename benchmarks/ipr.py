@@ -4,7 +4,8 @@ Objective:
 - Measure full-search effects of moving sufficiently large blocks through NumPy.
 
 Technical approach:
-- Swap only relinking on the same IPR class to avoid subclass-dispatch timing bias.
+- Swap only block-copy kernels under the CURRENT no-op-pruned callback policy.
+- Use the same IPR class to avoid subclass-dispatch timing bias.
 - Seed elites with each workload's real objective through the fixed-work runner.
 - Warm both variants, alternate order and compare results, pools and RNG states.
 
@@ -38,10 +39,10 @@ from typing import override
 
 
 class ScalarIPR(IPR):
-    """Retain the original relinking method as an executable timing reference.
+    """Retain per-gene copying under current path/callback policy for kernel comparison.
 
     Responsibilities:
-    - Replay the former candidate construction and per-gene guide copying.
+    - Share current no-op pruning and virtual steps, varying only guide assignment.
     - Share all other production search and callback behavior.
 
     Attributes:
@@ -66,6 +67,7 @@ class ScalarIPR(IPR):
         s_current = atual_keys.copy()
         best_path_keys = s_current.copy()
         best_path_cost: float = self.cost(self.decoder(s_current))
+        current_cost = best_path_cost
         for _ in range(max(1, num_blocks - 1)):
             best_iter_cost = math.inf
             best_iter_keys: np.ndarray | None = None
@@ -73,12 +75,19 @@ class ScalarIPR(IPR):
             for b in range(num_blocks):
                 if fixed_block[b]:
                     continue
-                s_viz = s_current.copy()
                 start = b * block_size
                 end = min((b + 1) * block_size, n)
-                for k in range(start, end):
-                    s_viz[k] = guia_keys[k]
-                viz_cost = self.cost(self.decoder(s_viz))
+                if (
+                    s_current.dtype == guia_keys.dtype
+                    and s_current[start:end].tobytes() == guia_keys[start:end].tobytes()
+                ):
+                    s_viz = s_current
+                    viz_cost = current_cost
+                else:
+                    s_viz = s_current.copy()
+                    for k in range(start, end):
+                        s_viz[k] = guia_keys[k]
+                    viz_cost = self.cost(self.decoder(s_viz))
                 if viz_cost < best_iter_cost:
                     best_iter_cost = viz_cost
                     best_iter_keys = s_viz.copy()
@@ -88,6 +97,7 @@ class ScalarIPR(IPR):
                 best_path_keys = best_iter_keys.copy()
             if best_block >= 0 and best_iter_keys is not None:
                 s_current = best_iter_keys.copy()
+                current_cost = best_iter_cost
                 fixed_block[best_block] = True
         return best_path_keys, best_path_cost
 

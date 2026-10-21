@@ -29,7 +29,9 @@ Flow (pseudocode):
 
 Important criteria:
 - Block size is at least 1 gene; include any partial final block.
-- For multiple blocks, take num_blocks-1 steps; shared blocks can reach the full guide earlier.
+- For multiple blocks, keep num_blocks-1 virtual steps; shared blocks can reach the guide earlier.
+- Representation-identical moves reuse the known current cost, not a callback.
+- Pure deterministic path results/ties are retained; stochastic/stateful callback counts change.
 - A one-block chromosome evaluates the guide rather than an empty block.
 - Identical effective parents from custom pools use bounded backoff, not relinking.
 - Initialization uses the existing callbacks and search deadline, with at most two seed evaluations.
@@ -71,7 +73,10 @@ class IPR(MetaheuristicBase):
       decoder (Callable[[np.ndarray], Any]): Solution decoding function.
       cost (Callable[[Any], float]): Objective function over decoded solutions.
       tam_solution (int): Length of the random-key vector.
+      _replay_contract (str): Diagnostic full-search compatibility token, not an option.
     """
+
+    _replay_contract: str = "ipr-unchanged-block-pruning-v1"
 
     def __init__(
         self,
@@ -108,14 +113,23 @@ class IPR(MetaheuristicBase):
         atual_keys: np.ndarray,
         guia_keys: np.ndarray,
     ) -> tuple[np.ndarray, float]:
-        """Perform block-by-block path relinking from atual toward guia.
+        """Relink with original virtual steps, omitting representation-identical evaluations.
+
+        A no-op candidate uses the last completed current cost but still participates
+        in first-tied selection and consumes its original virtual step. Changed
+        candidates remain ordinary callback evaluations. Deterministic pure scoring
+        retains the original path/minimum; stateful or stochastic callbacks receive
+        fewer evaluations, so their trajectories can change.
 
         Args:
-          atual_keys: Starting solution chromosome.
-          guia_keys: Guide solution chromosome.
+          atual_keys (np.ndarray): Starting solution chromosome.
+          guia_keys (np.ndarray): Guide solution chromosome.
 
         Returns:
-          Tuple of (best chromosome found along the path, its cost).
+          tuple[np.ndarray, float]: Best chromosome found along the path and its cost.
+
+        Raises:
+          Exception: Propagates decoder/objective errors and cooperative stop signals.
         """
         n = self.tam_solution
         block_size = max(1, int(n * 0.10))
@@ -125,6 +139,7 @@ class IPR(MetaheuristicBase):
         s_current = atual_keys.copy()
         best_path_keys = s_current.copy()
         best_path_cost: float = self.cost(self.decoder(s_current))
+        current_cost = best_path_cost
 
         for _ in range(max(1, num_blocks - 1)):
             best_iter_cost = math.inf
@@ -134,14 +149,21 @@ class IPR(MetaheuristicBase):
             for b in range(num_blocks):
                 if fixed_block[b]:
                     continue
-                s_viz = s_current.copy()
                 start = b * block_size
                 end = min((b + 1) * block_size, n)
-                if block_size == 1:
-                    s_viz[start] = guia_keys[start]
+                if (
+                    s_current.dtype == guia_keys.dtype
+                    and s_current[start:end].tobytes() == guia_keys[start:end].tobytes()
+                ):
+                    s_viz = s_current
+                    viz_cost = current_cost
                 else:
-                    s_viz[start:end] = guia_keys[start:end]
-                viz_cost = self.cost(self.decoder(s_viz))
+                    s_viz = s_current.copy()
+                    if block_size == 1:
+                        s_viz[start] = guia_keys[start]
+                    else:
+                        s_viz[start:end] = guia_keys[start:end]
+                    viz_cost = self.cost(self.decoder(s_viz))
                 if viz_cost < best_iter_cost:
                     best_iter_cost = viz_cost
                     best_iter_keys = s_viz.copy()
@@ -153,6 +175,7 @@ class IPR(MetaheuristicBase):
 
             if best_block >= 0 and best_iter_keys is not None:
                 s_current = best_iter_keys.copy()
+                current_cost = best_iter_cost
                 fixed_block[best_block] = True
 
         return best_path_keys, best_path_cost

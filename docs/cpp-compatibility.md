@@ -62,7 +62,10 @@ locally in IPR. A [fixed-work diagnosis](ipr-diagnosis.md) exposed clone collaps
 and redundant block evaluations. Stock Python pools now enforce
 [chromosome uniqueness](elite-diversity.md), retaining different tied-cost vectors;
 IPR skips identical effective parents. C++ update rejects objective duplicates,
-which is a different policy. Unchanged-block pruning remains separate.
+which is a different policy. Python's [unchanged-block pruning](ipr-block-pruning.md)
+reuses known current costs for representation-identical moves while retaining
+virtual path/tie decisions. This intentionally changes callback counts, not an
+assertion of matching C++ evaluation schedules or stochastic trajectories.
 Global initialization, random engines, block-path transitions and
 throughput still require separate matched comparisons. Random seeds are not generic
 feasibility repairs; no C++-matching quality claim follows from this correction.
