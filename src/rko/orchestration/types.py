@@ -68,6 +68,30 @@ class SearchMetadata:
 
 
 @dataclass(frozen=True)
+class PoolInitializationMetadata:
+    """Report shared startup work independently of algorithm search reports.
+
+    Responsibilities:
+    - Account for completed startup evaluations and their owned seed exactly once.
+
+    Attributes:
+        random_state (int): Actual initialization stream seed.
+        n_evaluations (int): Completed finite objective observations.
+        elapsed_seconds (float): Initialization duration, including pool publication.
+        pool_size (int): Admitted distinct chromosomes before searches start.
+        stop_reason (str): Completed or cooperative time limit.
+        time_limit (float): Independent startup allowance, not deducted from searches.
+    """
+
+    random_state: int
+    n_evaluations: int
+    elapsed_seconds: float
+    pool_size: int
+    stop_reason: Literal["completed", "time_limit"]
+    time_limit: float
+
+
+@dataclass(frozen=True)
 class MhSpec:
     """Declarative specification for constructing a metaheuristic."""
 
@@ -79,8 +103,19 @@ class MhSpec:
 
 @dataclass(frozen=True)
 class RunConfig:
-    """Validated execution settings extracted from ``config.toml``."""
+    """Validated execution settings extracted from ``config.toml``.
+
+    Responsibilities:
+    - Carry shared capacity/control and optional startup policy into every backend.
+
+    Attributes:
+        control (int): Offline or adaptive search control.
+        pool_size (int): Shared elite capacity, also startup slot count when opted in.
+        active_metaheuristics (tuple[str, ...]): Canonical selected algorithm names.
+        prefill_pool (bool): Enable a separately accounted reference-style prefix.
+    """
 
     control: int
     pool_size: int
     active_metaheuristics: tuple[str, ...]
+    prefill_pool: bool = False

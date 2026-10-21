@@ -8,6 +8,7 @@ control = 1
 
 # Number of elite solutions retained in the shared pool
 pool_size = 10
+prefill_pool = false
 
 [active_metaheuristics]
 # Algorithms dispatched through the explicitly selected backend.

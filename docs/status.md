@@ -82,10 +82,13 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   retains virtual path decisions for deterministic scoring but changes stochastic
   callback counts. General quality/speed/feasibility gains remain unestablished.
   A [full-driver startup audit](driver-initialization.md) confirms that C++ fills
-  its shared pool before searches whereas Python's capacity starts empty. Their
-  initialization work and budget boundaries differ. Initialization-policy changes,
-  more instance families, seeds, fixed-work measurements and domain-specific
-  validation still require separate evidence.
+  its shared pool before searches whereas Python's capacity starts empty by default.
+  Opt-in `prefill_pool=True` adds a reference-style bounded fill/tie pass with its
+  own startup allowance/report, before fresh search budgets. It uses an existing
+  child in process mode, not an extra worker or parent callback. Defaults, RNG
+  engines and chromosome-unique admission remain distinct from full C++ parity.
+  Default-on policy, quality gains, more instance families/seeds and matched-work
+  comparisons still require separate evidence.
 - **Licensing:** confirm imported-code ownership/terms before release; see
   [NOTICE](../NOTICE). An existing license file does not settle that review.
 

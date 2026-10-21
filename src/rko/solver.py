@@ -36,11 +36,13 @@ from .orchestration.execution import run_metaheuristics_parallel
 from .orchestration.execution import select_best_result
 from .orchestration.factory import build_metaheuristic
 from .orchestration.factory import normalize_hyperparameters
+from .orchestration.initialization import initialize_pool
 from .orchestration.processes import run_processes
 from .orchestration.search import SearchSession
 from .orchestration.types import CostFn
 from .orchestration.types import DecoderFn
 from .orchestration.types import Hyperparameters
+from .orchestration.types import PoolInitializationMetadata
 from .orchestration.types import RunConfig
 from .orchestration.types import SearchMetadata
 from .parameters.loader import load_config
@@ -75,6 +77,7 @@ class RKOResult:
         n_jobs (int | None): Requested process-worker cap.
         versions (tuple): RKO distribution, Python and NumPy runtime versions.
         available_cpus (int | None): Usable logical CPUs snapshotted for process execution.
+        initialization (PoolInitializationMetadata | None): Separate opt-in startup work.
     """
 
     keys: tuple[float, ...]
@@ -91,15 +94,20 @@ class RKOResult:
     n_jobs: int | None = None
     versions: tuple[tuple[str, str], ...] = ()
     available_cpus: int | None = None
+    initialization: PoolInitializationMetadata | None = None
 
     @property
     def n_evaluations(self) -> int | None:
         """Return completed finite objectives, or unknown for legacy manual results.
 
         Returns:
-            int | None: Total across all algorithms, not only the winning worker.
+            int | None: Completed startup plus all searches, or unknown for legacy results.
         """
-        return sum(report.n_evaluations for report in self.searches) if self.searches else None
+        if not self.searches and self.initialization is None:
+            return None
+        return sum(report.n_evaluations for report in self.searches) + (
+            self.initialization.n_evaluations if self.initialization is not None else 0
+        )
 
     @property
     def stop_reason(self) -> str:
@@ -144,6 +152,7 @@ class RKO:
         algorithms (Sequence[str] | None): Selection overriding TOML defaults.
         control (int | None): Offline 0 or online 1; None uses TOML defaults.
         pool_size (int | None): Shared elite capacity; None uses TOML defaults.
+        prefill_pool (bool | None): Opt-in reference-style startup; None uses TOML.
         params_dir (Path | None): Optional parameter directory.
         backend (str): Process, thread or serial execution.
         n_jobs (int | None): Positive process-worker limit, excluding the pool manager.
@@ -162,6 +171,7 @@ class RKO:
         algorithms: Sequence[str] | None = None,
         control: int | None = None,
         pool_size: int | None = None,
+        prefill_pool: bool | None = None,
         params_dir: Path | None = None,
         backend: Literal["process", "thread", "serial"] = "process",
         n_jobs: int | None = None,
@@ -178,6 +188,8 @@ class RKO:
             algorithms (Sequence[str] | None): Portfolio overriding configuration.
             control (int | None): Offline 0 or online 1, or configured default.
             pool_size (int | None): Elite capacity, or configured default.
+            prefill_pool (bool | None): Reference startup override; adds a separately
+                accounted cooperative allowance equal to time_limit before fresh searches.
             params_dir (Path | None): Optional parameter TOML directory.
             backend (Literal): Process, legacy thread or serial execution.
             n_jobs (int | None): Positive worker limit; None uses available logical CPUs.
@@ -194,6 +206,7 @@ class RKO:
         self.algorithms = algorithms
         self.control = control
         self.pool_size = pool_size
+        self.prefill_pool = prefill_pool
         self.params_dir = params_dir
         self.backend = backend
         self.n_jobs = n_jobs
@@ -207,7 +220,8 @@ class RKO:
 
         Args:
             time_limit (float): Positive finite search seconds, excluding startup;
-                serial mode currently gives each algorithm this duration.
+                serial mode currently gives each algorithm this duration. Opt-in
+                shared initialization has a separate equal cooperative allowance.
 
         Returns:
             RKOResult: Best candidate and execution metadata.
@@ -215,7 +229,7 @@ class RKO:
         Raises:
             ValueError: If callbacks, dimensions, settings or serialization are invalid.
             RuntimeError: If an algorithm fails or a process exits unexpectedly.
-            TimeoutError: If process startup/search exceeds its grace period.
+            TimeoutError: If process startup, initialization or search exceeds its grace.
             OSError: If parameter files cannot be read.
         """
         self.result_ = None
@@ -250,7 +264,11 @@ class RKO:
             ):
                 raise ValueError("'algorithms' must be a nonempty sequence of names.")
             raw["active_metaheuristics"] = {"list": list(self.algorithms)}
-        for key, value in (("control", self.control), ("pool_size", self.pool_size)):
+        for key, value in (
+            ("control", self.control),
+            ("pool_size", self.pool_size),
+            ("prefill_pool", self.prefill_pool),
+        ):
             if value is not None:
                 raw["run"][key] = value
         config = parse_run_config(raw)
@@ -265,6 +283,7 @@ class RKO:
                 flush=True,
             )
         metadata: list[SearchMetadata] = []
+        initialization: list[PoolInitializationMetadata] = []
         backend, n_jobs, random_state, n_variables = (
             self.backend,
             self.n_jobs,
@@ -278,6 +297,7 @@ class RKO:
             started_at=started,
             hyperparameters=hyperparameters,
             search_metadata=metadata,
+            initialization_metadata=initialization,
             process_worker_limit=n_jobs if n_jobs is not None else available_cpus,
         )
         positions = {name: index for index, name in enumerate(config.active_metaheuristics)}
@@ -299,6 +319,7 @@ class RKO:
             pool_size=config.pool_size,
             n_jobs=n_jobs,
             available_cpus=available_cpus,
+            initialization=initialization[0] if initialization else None,
             versions=(
                 ("rko", package_version),
                 ("python", platform.python_version()),
@@ -322,6 +343,7 @@ class RKO:
         hyperparameters: Hyperparameters | None = None,
         search_metadata: list[SearchMetadata] | None = None,
         process_worker_limit: int | None = None,
+        initialization_metadata: list[PoolInitializationMetadata] | None = None,
     ) -> tuple[list[float], float]:
         """Dispatch a validated portfolio without retaining worker state.
 
@@ -332,6 +354,7 @@ class RKO:
             hyperparameters (Hyperparameters | None): Owned normalized offline overrides.
             search_metadata (list[SearchMetadata] | None): Optional immutable report collector.
             process_worker_limit (int | None): Resolved per-solve process cap.
+            initialization_metadata (list | None): Optional shared startup report collector.
 
         Returns:
             tuple[list[float], float]: Best keys and objective.
@@ -373,9 +396,22 @@ class RKO:
                 started_at=started_at,
                 hyperparameters=hyperparameters,
                 search_metadata=search_metadata,
+                initialization_metadata=initialization_metadata,
             )
         pool.start_progress()
         try:
+            if config.prefill_pool:
+                report = initialize_pool(
+                    pool,
+                    self.decoder,
+                    self.cost,
+                    self.n_variables,
+                    config.pool_size,
+                    time_limit,
+                    self.random_state,
+                )
+                if initialization_metadata is not None:
+                    initialization_metadata.append(report)
             if self.backend == "thread":
                 return select_best_result(
                     run_metaheuristics_parallel(

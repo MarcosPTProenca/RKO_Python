@@ -118,8 +118,10 @@ behavior. The linked unchanged-block correction now reuses known current costs f
 representation-identical moves, retaining virtual steps and deterministic path/tie
 results. Stochastic callback counts change explicitly. A full-population policy
 still requires controlled evidence; this diagnosis does not choose one. The
-[full-driver startup audit](driver-initialization.md) details the reference pool
-fill, bounded cost-tie pass, Python empty startup and distinct clock boundaries.
+[full-driver startup contract](driver-initialization.md) details the reference
+pool fill, bounded cost-tie pass, default empty startup and distinct clock boundaries.
+The opt-in `prefill_pool=True` phase now supplies shared context with explicit
+startup accounting; it is not a demonstrated IPR quality/feasibility correction.
 
 The original diagnosis itself changed no production transition/admission policy;
 the linked subsequent correction is a separately identified behavior change.
