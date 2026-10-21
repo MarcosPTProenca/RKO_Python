@@ -29,7 +29,7 @@ Flow (pseudocode):
 
 Important criteria:
 - Block size is at least 1 gene; include any partial final block.
-- For multiple blocks, stop before the full guide to preserve path diversity.
+- For multiple blocks, take num_blocks-1 steps; shared blocks can reach the full guide earlier.
 - A one-block chromosome evaluates the guide rather than an empty block.
 - Initialization uses the existing callbacks and search deadline, with at most two seed evaluations.
 - An already usable elite pool keeps its original initialization RNG draw order.

@@ -70,6 +70,9 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   establish comparable initialization or search work. IPR now bootstraps a missing
   elite pair instead of returning its only random evaluation when no peer produces
   elites; this is domain-neutral and does not guarantee feasibility or C++ quality.
+  A [bounded-work diagnosis](ipr-diagnosis.md) exposes current duplicate elite
+  collapse and redundant unchanged-block evaluations. Its experimental controls
+  change no production policy and do not establish a general quality gain.
   Full-driver initialization parity, more instance families, seeds, fixed-work
   measurements and domain-specific validation remain necessary.
 - **Licensing:** confirm imported-code ownership/terms before release; see

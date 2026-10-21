@@ -28,6 +28,8 @@ jobs:
         run: uv run --locked pytest src/rko/tests -q
       - name: Native-thread launch smoke
         run: uv run --locked --with threadpoolctl==3.7.0 python benchmarks/native_threads.py --repeats 1 --dimension 8 --evaluations 2 --workers 1
+      - name: IPR fixed-work diagnostic smoke
+        run: uv run --locked python benchmarks/ipr_diagnosis.py --evaluations 64 --seeds 1 --dimension 20
       - name: Build distribution artifacts
         run: uv build
       - name: Test isolated wheel and sdist installs

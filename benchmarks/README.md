@@ -664,3 +664,27 @@ Callback-global draws are neither implicitly seeded nor rolled back; stochastic
 callbacks must own their generators. Standalone built-in operators retain global
 RNG compatibility. No RSS, whole-portfolio speedup or quality improvement follows
 from these replay checks.
+
+## IPR work and population diagnosis (not timing)
+
+```bash
+uv run --locked python benchmarks/ipr_diagnosis.py
+```
+
+`ipr-diagnosis-reference.jsonl` contains 36 cases: three seeds, three synthetic
+objectives, two starting-population modes and a separately labeled exact-vector
+admission control, each charged exactly 1,024 completed objective evaluations.
+Production two-seed cases use 2 seed + 1,022 path evaluations; ten-elite cases use
+11 + 1,013, including production IPR's unconditional extra initial draw.
+
+All three ordinary-bootstrap sphere cases collapse to one distinct vector in ten
+pool slots. Rejecting exact clones in the isolated control eliminates identical
+parents but does not improve the best score in any of the nine two-seed cases.
+A direct one-differing-block pair makes 55 evaluations for only two unique vectors.
+More initial seeds improve the sphere/threshold examples here, not all domains;
+combining larger populations with duplicate rejection has mixed relative outcomes.
+
+See [diagnostic contracts and findings](../docs/ipr-diagnosis.md) for seed-prefix
+matching, source fingerprints, work accounting and reference-source limitations.
+No production admission/transition policy, runtime API or active Knapsack benchmark
+is changed. This is not a throughput, feasibility, C++ parity or native-backend result.
