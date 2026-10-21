@@ -114,9 +114,11 @@ benchmark remains unchanged; full validation is hosted to avoid local contention
 The [startup contract audit](driver-initialization.md) separates shared-pool
 seeding from private algorithm populations. C++ fills its shared pool before
 launching searches and makes one cost-tie perturbation pass; Python starts empty
-and treats `pool_size` as capacity. Equal nominal capacities and durations do not
-imply equal startup evaluations, diversity or available search time. No Python
-prefill policy or result-accounting change is introduced by the audit.
+by default and treats `pool_size` as capacity. An explicit `prefill_pool=True`
+now enables the reference-style fill/tie pass with isolated callbacks, separate
+startup reports and fresh search allowances. Coordinate-unique admission and RNG
+engines remain different. Equal nominal capacities/durations still do not imply
+exact startup work, diversity or trajectory parity.
 
 ## Still to resolve
 

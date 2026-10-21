@@ -32,6 +32,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from rko import RKO
+from rko import PoolInitializationMetadata
 from rko import SearchMetadata
 from rko.components.adaptive_control.q_learning import QLearningController
 from rko.examples.run_kp_cpp_instances import default_instances_dir
@@ -135,6 +136,24 @@ def main() -> None:
                 algorithm in ("GRASP", "SA", "PSO") and control == 1
             )
             assert pickle.loads(pickle.dumps(result)) == result
+        prefilled = RKO(
+            decode,
+            objective,
+            3,
+            algorithms=["MultiStart"],
+            control=0,
+            backend=backend,
+            prefill_pool=True,
+            pool_size=3,
+            random_state=42,
+        ).solve(0.05)
+        assert isinstance(prefilled.initialization, PoolInitializationMetadata)
+        assert prefilled.initialization.n_evaluations == 3
+        assert prefilled.initialization.pool_size == 3
+        assert prefilled.n_evaluations == 3 + sum(
+            report.n_evaluations for report in prefilled.searches
+        )
+        assert pickle.loads(pickle.dumps(prefilled)) == prefilled
     automatic = RKO(
         decode,
         objective,

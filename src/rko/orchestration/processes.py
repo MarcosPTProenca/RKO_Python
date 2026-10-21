@@ -5,6 +5,7 @@ Objective:
 
 Technical approach:
 - Host SolutionPool in a manager and exchange control/results through pipes.
+- Optional startup uses one existing child before fresh search-deadline release.
 - Construct searches in bounded worker groups and release ready workers together.
 - Divide each worker's remaining common time among its queued searches at dispatch.
 
@@ -37,10 +38,12 @@ from ..components.solution_pool import SolutionPool
 from .execution import select_best_result
 from .factory import build_metaheuristic
 from .factory import normalize_hyperparameters
+from .initialization import initialize_pool
 from .search import SearchSession
 from .types import CostFn
 from .types import DecoderFn
 from .types import Hyperparameters
+from .types import PoolInitializationMetadata
 from .types import RunConfig
 from .types import RunResult
 from .types import SearchMetadata
@@ -171,6 +174,9 @@ def _worker(
     connection: Connection,
     hyperparameters: Hyperparameters | None = None,
     collect_metadata: bool = False,
+    initialization_start: Event | None = None,
+    initialization_duration: float | None = None,
+    initialization_random_state: int | None = None,
 ) -> None:
     """Run assigned searches sequentially without extending the common deadline.
 
@@ -187,6 +193,9 @@ def _worker(
         connection (Connection): Dedicated result/control pipe.
         hyperparameters (Hyperparameters | None): Normalized partial offline overrides.
         collect_metadata (bool): Send compact reports, including unstarted queued searches.
+        initialization_start (Event | None): Gate supplied only to the designated initializer.
+        initialization_duration (float | None): Separate cooperative startup allowance.
+        initialization_random_state (int | None): Source for the reserved startup stream.
     """
     name = "startup"
     try:
@@ -206,6 +215,20 @@ def _worker(
                 )
             prepared.append((mh, streams))
         connection.send(("ready", None))
+        if initialization_start is not None:
+            name = "initial_pool"
+            initialization_start.wait()
+            assert initialization_duration is not None
+            report = initialize_pool(
+                pool,
+                decoder,
+                cost,
+                dimension,
+                config.pool_size,
+                initialization_duration,
+                initialization_random_state,
+            )
+            connection.send(("initialized", report))
         start.wait()
         best: RunResult | None = None
         reports: list[SearchMetadata] = []
@@ -271,6 +294,7 @@ def run_processes(
     started_at: float | None = None,
     hyperparameters: Hyperparameters | None = None,
     search_metadata: list[SearchMetadata] | None = None,
+    initialization_metadata: list[PoolInitializationMetadata] | None = None,
 ) -> tuple[list[float], float]:
     """Execute a selected portfolio with a common start and managed pool.
 
@@ -288,6 +312,7 @@ def run_processes(
         started_at (float | None): Parent solve's monotonic origin for elapsed log times.
         hyperparameters (Hyperparameters | None): Partial offline scalar mappings.
         search_metadata (list[SearchMetadata] | None): Optional collector for all algorithms.
+        initialization_metadata (list | None): Separate opt-in startup report collector.
 
     Returns:
         tuple[list[float], float]: Best keys and minimization objective.
@@ -322,6 +347,9 @@ def run_processes(
     with PoolManager(ctx=context) as manager:
         pool = manager.SolutionPool(config.pool_size, verbose=verbose, started_at=started_at)
         start = context.Event()
+        initialization_start = context.Event() if config.prefill_pool else None
+        initialization_done = not config.prefill_pool
+        initialization_released = False
         deadline = context.Value("d", 0.0)
         processes: list[mp.Process] = []
         connections: list[Connection] = []
@@ -331,7 +359,7 @@ def run_processes(
         expires = time.perf_counter() + 60.0
         try:
             pool.start_progress()
-            for group in groups:
+            for group_index, group in enumerate(groups):
                 name = "/".join(name for name, _ in group)
                 parent, child = context.Pipe(duplex=False)
                 connections.append(parent)
@@ -351,6 +379,9 @@ def run_processes(
                         child,
                         hyperparameters,
                         search_metadata is not None,
+                        initialization_start if group_index == 0 else None,
+                        limit_time,
+                        random_state,
                     ),
                 )
                 processes.append(process)
@@ -363,7 +394,11 @@ def run_processes(
             while pending:
                 available = wait(list(pending), timeout=max(0.0, expires - time.perf_counter()))
                 if not available:
-                    phase = "search" if start.is_set() else "startup"
+                    phase = (
+                        "initialization"
+                        if initialization_released and not initialization_done
+                        else ("search" if start.is_set() else "startup")
+                    )
                     raise TimeoutError(
                         f"RKO {phase} timed out; unfinished: {list(pending.values())}"
                     )
@@ -378,6 +413,10 @@ def run_processes(
                         raise RuntimeError(f"{name}: worker failed.\n{details}") from cause
                     if status == "ready":
                         ready.add(connection)
+                    elif status == "initialized":
+                        initialization_done = True
+                        if initialization_metadata is not None:
+                            initialization_metadata.append(payload)
                     elif status == "metadata":
                         assert search_metadata is not None
                         search_metadata.extend(payload)
@@ -385,9 +424,15 @@ def run_processes(
                         results.append(payload)
                         del pending[connection]
                 if not start.is_set() and len(ready) == worker_count:
-                    deadline.value = time.perf_counter() + limit_time
-                    expires = deadline.value + 5.0
-                    start.set()
+                    if initialization_done:
+                        deadline.value = time.perf_counter() + limit_time
+                        expires = deadline.value + 5.0
+                        start.set()
+                    elif not initialization_released:
+                        assert initialization_start is not None
+                        initialization_released = True
+                        expires = time.perf_counter() + limit_time + 5.0
+                        initialization_start.set()
             return select_best_result(results, pool)
         finally:
             for process in processes:

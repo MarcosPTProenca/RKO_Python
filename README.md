@@ -39,7 +39,12 @@ or starting workers. Each solve builds a fresh portfolio and returns an immutabl
 before every attempt, including failed solves.
 
 Select `algorithms`, `control` and `pool_size` directly in Python; omitted values
-use the packaged TOML defaults. SA now implements its requested online control
+use the packaged TOML defaults. By default `pool_size` is capacity, not an initial
+population. Opt in with `prefill_pool=True` (CLI `--prefill-pool`) for
+[reference-style shared initialization](docs/driver-initialization.md#opt-in-reference-style-startup).
+Startup has its own cooperative allowance equal to `time_limit`, followed by fresh
+search allowances; total elapsed can increase. `result.initialization` reports its
+work separately, and `result.n_evaluations` includes startup plus searches once. SA now implements its requested online control
 rather than falling back to offline parameters; use `control=0` for its legacy
 fixed-parameter path. See [adaptive SA and migration](docs/sa-control.md).
 GRASP now samples the [wider reference lattice](docs/grasp-line-search.md) in both

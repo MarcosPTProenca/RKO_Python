@@ -39,6 +39,7 @@ def run(
     n_jobs: int | None = None,
     random_state: int | None = None,
     verbose: bool = False,
+    prefill_pool: bool | None = None,
 ) -> tuple[list[float], float]:
     """Delegate a legacy call to RKO and retain its tuple result contract.
 
@@ -52,6 +53,8 @@ def run(
         n_jobs (int | None): Optional process budget.
         random_state (int | None): Nonnegative per-search seed in every backend.
         verbose (bool): Flush lifecycle and pool updates; quiet by default.
+        prefill_pool (bool | None): Opt-in reference startup override; None uses TOML.
+            Startup has a separate allowance and does not reduce search durations.
 
     Returns:
         tuple[list[float], float]: Best keys and objective value.
@@ -71,5 +74,6 @@ def run(
         n_jobs=n_jobs,
         random_state=random_state,
         verbose=verbose,
+        prefill_pool=prefill_pool,
     ).solve(limit_time)
     return list(result.keys), result.cost

@@ -2,9 +2,9 @@
 
 ## Scope and outcome
 
-This is a source-contract audit, not a change to initialization defaults or a
-quality/timing comparison. Python's shared-pool capacity does **not** request a
-prefilled population. The pinned C++ driver creates a full shared pool before
+The default remains unchanged after this source-contract audit; this is not a
+quality/timing comparison. Python's shared-pool capacity alone does **not** request a
+prefilled population. An explicit opt-in reference-style phase is described below. The pinned C++ driver creates a full shared pool before
 launching algorithms. Matching `pool_size=10` to `sizePool 10` therefore does not
 match initialization work or starting search context.
 
@@ -39,7 +39,7 @@ The driver records `pool[0]` as its initial best. If a run restarts, it can call
 constant. Individual algorithms may also create their own private populations.
 The shared startup pool is not a substitute for those private populations.
 
-## Current Python startup
+## Default Python startup
 
 `RKO._execute` in `src/rko/solver.py` creates an empty `SolutionPool` and constructs
 selected algorithms without driver-level candidate evaluation. Serial execution
@@ -95,24 +95,72 @@ It does not establish that startup differences alone caused any feasibility or
 quality gap. The same nominal capacity and duration are insufficient evidence of
 matched initialization, callback work or search time.
 
-## Next decision and evidence
+## Opt-in reference-style startup
 
-Before choosing a Python prefill policy, define and measure a separate bounded
-initialization phase: candidate budget, RNG ownership, callback isolation, finite
-validation, deadline/incumbent recovery and an explicit report of seed evaluations.
-Count it once, rather than silently charging it to the first selected algorithm or
-adding unreported evaluations before the search. Preserve chromosome uniqueness;
-any C++-style cost-tie perturbation would require a separate documented decision.
+Enable `RKO(..., prefill_pool=True)` or `[run] prefill_pool = true`. The packaged
+default is false, old configurations may omit it, and explicit Python booleans
+override TOML. The CLI supports `--prefill-pool` and `--no-prefill-pool`; absent
+flags follow TOML. Legacy `run(..., prefill_pool=True)` keeps its tuple return.
 
-Then compare the same initial vectors/work budgets against the current empty-pool
-policy across general numerical/permutation objectives and relevant instance
-families. Separate quality from callback throughput before selecting native kernels.
-Do not change `pool_size` from capacity to mandatory seed count without a deliberate
-compatibility decision. No prefill option or result-schema extension is added here.
+The phase creates P private slots, uses the reference selection-sort swap order,
+then performs its single backward cost-tie perturbation pass and re-sorts. Working
+slots are kept separate from elite admission so worse mutated replacements are not
+silently rejected before completing the reference pass. Completed final/partial
+slots and the phase's best observation are published through ordinary Python
+chromosome-unique admission. There are no retries to fill duplicate slots; admitted
+occupancy may be below capacity. Full phases use P..2P-1 objective observations.
+Slot storage is O(P*n), selection sorting O(P²); no resource improvement is claimed.
 
-Regression probes use the real public serial/thread dispatchers, factory, callback
-sessions and result metadata, replacing only one algorithm body. Capacities 1, 10
-and 100 all enter construction/search with zero entries and zero user evaluations;
+Startup uses an independent owned stream derived from a reserved grandchild seed
+branch `(0, 0)`, independent of portfolio length. Existing algorithm seed derivation
+is unchanged. Python/C++ random engines and final admission policies still differ;
+this is not exact seeded trajectory parity.
+
+Startup has **its own cooperative allowance equal to `time_limit`**. This is a
+safety extension beyond the reference's unchecked fill. A first finite observation
+is allowed; on expiry completed partial context and the best observation survive.
+Active callbacks cannot be interrupted. The selected searches then receive their
+usual fresh allowances: startup is not deducted from their budgets. Total elapsed
+can grow by roughly another requested duration, plus normal setup and callback
+overruns. A `time_limit` startup report can also describe an overrun after all
+planned observations completed; it does not guarantee a partial pool.
+
+Serial/thread startup runs in the caller after constructor validation and before
+search execution. Process startup uses the first existing worker after all workers
+are ready; no callback runs in the parent/manager and no extra search worker is
+added. Other workers wait until the initialization report, then the parent starts
+a fresh common search deadline and releases searches. The initialization watchdog
+uses its own allowance plus the existing five-second process grace; a blocked
+callback or failed initializer tears down waiting workers. Decoder/objective or
+nonfinite failures fail the solve rather than masquerading as successful partial
+startup.
+
+`result.initialization` is an immutable `PoolInitializationMetadata` report with
+actual `random_state`, `n_evaluations`, `elapsed_seconds`, admitted `pool_size`,
+`stop_reason` and `time_limit`; it is None when disabled. `result.searches` remains
+per-algorithm only. `result.n_evaluations` includes startup plus searches exactly
+once. No objective is re-run to publish the best or calculate metadata.
+
+Callback-owned mutable/global/random state is not cloned or reset. Additional
+startup observations can affect subsequent user callbacks, including the designated
+process worker's own callback state; other workers have their separate process
+copies. Library RNG isolation does not promise stochastic-backend equivalence.
+
+## Remaining evidence
+
+Compare equal initial vectors and total completed-work budgets against the default
+empty-pool policy across general numerical/permutation objectives and relevant
+instance families. Startup observations must be included, not compared only through
+per-search reports. Separate quality from callback throughput before selecting
+native kernels. No quality, feasibility, throughput, memory or C++ parity gain has
+been established by enabling this phase.
+
+Default-off regression probes use the real public serial/thread dispatchers,
+factory, callback sessions and result metadata, replacing only one algorithm body.
+Capacities 1, 10 and 100 all enter construction/search with zero entries/evaluations;
 one completed observation is reported once. They characterize driver policy,
-not the private initialization of every algorithm. Process startup and the C++
-behavior above are source-audited, not new compiled-C++ or spawned-probe results.
+not every algorithm's private initialization. Separate opt-in tests exercise real
+serial/thread/process startup, callback ownership, grouped worker caps, completed
+totals, partial timeouts, nonfinite/errors, blocked-worker cleanup, configuration
+precedence and CLI forwarding. The C++ observations remain source-audited, not new
+compiled-C++ application or quality measurements.

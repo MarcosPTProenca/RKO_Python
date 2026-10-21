@@ -30,6 +30,25 @@ from rko.examples.run_kp_cpp_instances import parse_args
 from rko.parameters.loader import default_params_dir
 
 
+@pytest.mark.parametrize(
+    "flags, expected", [([], None), (["--prefill-pool"], True), (["--no-prefill-pool"], False)]
+)
+def test_prefill_cli_override(
+    monkeypatch: pytest.MonkeyPatch,
+    flags: list[str],
+    expected: bool | None,
+) -> None:
+    """Keep TOML precedence unless initialization is explicitly enabled or disabled.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Supply the command-line override.
+        flags (list[str]): Explicit opt-in, opt-out or absent option.
+        expected (bool | None): Override forwarded to the public solver.
+    """
+    monkeypatch.setattr(sys, "argv", ["rko", *flags])
+    assert parse_args().prefill_pool is expected
+
+
 def test_legacy_batch_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep the existing no-argument bundled-instance selection.
 
@@ -145,6 +164,7 @@ def test_console_runs_external_instance_and_parameters(
             executable,
             *arguments,
             *(["--quiet"] if quiet else []),
+            *(["--prefill-pool"] if selection == "single" else []),
             *(["--n-jobs", "1"] if backend == "process" else []),
             "--params-dir",
             str(parameters),

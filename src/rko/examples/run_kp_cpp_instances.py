@@ -259,6 +259,7 @@ def run_single_instance(
     n_jobs: int | None = None,
     random_state: int | None = None,
     verbose: bool = False,
+    prefill_pool: bool | None = None,
 ) -> KpRunResult:
     """Execute one KP instance and print a concise summary line.
 
@@ -270,6 +271,7 @@ def run_single_instance(
       n_jobs (int | None): Optional process budget.
       random_state (int | None): Optional worker-seed source.
       verbose (bool): Emit lifecycle and attributed shared-pool updates.
+      prefill_pool (bool | None): Optional separately budgeted shared startup phase.
 
     Returns:
       KpRunResult: Normalized result row including end-to-end elapsed time.
@@ -288,6 +290,7 @@ def run_single_instance(
         n_jobs=n_jobs,
         random_state=random_state,
         verbose=verbose,
+        prefill_pool=prefill_pool,
     ).solve(limit_time)
     elapsed = time.perf_counter() - started
     best_sol = decode_knapsack(outcome.keys)
@@ -419,6 +422,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--random-state", type=int, default=None, help="Worker seed source.")
     parser.add_argument(
+        "--prefill-pool",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Reference-style shared startup (separate allowance); default follows TOML.",
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Hide live algorithm/pool updates; retain the final result and CSV.",
@@ -468,6 +477,7 @@ def main() -> None:
                 n_jobs=args.n_jobs,
                 random_state=args.random_state,
                 verbose=not args.quiet,
+                prefill_pool=args.prefill_pool,
             )
         )
 
