@@ -667,6 +667,29 @@ callbacks must own their generators. Standalone built-in operators retain global
 RNG compatibility. No RSS, whole-portfolio speedup or quality improvement follows
 from these replay checks.
 
+## Shared startup matched-work pilot (not timing)
+
+```bash
+uv run --locked python benchmarks/prefill_work.py > /tmp/prefill-work.jsonl
+```
+
+`prefill-work-reference.jsonl` identifies 60 paired / 120 real serial Python trials:
+IPR, GRASP and MultiStart; four pure objective families; 20 keys; capacity 10;
+five seeds; **256 total completed objectives including startup** per trial.
+Policy clocks are frozen offline, with a separate real emergency guard. Both
+arms also make exactly one final unscored decoder call, recorded explicitly.
+Actual search seeds/first search chromosomes match within pairs; initial raw
+prefill slots match across algorithm/workload groups for the same seed. Two full
+runs reproduced byte-identical JSONL in the identified environment.
+
+IPR improved on 15/15 non-flat pairs and improved beyond its startup best in all
+15. GRASP had 1 better / 11 tied / 3 worse; MultiStart 1 better / 14 tied. Flat
+pairs all tied. These are small fixed-work pilot observations, not statistical
+superiority or a recommendation to enable prefill globally. No timings, throughput,
+Knapsack feasibility or C++ parity were measured. See
+[controls, results and limits](../docs/prefill-matched-work.md). The runner uses an
+internal cooperative stop seam; it does not add a public fixed-evaluation API.
+
 ## IPR work and population diagnosis (not timing)
 
 ```bash

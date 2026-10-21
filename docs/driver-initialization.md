@@ -156,8 +156,10 @@ Compare equal initial vectors and total completed-work budgets against the defau
 empty-pool policy across general numerical/permutation objectives and relevant
 instance families. Startup observations must be included, not compared only through
 per-search reports. Separate quality from callback throughput before selecting
-native kernels. No quality, feasibility, throughput, memory or C++ parity gain has
-been established by enabling this phase.
+native kernels. A [small matched-work pilot](prefill-matched-work.md) found
+consistent IPR improvements but mixed GRASP effects at one offline dimension/budget;
+keep prefill opt-in. General quality, feasibility, throughput, memory and C++ parity
+remain unestablished.
 
 Default-off regression probes use the real public serial/thread dispatchers,
 factory, callback sessions and result metadata, replacing only one algorithm body.
