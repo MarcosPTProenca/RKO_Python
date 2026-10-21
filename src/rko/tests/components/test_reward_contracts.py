@@ -24,6 +24,7 @@ import math
 import numpy as np
 import pytest
 from rko.components.adaptive_control.q_learning import QLearningController
+from rko.components.random_streams import RandomStreams
 from rko.components.solution_pool import SolutionPool
 from rko.metaheuristics import grasp as grasp_module
 from rko.metaheuristics import ils as ils_module
@@ -31,6 +32,7 @@ from rko.metaheuristics import lns as lns_module
 from rko.metaheuristics.grasp import GRASP
 from rko.metaheuristics.ils import ILS
 from rko.metaheuristics.lns import LNS
+from unittest.mock import Mock
 
 
 @pytest.mark.parametrize("previous", [-100.0, 0.0, 100.0])
@@ -107,13 +109,41 @@ def test_reward_survives_incumbent_update(name: str, monkeypatch: pytest.MonkeyP
         parameters=grid,
     )
     ticks = iter([False, False, True, True])
-    solutions = iter([(np.array([0.1]), -100.0), (np.array([0.2]), -150.0)])
+    solutions = iter(
+        [(np.array([0.2]), -150.0)]
+        if name == "GRASP"
+        else [(np.array([0.1]), -100.0), (np.array([0.2]), -150.0)]
+    )
     rewards = []
     monkeypatch.setattr(algorithm, "time_limit_reached", lambda _: next(ticks))
     monkeypatch.setattr(module, "QLearningController", lambda *args, **kwargs: controller)
+    if name == "GRASP":
+        # GRASP scores its initial vector without refinement and then constructs,
+        # so the first scripted result must arrive during that construction.
+        streams = RandomStreams(42)
+        generator = Mock(wraps=streams.numpy)
+        generator.random.side_effect = lambda size: np.full(np.atleast_1d(size).astype(int), 0.1)
+        monkeypatch.setattr(streams, "numpy", generator)
+        monkeypatch.setattr(streams.python, "uniform", lambda lower, upper: 0.5)
+        monkeypatch.setattr(streams.python, "shuffle", lambda values: None)
+        monkeypatch.setattr(streams.python, "randrange", lambda stop: 0)
+        monkeypatch.setattr(
+            algorithm, "local_search_operator", lambda *args, **kwargs: next(solutions)
+        )
+        rewards = []
+        monkeypatch.setattr(
+            controller,
+            "update_q_value",
+            lambda st, at, reward, lf, df: rewards.append(reward),
+        )
+        with streams.activate():
+            _, _, best = algorithm.solve(1.0)
+        assert best == -150.0
+        assert rewards == [1.0]
+        return
     monkeypatch.setattr(
         module,
-        "nelder_mead_search" if name == "LNS" else "rvnd",
+        "nelder_mead_search",
         lambda *args, **kwargs: next(solutions),
     )
     monkeypatch.setattr(
