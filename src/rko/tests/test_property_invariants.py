@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from hypothesis import example
 from hypothesis import given
 from hypothesis import settings
 from hypothesis import strategies as st
@@ -76,11 +77,13 @@ def test_solution_pool_default_source_is_reported_as_unknown(
         max_size=24,
     ),
 )
+@example(capacity=2, entries=[(0.0, [0.0]), (0.0, [0.0]), (1.0, [1.0])])
+@example(capacity=2, entries=[(10.0, [0.1]), (5.0, [0.2]), (2.0, [0.1])])
 def test_solution_pool_retains_sorted_best_entries(
     capacity: int,
     entries: list[tuple[float, list[float]]],
 ) -> None:
-    """Keep the lowest-cost generated entries within the configured capacity.
+    """Keep the lowest per-chromosome observations within the configured capacity.
 
     Args:
         capacity (int): Maximum pool occupancy.
@@ -91,9 +94,15 @@ def test_solution_pool_retains_sorted_best_entries(
         pool.insert(entry)
 
     elite = pool.get_elite(capacity + 1)
-    expected_costs = sorted(cost for cost, _ in entries)[:capacity]
+    best_observations: dict[tuple[float, ...], float] = {}
+    for cost, keys in entries:
+        vector = tuple(keys)
+        best_observations[vector] = min(cost, best_observations.get(vector, cost))
+    expected_costs = sorted(best_observations.values())[:capacity]
 
-    assert pool.size == min(capacity, len(entries))
+    assert pool.size == min(capacity, len(best_observations))
+    assert len({tuple(keys) for _, keys in elite}) == pool.size
+    assert all(cost == best_observations[tuple(keys)] for cost, keys in elite)
     assert [cost for cost, _ in elite] == expected_costs
     costs = [cost for cost, _ in elite]
     assert costs == sorted(costs)
