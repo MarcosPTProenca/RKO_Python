@@ -158,8 +158,10 @@ instance families. Startup observations must be included, not compared only thro
 per-search reports. Separate quality from callback throughput before selecting
 native kernels. A [small matched-work pilot](prefill-matched-work.md) found
 consistent IPR improvements but mixed GRASP effects at one offline dimension/budget;
-keep prefill opt-in. General quality, feasibility, throughput, memory and C++ parity
-remain unestablished.
+keep prefill opt-in. The [hosted expansion](prefill-expanded-work.md) confirms
+broader but non-universal IPR benefits and identifies incomplete GRASP stages at
+small budgets, including startup-only wins. General quality, feasibility,
+throughput, memory and C++ parity remain unestablished.
 
 Default-off regression probes use the real public serial/thread dispatchers,
 factory, callback sessions and result metadata, replacing only one algorithm body.

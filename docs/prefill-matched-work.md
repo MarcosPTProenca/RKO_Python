@@ -71,7 +71,11 @@ GRASP has regressions and most MultiStart pairs tie. Five seeds, one dimension,
 one small budget, synthetic objectives and a frozen offline clock cannot justify
 a global default, adaptive-policy recommendation or a feasibility guarantee.
 GRASP at dimension 20 also exercises its small-unfixed-set fallback; results must
-not be extrapolated to the 500-coordinate benchmark regime.
+not be extrapolated to the 500-coordinate benchmark regime. The later
+[stage-work check](prefill-expanded-work.md#why-the-grasp-wins-need-a-stage-qualification)
+shows that even this pilot's 256-call budget cannot finish the first construction
+(minimum 350 at packaged settings). These are valid best-observation outcomes,
+not evidence about completed construction/refinement cycles.
 
 Next compare wider dimensions, budgets and seeds, then adaptive/timed production
 searches and relevant instance families after the protected run finishes. Preserve
@@ -81,7 +85,9 @@ C++ quality/trajectory parity claim.
 
 ## Hosted expansion
 
-The manual `.github/workflows/prefill-study.yml` keeps this pilot's controls while
+The [completed hosted expansion](prefill-expanded-work.md) retains all paired
+observations and qualifies the large-GRASP incomplete-stage limitation. Its manual
+`.github/workflows/prefill-study.yml` keeps this pilot's controls while
 expanding to dimensions 20/100/500, budgets 256/1024, capacity 10 and seeds 200–219.
 Six Ubuntu shards run the original serial runner, at most three jobs concurrently,
 with launch-configured OpenBLAS/OMP/MKL thread limits of one. This is 1,440 pairs /
