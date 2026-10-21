@@ -16,7 +16,7 @@ Flow (pseudocode):
 Important criteria:
 - Intensity is rounded upward, but no coordinate is committed more than once.
 - A 10-percent subset below two means every remaining coordinate, not two.
-- Existing in-place shuffle semantics are controlled, not changed by this correction.
+- Subsets come from a shuffled copy; the unfixed order survives every pass.
 
 Inputs/Outputs:
 - Input: positive dimensions, matched intensities, numerical objectives and owned RNGs.
@@ -67,7 +67,8 @@ def construction_reference(
     Args:
         dimension (int): Positive chromosome dimension.
         intensity (float): Matched real construction fraction.
-        reverse_order (bool): Reverse remaining coordinates at each shuffle point.
+        reverse_order (bool): Reverse a fresh copy of remaining coordinates at each
+            shuffle point, leaving the stored order itself untouched.
 
     Returns:
         tuple[list[tuple[int, tuple[float, ...]]], list[float]]: Expected callbacks and final keys.
@@ -80,11 +81,10 @@ def construction_reference(
         limit = int(len(remaining) * 0.1)
         if limit < 2:
             limit = len(remaining)
-        if reverse_order:
-            remaining.reverse()
+        subset = list(reversed(remaining)) if reverse_order else list(remaining)
         best_score = math.inf
-        best_pos = remaining[0]
-        for pos in remaining[:limit]:
+        best_pos = subset[0]
+        for pos in subset[:limit]:
             visits.append((pos, tuple(state)))
             trial = state.copy()
             trial[pos] = 0.5
@@ -95,6 +95,55 @@ def construction_reference(
         remaining.remove(best_pos)
         completed += 1
     return visits, state
+
+
+def test_shuffled_copy_preserves_remaining_order_and_first_ties(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep each remaining list ordered while choosing first-tied shuffled candidates.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Reverse each selection and fix equal scores.
+    """
+    shuffles: list[list[int]] = []
+    before_shuffle: list[list[int]] = []
+    visits: list[int] = []
+    streams = RandomStreams(42)
+
+    def reverse_copy(values: list[int]) -> None:
+        """Record each independent input, then reverse it for deterministic selection.
+
+        Args:
+            values (list[int]): Fresh candidate-order list.
+        """
+        before_shuffle.append(values.copy())
+        shuffles.append(values)
+        values.reverse()
+
+    def tied_search(pos: int, h: float, keys: np.ndarray) -> tuple[float, float]:
+        """Return equal costs so the first selected coordinate wins each commit.
+
+        Args:
+            pos (int): Evaluated coordinate.
+            h (float): Forwarded grid step.
+            keys (np.ndarray): Committed partial state.
+
+        Returns:
+            tuple[float, float]: Candidate value and tied cost.
+        """
+        visits.append(pos)
+        return 0.5, 0.0
+
+    algorithm = GRASP(SolutionPool(), decode, lambda keys: 0.0, 4)
+    monkeypatch.setattr(algorithm, "_line_search", tied_search)
+    monkeypatch.setattr(streams.python, "uniform", lambda lower, upper: 0.7)
+    monkeypatch.setattr(streams.python, "shuffle", reverse_copy)
+    with streams.activate():
+        result, cost = algorithm._constructive(0.125, np.zeros(4))
+    assert before_shuffle == [[0, 1, 2, 3], [0, 1, 2], [0, 1]]
+    assert len({id(values) for values in shuffles}) == 3
+    assert visits == [3, 2, 1, 0, 2, 1, 0, 1, 0]
+    assert result.tolist() == [0.0, 0.5, 0.5, 0.5] and cost == 0.0
 
 
 @pytest.mark.parametrize(
@@ -125,7 +174,7 @@ def test_constructive_matches_counts_and_partial_contexts(
         monkeypatch (pytest.MonkeyPatch): Control intensity, order and coordinate scoring.
         dimension (int): Small dimension or boundary near the 10-percent cutoff.
         intensity (float): Fixed fraction, including integer and adjacent floating bounds.
-        reverse_order (bool): Controlled in-place shuffle behavior.
+        reverse_order (bool): Controlled shuffled-copy selection.
     """
     expected, expected_keys = construction_reference(dimension, intensity, reverse_order)
     observed: list[tuple[int, tuple[float, ...]]] = []

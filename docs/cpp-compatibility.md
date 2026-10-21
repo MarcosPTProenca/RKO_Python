@@ -95,7 +95,7 @@ Other audited construction/refinement policies remain separate:
 | Incumbent in subset | May be omitted; construction can worsen | May be omitted; global solver best remains protected |
 | Small unfixed sets | Search every remaining coordinate when the 10% subset is below two | Same fallback, recomputed after each commit |
 | Construction intensity | Integer loop against a real bound (effectively ceiling) | `ceil(n*intensity)`, including one construction step for n=1 |
-| Shuffle ordering | Shuffle a copy of unfixed coordinates | Shuffle unfixed coordinates in place; retained existing policy |
+| Shuffle ordering | Shuffle a copy of unfixed coordinates | Shuffle a copy; unfixed order survives every pass (aligned) |
 | Improving fine-grid step | Keep the current h | Keep the current h; previous reset to hs removed |
 | Initial refinement | Score the initial vector before construction | Score the initial vector, then insert it; no initial RVND |
 | Alpha parameter | Read/selected but unused by construction | Adaptive axis selected but unused by construction |
@@ -103,13 +103,13 @@ Other audited construction/refinement policies remain separate:
 The former near-only Python grid could miss available candidates while making
 more callback evaluations. Bounded dyadic oracle cases now cover the wider universe,
 ordered samples and callback budget; this is not a full compiled-C++ quality test or
-bitstream/rounding equivalence. Shuffle ordering and the unused alpha axis remain
-separate, not blindly replaced just to match reference code. The ongoing paired
+bitstream/rounding equivalence. The unfixed-order shuffle now also matches the
+reference copy semantics; only the unused alpha axis remains open. The ongoing paired
 benchmark remains unchanged; full validation is hosted to avoid local contention.
 
 ## Still to resolve
 
-- GRASP shuffle ordering and an unused-alpha decision.
+- GRASP unused-alpha decision.
 - Full SA/GRASP transition and refinement comparisons beyond adaptive plumbing.
 - Full per-algorithm initialization, transition, restart and stopping contracts.
 - Full-driver population initialization and comparable timing/work accounting;

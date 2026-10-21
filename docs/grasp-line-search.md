@@ -104,15 +104,23 @@ Installed smoke exercises GRASP in serial/thread/spawn and both control modes.
 
 Historical RNG-only replays of the old GRASP algorithm are now reported as
 `not_comparable` for both modes; the constructor carries the
-`grasp-construction-v3` compatibility token. The token is diagnostic, not a
+`grasp-construction-v4` compatibility token. The token is diagnostic, not a
 user-selectable search policy. Older replay reference files retain their original
 scope; they are not evidence for the corrected candidate policy.
 
-Unchanged and still separate: in-place shuffle ordering versus the reference's
-shuffled copy, and the unused alpha axis. Step decay and initial handling now follow
-the reference grid progression: h is halved only after a construction that fails to
-improve the global best, and the initial random vector is scored once and published
-without refinement. Both are deliberate behavior changes with contract tests and no
-measured quality claim. Full-driver initialization, quality, throughput and
-native-backend decisions still require matched comparisons. See
+Construction now shuffles a fresh copy on every pass and removes only the committed
+coordinate from the original unfixed list, preserving its surviving order. Ties
+still select the first candidate in each pass's shuffled order. Subset sizes, intensity, line-search
+sampling and callback ownership are unchanged. The extra list costs O(remaining)
+scratch; no memory or throughput improvement is claimed. Seeded candidate paths
+can differ despite the same number of shuffle calls; pin `a388e47` for the previous
+in-place policy. RNG engines still differ from C++, so this is not bitstream parity.
+
+Unchanged and still separate: the unused alpha axis. In-place subset shuffling was
+replaced by the reference's shuffled-copy semantics. Step decay and initial
+handling now follow the reference grid: h is halved only after a construction that
+fails to improve the global best, and the initial random vector is scored once and
+published without refinement. All are deliberate behavior changes with contract
+tests and no measured quality claim. Full-driver initialization, quality,
+throughput and native-backend decisions still require matched comparisons. See
 [the contract table](cpp-compatibility.md) and [current limitations](status.md).
