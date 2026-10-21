@@ -15,7 +15,7 @@ Technical approach:
   criterion based on elapsed time controls acceptance of non-improving moves.
 - Construction shuffles a fresh copy of unfixed coordinates, retaining their order.
 - Q-Learning selects initial/final step settings online; the reference alpha axis
-  remains present but is not used by construction.
+  is retained in the state graph but does not influence construction directly.
 - Sample a bounded subset of the wider reference lattice without materializing it.
 - Round the construction fraction upward and scan all small remaining coordinate sets.
 
@@ -78,7 +78,8 @@ class GRASP(MetaheuristicBase):
       he (float): Minimum line-search step size.
       control (int): Zero for fixed hs/he, one for adaptive step settings.
       parameters (list[list[float]]): Discrete Q-Learning parameter grid
-        ``[[alpha_grasp values], [hs values], [he values]]``; alpha is currently unused.
+        ``[[alpha_grasp values], [hs values], [he values]]``; alpha is retained for
+        reference state-graph compatibility, not constructive candidate selection.
       _replay_contract (str): Internal RNG-replay compatibility token, not an option.
     """
 
@@ -109,7 +110,8 @@ class GRASP(MetaheuristicBase):
           he: Minimum line-search step size (offline mode).
           control: 0 for offline fixed parameters, 1 for Q-Learning.
           parameters: Discrete grid for Q-Learning
-            ``[[alpha_grasp...], [hs...], [he...]]``.
+            ``[[alpha_grasp...], [hs...], [he...]]``. Alpha labels affect adaptive
+            states/actions, not the constructive kernel.
           local_search_operator (LocalSearchOperator | None): Optional RVND replacement.
           name: Human-readable identifier for logging.
 

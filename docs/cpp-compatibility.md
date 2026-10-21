@@ -98,18 +98,20 @@ Other audited construction/refinement policies remain separate:
 | Shuffle ordering | Shuffle a copy of unfixed coordinates | Shuffle a copy; unfixed order survives every pass (aligned) |
 | Improving fine-grid step | Keep the current h | Keep the current h; previous reset to hs removed |
 | Initial refinement | Score the initial vector before construction | Score the initial vector, then insert it; no initial RVND |
-| Alpha parameter | Read/selected but unused by construction | Adaptive axis selected but unused by construction |
+| Alpha parameter | Read/selected but unused by construction | Retained adaptive state axis; no direct construction effect ([policy](grasp-alpha.md)) |
 
 The former near-only Python grid could miss available candidates while making
 more callback evaluations. Bounded dyadic oracle cases now cover the wider universe,
 ordered samples and callback budget; this is not a full compiled-C++ quality test or
 bitstream/rounding equivalence. The unfixed-order shuffle now also matches the
-reference copy semantics; only the unused alpha axis remains open. The ongoing paired
+reference copy semantics. Alpha is deliberately retained for reference state-graph
+compatibility, not interpreted as an RCL. Its indirect adaptive effects and the
+remaining offline RNG-draw difference are documented in [the alpha policy](grasp-alpha.md). The ongoing paired
 benchmark remains unchanged; full validation is hosted to avoid local contention.
 
 ## Still to resolve
 
-- GRASP unused-alpha decision.
+- GRASP offline unused-alpha RNG draw differs; exact random-engine/trajectory parity is not claimed.
 - Full SA/GRASP transition and refinement comparisons beyond adaptive plumbing.
 - Full per-algorithm initialization, transition, restart and stopping contracts.
 - Full-driver population initialization and comparable timing/work accounting;
