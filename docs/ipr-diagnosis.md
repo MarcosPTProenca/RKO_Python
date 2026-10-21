@@ -1,5 +1,10 @@
 # IPR fixed-work diagnosis
 
+**Historical baseline:** the findings below describe `0c3a573`, before production
+chromosome uniqueness. The [elite-diversity correction](elite-diversity.md) now
+prevents duplicate admission and skips identical effective parents. The original
+reference remains unchanged; a separate post-fix work record is maintained.
+
 The empty-pool bootstrap enables standalone IPR to start relinking. It does not
 establish adequate population diversity, efficient path work or solution quality.
 This diagnostic isolates those questions without another timed quality benchmark.
@@ -102,16 +107,16 @@ Read-only reference: `RKO_Cpp_v2.0` revision
   blocks, and its block count truncates. Python safely covers partial blocks; do
   not reproduce reference indexing/edge defects to claim parity.
 
-## Next correction to isolate
+## Remaining correction to isolate
 
-First address exact duplicate elite admission/identical-parent selection, preserving
-valid tied but different vectors and bounded behavior when fewer than two distinct
-elites exist. Audit every pool consumer/transport before changing shared semantics.
-Then remove unchanged-block evaluations while preserving the meaningful candidate
+Exact duplicate admission/identical-parent selection is now addressed by the linked
+production correction, retaining valid tied vectors and bounded deficient-pair
+behavior. Next remove unchanged-block evaluations while preserving the meaningful candidate
 path, tie policy, parent ownership and incumbent/deadline recovery. Only afterward
 choose a full-population policy from controlled evidence.
 
-No production transition or pool-admission policy was changed by this diagnosis.
+The original diagnosis itself changed no production transition/admission policy;
+the linked subsequent correction is a separately identified behavior change.
 It does **not** establish Knapsack feasibility after the bootstrap, end-to-end
 speedup, full C++ parity or a reason to rewrite the core in Rust. The ongoing pinned
 benchmark remains a historical baseline and must not be relabeled as current IPR.

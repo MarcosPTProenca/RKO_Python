@@ -360,6 +360,9 @@ def main() -> None:
                 "solver_source_sha256": hashlib.sha256(
                     Path(inspect.getfile(IPR)).read_bytes()
                 ).hexdigest(),
+                "pool_source_sha256": hashlib.sha256(
+                    Path(inspect.getfile(SolutionPool)).read_bytes()
+                ).hexdigest(),
                 "probe_source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 "timing": False,
             }

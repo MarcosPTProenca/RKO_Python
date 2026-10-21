@@ -31,6 +31,7 @@ Important criteria:
 - Block size is at least 1 gene; include any partial final block.
 - For multiple blocks, take num_blocks-1 steps; shared blocks can reach the full guide earlier.
 - A one-block chromosome evaluates the guide rather than an empty block.
+- Identical effective parents from custom pools use bounded backoff, not relinking.
 - Initialization uses the existing callbacks and search deadline, with at most two seed evaluations.
 - An already usable elite pool keeps its original initialization RNG draw order.
 - Pools unable to retain a pair still use bounded waiting rather than repeated seed retries.
@@ -198,6 +199,9 @@ class IPR(MetaheuristicBase):
                 k1, k2 = 0, 1
             atual_keys = np.array(elite[k1][1], dtype=float)
             guia_keys = np.array(elite[k2][1], dtype=float)
+            if np.array_equal(atual_keys, guia_keys):
+                time.sleep(min(0.01, max(0.0, limit_time - self.elapsed())))
+                continue
 
             path_keys, path_cost = self._relink(atual_keys, guia_keys)
             self.solution_pool.insert((path_cost, path_keys.tolist()), self.name)

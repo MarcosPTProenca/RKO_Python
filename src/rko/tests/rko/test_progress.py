@@ -77,7 +77,7 @@ def test_reporting_does_not_change_elite_selection(
     pool = SolutionPool(2, verbose=verbose)
     for value in [9.0, 4.0, 6.0, 4.0, 7.0]:
         pool.insert((value, [0.25]), "worker")
-    assert pool.get_elite(2) == [(4.0, [0.25]), (4.0, [0.25])]
+    assert pool.get_elite(2) == [(4.0, [0.25])]
     assert bool(capsys.readouterr().out) == verbose
 
 

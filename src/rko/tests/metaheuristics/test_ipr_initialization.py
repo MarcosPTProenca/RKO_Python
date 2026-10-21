@@ -30,6 +30,7 @@ from rko.components.solution_pool import SolutionPool
 from rko.metaheuristics.ipr import IPR
 from rko.orchestration.search import SearchSession
 from rko.orchestration.types import CostFn
+from unittest.mock import Mock
 from unittest.mock import patch
 
 
@@ -107,9 +108,57 @@ def test_missing_pairs_bootstrap_and_relink(
     assert streams.numpy.get_state()[2:] == expected.get_state()[2:]
     if occupancy == 2:
         expected_python = random.Random(42)
-        for size in (2, 3, 4, 4):
+        for size in (2, 2, 3, 3) if cost is sphere else (2, 2, 2, 2):
             expected_python.sample(list(range(size)), 2)
         assert streams.python.getstate() == expected_python.getstate()
+
+
+@pytest.mark.parametrize("parents", [([0.2], [0.2]), ([2**60], [2**60 + 1])])
+def test_custom_pool_identical_effective_parents_back_off(
+    monkeypatch: pytest.MonkeyPatch, parents: tuple[list[float], list[float]]
+) -> None:
+    """Skip custom-pool clones, including distinct integers collapsing to binary64.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Simulate custom snapshots and bounded waits.
+        parents (tuple[list[float],list[float]]): Equal effective numerical chromosomes.
+    """
+    pool = SolutionPool(2)
+    pool.insert((0.0, [0.1]))
+    pool.insert((1.0, [0.9]))
+    monkeypatch.setattr(pool, "get_elite", lambda count: [(0.0, keys.copy()) for keys in parents])
+    algorithm = IPR(pool, decode, sphere, 1)
+    checks = iter([False, False, True])
+    monkeypatch.setattr(algorithm, "time_limit_reached", lambda duration: next(checks))
+    monkeypatch.setattr(algorithm, "_relink", lambda *_: pytest.fail("identical pair relinked"))
+    with patch("rko.metaheuristics.ipr.time.sleep") as sleep, RandomStreams(42).activate():
+        session = SearchSession(decode, sphere)
+        result = session.solve(algorithm, 60.0)
+    assert session.n_evaluations == 1
+    assert sleep.call_count == 2
+    assert result[2] == sphere(np.asarray(result[1]))
+
+
+def test_repeated_seed_keys_do_not_retry_until_unique(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Attempt only one extra seed when duplicate draws cannot establish diversity.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Install a repeated-key RNG and bounded timer.
+    """
+    pool = SolutionPool(4)
+    algorithm = IPR(pool, decode, sphere, 5)
+    checks = iter([False, False, False, True])
+    monkeypatch.setattr(algorithm, "time_limit_reached", lambda duration: next(checks))
+    monkeypatch.setattr(algorithm, "_relink", lambda *_: pytest.fail("no distinct pair"))
+    streams = RandomStreams(42)
+    generator = Mock(wraps=streams.numpy)
+    generator.random.side_effect = lambda size: np.full(size, 0.5)
+    monkeypatch.setattr(streams, "numpy", generator)
+    with patch("rko.metaheuristics.ipr.time.sleep") as sleep, streams.activate():
+        session = SearchSession(decode, sphere)
+        session.solve(algorithm, 60.0)
+    assert session.n_evaluations == 2 and generator.random.call_count == 2
+    assert pool.size == 1 and sleep.call_count == 2
 
 
 def test_pair_bootstrap_is_bounded_when_capacity_is_one(monkeypatch: pytest.MonkeyPatch) -> None:
