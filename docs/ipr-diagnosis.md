@@ -100,7 +100,8 @@ Read-only reference: `RKO_Cpp_v2.0` revision
   branch exists but is inactive; missing external search is **not** an established
   explanation of this comparison.
 - `Program/src/Method.h::UpdatePoolSolutions` rejects already-present **objective
-  values**, while Python's pool currently admits exact vector clones. Copying that
+  values**, while the historical Python policy admitted exact vector clones
+  (now corrected separately). Copying that
   policy would also reject distinct tied vectors; it is not an automatic safe fix.
 - The C++ driver initializes its population before invoking IPR and perturbs some
   tied-cost initial entries. The ten-random-elite arm here is **not** that complete
@@ -116,7 +117,9 @@ production correction, retaining valid tied vectors and bounded deficient-pair
 behavior. The linked unchanged-block correction now reuses known current costs for
 representation-identical moves, retaining virtual steps and deterministic path/tie
 results. Stochastic callback counts change explicitly. A full-population policy
-still requires controlled evidence; this diagnosis does not choose one.
+still requires controlled evidence; this diagnosis does not choose one. The
+[full-driver startup audit](driver-initialization.md) details the reference pool
+fill, bounded cost-tie pass, Python empty startup and distinct clock boundaries.
 
 The original diagnosis itself changed no production transition/admission policy;
 the linked subsequent correction is a separately identified behavior change.

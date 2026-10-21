@@ -81,8 +81,11 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   identical effective parents. [Unchanged-block callback pruning](ipr-block-pruning.md)
   retains virtual path decisions for deterministic scoring but changes stochastic
   callback counts. General quality/speed/feasibility gains remain unestablished.
-  Full-driver initialization parity, more instance families, seeds, fixed-work
-  measurements and domain-specific validation remain necessary.
+  A [full-driver startup audit](driver-initialization.md) confirms that C++ fills
+  its shared pool before searches whereas Python's capacity starts empty. Their
+  initialization work and budget boundaries differ. Initialization-policy changes,
+  more instance families, seeds, fixed-work measurements and domain-specific
+  validation still require separate evidence.
 - **Licensing:** confirm imported-code ownership/terms before release; see
   [NOTICE](../NOTICE). An existing license file does not settle that review.
 
