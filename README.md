@@ -42,6 +42,8 @@ Select `algorithms`, `control` and `pool_size` directly in Python; omitted value
 use the packaged TOML defaults. SA now implements its requested online control
 rather than falling back to offline parameters; use `control=0` for its legacy
 fixed-parameter path. See [adaptive SA and migration](docs/sa-control.md).
+GRASP now samples the [wider reference lattice](docs/grasp-line-search.md) in both
+control modes; seeded trajectories and callback counts change without a new option.
 With `control=0`, `hyperparameters` supplies partial
 per-algorithm scalar overrides without editing files. `params_dir` remains
 available for custom defaults and adaptive grids. Library calls are quiet by default; `verbose=True` on `RKO` prints lifecycle

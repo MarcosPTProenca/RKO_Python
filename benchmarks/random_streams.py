@@ -8,18 +8,19 @@ Technical approach:
 - Alternate original global RNG searches and production owned-stream searches.
 
 Flow (pseudocode):
-1. Load the reference src/rko package and warm both implementations.
+1. Load the reference package, identify comparable contracts/controls and warm them.
 2. Run numerical and ordering objectives with fixed evaluation counts.
 3. Require identical results, elite pools and both final RNG states.
 
 Important criteria:
 - The reference package executes Python code and must be trusted.
+- Intentional contract or unsupported-control changes are not RNG-only comparisons.
 - Adaptive clocks are frozen; real timed cooperation is not being compared.
 - Timings exclude imports, stream construction and process startup.
 
 Inputs/Outputs:
 - Input: --reference pointing to a trusted pre-isolation src/rko directory.
-- Output: JSON lines of exact replay checks and paired wall/CPU ratios.
+- Output: JSON replay checks/ratios and explicit not_comparable mode records.
 """
 
 import argparse
@@ -44,6 +45,28 @@ from rko.metaheuristics.base import MetaheuristicBase
 from rko.orchestration.configuration import MH_SPECS
 from rko.orchestration.types import CostFn
 from rko.orchestration.types import DecoderFn
+
+
+def replay_modes(current: type, reference: type) -> tuple[int, ...]:
+    """Identify controls whose search contract can support an RNG-only comparison.
+
+    Args:
+        current (type): Current registered algorithm constructor.
+        reference (type): Trusted historical constructor for the same algorithm.
+
+    Returns:
+        tuple[int, ...]: Shared controls, or no modes after an intentional lattice change.
+
+    Raises:
+        ValueError: If a trusted constructor has no inspectable signature.
+    """
+    if getattr(current, "_replay_contract", None) != getattr(reference, "_replay_contract", None):
+        return ()
+    if all(
+        "control" in inspect.signature(algorithm).parameters for algorithm in (current, reference)
+    ):
+        return (0, 1)
+    return (0,)
 
 
 def replay_type(algorithm: type, control: int) -> type:
@@ -151,20 +174,21 @@ def main() -> None:
                 ),
                 current.__name__,
             )
-            reference_adaptive = "control" in inspect.signature(reference).parameters
-            if settings.supports_control and not reference_adaptive:
-                print(
-                    json.dumps(
-                        {
-                            "algorithm": name,
-                            "control": 1,
-                            "status": "not_comparable",
-                            "reason": "reference constructor has no adaptive control",
-                        }
-                    ),
-                    flush=True,
-                )
-            for control in (0, 1) if settings.supports_control and reference_adaptive else (0,):
+            modes = replay_modes(current, reference)
+            for control in (0, 1) if settings.supports_control else (0,):
+                if control not in modes:
+                    print(
+                        json.dumps(
+                            {
+                                "algorithm": name,
+                                "control": control,
+                                "status": "not_comparable",
+                                "reason": "reference search contract or adaptive control differs",
+                            }
+                        ),
+                        flush=True,
+                    )
+                    continue
                 classes = {
                     "global": replay_type(reference, control),
                     "owned": replay_type(current, control),

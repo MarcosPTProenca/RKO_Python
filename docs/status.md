@@ -48,8 +48,10 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   scientific invariants remain. SA now honors online control with real feasible
   Q actions, signed rewards and documented next-schedule t0 semantics; choose
   `control=0` for its former fixed path. This is not a demonstrated quality gain.
-  GRASP's candidate lattice/subset, unused alpha and refinement transitions still
-  need isolated correction/validation. Six local
+  GRASP now samples the wider lattice within the reference callback quota, using
+  bounded storage and owned RNGs; the incumbent may be omitted without losing the
+  global best. This is not a demonstrated quality/speed gain. Small-coordinate
+  subset/intensity/h rules, unused alpha and refinement remain separate. Six local
   neighborhood cases now match compiled C++ kernels: strategy 1 continues the
   sweep, and supplied indices are reshuffled. See [compatibility](cpp-compatibility.md).
   Corrected Q/reward/grid/IPR behavior is not a promise of unchanged C++ trajectories.

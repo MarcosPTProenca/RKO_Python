@@ -633,10 +633,14 @@ native-code parity.
 streams against a **trusted pre-isolation source package** loaded under a separate
 namespace. It warms each case, balances execution order over two repeats and
 three seeds, and checks 1,000 evaluations at 64 keys for all eleven algorithms,
-with adaptive control where supported by BOTH constructors. SA now has an adaptive
-path absent from the historical pre-isolation baseline; such cases are explicitly
-reported as `not_comparable`, never silently labeled as equivalent online runs.
-Offline SA remains comparable. Costs, keys, final elites and both final
+only where BOTH constructors share the search contract and requested control.
+SA now has an adaptive path absent from the historical pre-isolation baseline;
+that mode is `not_comparable`, never mislabeled as equivalent online runs.
+GRASP's sampled-lattice correction changes both modes, so old references without
+the matching internal replay-contract token are `not_comparable` for both. This
+avoids reporting intentional candidate/RNG changes as isolation regressions.
+Offline SA remains comparable; historical 342-pair reference files retain their
+original algorithm scope, not coverage of the new GRASP policy. Costs, keys, final elites and both final
 RNG states must match exactly. Adaptive policy clocks are frozen, not real timed
 cooperation. The reference package executes Python code and must be trusted.
 
