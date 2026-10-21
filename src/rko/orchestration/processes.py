@@ -263,6 +263,9 @@ def _worker(
             if best is None or result[2] < best[2]:
                 best = result
             del result
+        if best is None and config.prefill_pool:
+            keys, value = select_best_result([], pool)
+            best = ([], keys, value)
         if best is None:
             raise TimeoutError("Search deadline elapsed before worker execution.")
         if collect_metadata:
