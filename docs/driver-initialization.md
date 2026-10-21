@@ -129,7 +129,11 @@ Serial/thread startup runs in the caller after constructor validation and before
 search execution. Process startup uses the first existing worker after all workers
 are ready; no callback runs in the parent/manager and no extra search worker is
 added. Other workers wait until the initialization report, then the parent starts
-a fresh common search deadline and releases searches. The initialization watchdog
+a fresh common search deadline and releases searches. If that search window expires
+before a worker can execute, opted-in runs retain the already evaluated shared
+incumbent and report the search as not started, without another callback. Default-off
+runs retain their preceding error behavior when no worker search could execute.
+The initialization watchdog
 uses its own allowance plus the existing five-second process grace; a blocked
 callback or failed initializer tears down waiting workers. Decoder/objective or
 nonfinite failures fail the solve rather than masquerading as successful partial

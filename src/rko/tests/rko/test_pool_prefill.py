@@ -29,6 +29,7 @@ import pickle
 import pytest
 import random
 import shutil
+import threading
 import time
 from dataclasses import FrozenInstanceError
 from pathlib import Path
@@ -37,7 +38,10 @@ from rko.components.random_streams import RandomStreams
 from rko.components.solution_pool import SolutionPool
 from rko.orchestration import initialization as initialization_module
 from rko.orchestration.initialization import initialize_pool
+from rko.orchestration.processes import _worker
+from rko.orchestration.types import RunConfig
 from rko.parameters.loader import default_params_dir
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 
@@ -501,6 +505,58 @@ def test_initialization_watchdog_terminates_waiting_processes() -> None:
     assert {child.pid for child in mp.active_children()} == children
 
 
+@pytest.mark.parametrize("prefill", [False, True])
+def test_expired_process_search_preserves_only_opted_in_startup(prefill: bool) -> None:
+    """Retain startup work when no search starts without changing default error behavior.
+
+    Args:
+        prefill (bool): Explicit initialization policy supplied to the worker.
+    """
+    pool = SolutionPool(2)
+    pool.insert((0.1, [0.2]))
+    parent, child = mp.Pipe(duplex=False)
+    start = threading.Event()
+    start.set()
+
+    def forbidden(keys: np.ndarray) -> float:
+        """Reject any callback after an already-expired search release.
+
+        Args:
+            keys (np.ndarray): Unused candidate.
+
+        Raises:
+            AssertionError: If search work is incorrectly started.
+        """
+        raise AssertionError("no search callback should start")
+
+    try:
+        _worker(
+            (("MultiStart", 42),),
+            RunConfig(0, 2, ("MultiStart",), prefill),
+            pool,
+            decode,
+            forbidden,
+            1,
+            None,
+            start,
+            SimpleNamespace(value=time.perf_counter() - 1.0),
+            child,
+            collect_metadata=True,
+        )
+        assert parent.recv() == ("ready", None)
+        status, payload = parent.recv()
+        if prefill:
+            assert status == "metadata"
+            assert len(payload) == 1 and payload[0].stop_reason == "not_started"
+            assert payload[0].n_evaluations == 0
+            assert parent.recv() == ("result", ([], [0.2], 0.1))
+        else:
+            assert status == "error" and isinstance(payload[0], TimeoutError)
+    finally:
+        parent.close()
+        child.close()
+
+
 class ChildOnlyCost:
     """Reject accidental parent evaluation in the spawned startup path.
 
@@ -529,6 +585,27 @@ class ChildOnlyCost:
         """
         assert os.getpid() != self.parent_pid
         return sphere(keys)
+
+
+def test_prefilled_process_returns_seed_without_started_searches() -> None:
+    """Return completed startup context even when the fresh search deadline is immediate."""
+    result = RKO(
+        decode,
+        ChildOnlyCost(),
+        3,
+        algorithms=["MultiStart"],
+        control=0,
+        backend="process",
+        pool_size=3,
+        prefill_pool=True,
+        random_state=42,
+        n_jobs=1,
+    ).solve(1e-12)
+    assert result.initialization.n_evaluations == result.n_evaluations == 1
+    assert result.searches[0].stop_reason == "not_started"
+    assert result.searches[0].n_evaluations == 0
+    assert result.stop_reason == "time_limit" and np.isfinite(result.cost)
+    assert result.cost == sphere(np.asarray(result.keys))
 
 
 def test_prefilled_process_groups_keep_existing_worker_cap() -> None:
