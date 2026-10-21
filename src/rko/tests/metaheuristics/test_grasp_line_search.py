@@ -227,20 +227,21 @@ def test_solver_retains_global_best_after_worse_construction(
     def refine(
         keys: np.ndarray, decoder: DecoderFn, cost: CostFn, *, pool: ElitePool | None = None
     ) -> tuple[np.ndarray, float]:
-        """Keep the constructed point unchanged and mark completed refinement calls.
+        """Return a deliberately worse point and mark completed refinement calls.
 
         Args:
-            keys (np.ndarray): Initial or constructed point.
+            keys (np.ndarray): Constructed point.
             decoder (DecoderFn): Ordinary decoder.
             cost (CostFn): Numerical objective.
             pool (ElitePool | None): Shared context.
 
         Returns:
-            tuple[np.ndarray, float]: Unchanged candidate with its cost.
+            tuple[np.ndarray, float]: Shifted candidate and its worse cost.
         """
-        value = cost(decoder(keys))
+        worse = np.clip(keys + 0.25, 0.0, 1.0)
+        value = cost(decoder(worse))
         refinements.append(value)
-        return keys, value
+        return worse, value
 
     streams = RandomStreams(42)
     generator = Mock(wraps=streams.numpy)
@@ -253,7 +254,7 @@ def test_solver_retains_global_best_after_worse_construction(
     monkeypatch.setattr(algorithm, "time_limit_reached", lambda duration: len(refinements) >= 2)
     with streams.activate():
         result = algorithm.solve(60.0)
-    assert refinements[0] == 0 and refinements[1] > 0
+    assert len(refinements) == 2 and all(value > 0 for value in refinements)
     assert result[1:] == ([0.375] * 4, 0.0)
 
 

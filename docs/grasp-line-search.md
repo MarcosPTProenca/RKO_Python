@@ -103,12 +103,16 @@ threshold transition, distinct committed coordinates and callback stopping/failu
 Installed smoke exercises GRASP in serial/thread/spawn and both control modes.
 
 Historical RNG-only replays of the old GRASP algorithm are now reported as
-`not_comparable` for both modes. The internal replay-contract token is diagnostic,
-not a user-selectable search policy. Older replay reference files retain their
-original scope; they are not evidence for the corrected candidate policy.
+`not_comparable` for both modes; the constructor carries the
+`grasp-construction-v3` compatibility token. The token is diagnostic, not a
+user-selectable search policy. Older replay reference files retain their original
+scope; they are not evidence for the corrected candidate policy.
 
-Unchanged and still separate: `h` resets, initial RVND, in-place shuffle ordering
-versus the reference's shuffled copy, and the unused alpha axis. Full-driver
-initialization, quality, throughput and native-backend decisions still require
-matched comparisons. See [the contract table](cpp-compatibility.md) and
-[current limitations](status.md).
+Unchanged and still separate: in-place shuffle ordering versus the reference's
+shuffled copy, and the unused alpha axis. Step decay and initial handling now follow
+the reference grid progression: h is halved only after a construction that fails to
+improve the global best, and the initial random vector is scored once and published
+without refinement. Both are deliberate behavior changes with contract tests and no
+measured quality claim. Full-driver initialization, quality, throughput and
+native-backend decisions still require matched comparisons. See
+[the contract table](cpp-compatibility.md) and [current limitations](status.md).

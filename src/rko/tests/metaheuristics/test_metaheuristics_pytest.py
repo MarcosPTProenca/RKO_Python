@@ -55,8 +55,8 @@ def test_solution_pool_implements_search_protocols() -> None:
     assert isinstance(pool, ElitePool)
 
 
-def test_grasp_uses_injected_local_search_operator() -> None:
-    """Verify GRASP delegates refinement to a supplied operator."""
+def test_grasp_uses_injected_local_search_operator(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify GRASP delegates construction refinement to a supplied operator."""
     pool = SolutionPool(capacity=4)
     calls: list[object] = []
 
@@ -78,7 +78,9 @@ def test_grasp_uses_injected_local_search_operator() -> None:
         3,
         local_search_operator=local_search,
     )
-    grasp.solve(0.0)
+    monkeypatch.setattr(grasp, "_constructive", lambda step, keys: (keys, float(np.sum(keys))))
+    monkeypatch.setattr(grasp, "time_limit_reached", lambda duration: len(calls) >= 1)
+    grasp.solve(60.0)
 
     assert calls == [pool]
 

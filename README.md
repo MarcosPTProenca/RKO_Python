@@ -44,6 +44,9 @@ rather than falling back to offline parameters; use `control=0` for its legacy
 fixed-parameter path. See [adaptive SA and migration](docs/sa-control.md).
 GRASP now samples the [wider reference lattice](docs/grasp-line-search.md) in both
 control modes; seeded trajectories and callback counts change without a new option.
+Its grid step is halved only after a construction that fails to improve the global
+best, and the initial random vector is scored and published without refinement,
+matching the reference grid progression; seeded trajectories also change here.
 With `control=0`, `hyperparameters` supplies partial
 per-algorithm scalar overrides without editing files. `params_dir` remains
 available for custom defaults and adaptive grids. Library calls are quiet by default; `verbose=True` on `RKO` prints lifecycle

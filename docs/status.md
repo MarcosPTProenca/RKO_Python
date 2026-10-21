@@ -50,10 +50,13 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   `control=0` for its former fixed path. This is not a demonstrated quality gain.
   GRASP now samples the wider lattice within the reference callback quota, using
   bounded storage and owned RNGs; the incumbent may be omitted without losing the
-  global best. Construction now rounds its intensity upward and searches all
-  remaining coordinates when the 10% subset is below two. These corrections are
-  not demonstrated quality/speed gains. H resets, shuffle ordering, unused alpha
-  and refinement remain separate. Six local
+  global best. Construction rounds its intensity upward and searches all
+  remaining coordinates when the 10% subset is below two. Step decay and initial
+  handling now follow the reference grid: h is halved only after a construction
+  that fails to improve the global best, and the initial random vector is scored
+  once and published without refinement. These corrections are not demonstrated
+  quality/speed gains. Shuffle ordering and an unused alpha decision remain
+  separate. Six local
   neighborhood cases now match compiled C++ kernels: strategy 1 continues the
   sweep, and supplied indices are reshuffled. See [compatibility](cpp-compatibility.md).
   Corrected Q/reward/grid/IPR behavior is not a promise of unchanged C++ trajectories.

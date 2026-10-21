@@ -9,22 +9,23 @@ Technical approach:
   adding the best gene value to the partial solution at each construction step.
   The subset size and order are randomised to yield diverse starting points.
 - Improvement phase: RVND refines the constructed solution.
-- Step h is halved whenever no global improvement is found; it is reset when a
-  new best is discovered.  A Metropolis criterion based on elapsed time controls
-  acceptance of non-improving moves.
+- Step h is halved only when no global improvement is found; it stays at the
+  current value when a new best is discovered and restarts from hs at each new
+  Q-Learning state, matching the reference grid progression.  A Metropolis
+  criterion based on elapsed time controls acceptance of non-improving moves.
 - Q-Learning selects initial/final step settings online; the reference alpha axis
   remains present but is not used by construction.
 - Sample a bounded subset of the wider reference lattice without materializing it.
 - Round the construction fraction upward and scan all small remaining coordinate sets.
 
 Flow (pseudocode):
-1. Build initial random solution, apply RVND, insert into pool.
+1. Build and score an initial random solution; insert into pool without refinement.
 2. While time budget not exhausted:
    a. [Q-Learning] choose action, retrieve (alpha_grasp, hs, he).
    b. h = hs; while h >= he and time not exhausted:
       i.   Greedy-randomised construction.
       ii.  RVND.
-      iii. If improved globally: update best, insert pool, reset h.
+      iii. If improved globally: update best, insert pool, keep h.
       iv.  Else: halve h.
       v.   Metropolis acceptance for local incumbent.
    c. [Q-Learning] reward, update Q-table.
@@ -80,7 +81,7 @@ class GRASP(MetaheuristicBase):
       _replay_contract (str): Internal RNG-replay compatibility token, not an option.
     """
 
-    _replay_contract: str = "grasp-construction-v2"
+    _replay_contract: str = "grasp-construction-v3"
 
     def __init__(
         self,
@@ -279,9 +280,7 @@ class GRASP(MetaheuristicBase):
             st = random.randint(0, max(0, len(ql.states) - 1))
 
         best_keys: np.ndarray = numpy_rng.random(n)
-        best_keys, best_cost = (self.local_search_operator or rvnd)(
-            best_keys, self.decoder, self.cost, pool=self.solution_pool
-        )
+        best_cost: float = self.cost(self.decoder(best_keys))
         self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
 
         s = best_keys.copy()
@@ -304,8 +303,8 @@ class GRASP(MetaheuristicBase):
                 he_cur = ql.states[i_curr].par[2]
 
             h = hs_cur
-            improv = 0
             while h >= he_cur and not self.time_limit_reached(limit_time):
+                improved = False
                 s_line, _ = self._constructive(h, s.copy())
                 s_line, s_line_cost = (self.local_search_operator or rvnd)(
                     s_line, self.decoder, self.cost, pool=self.solution_pool
@@ -314,7 +313,7 @@ class GRASP(MetaheuristicBase):
                 if s_line_cost < best_cost:
                     best_cost = s_line_cost
                     best_keys = s_line.copy()
-                    improv = 1
+                    improved = True
                     self.solution_pool.insert((best_cost, best_keys.tolist()), self.name)
 
                 if s_line_cost < s_cost:
@@ -328,10 +327,7 @@ class GRASP(MetaheuristicBase):
                         s = s_line.copy()
                         s_cost = s_line_cost
 
-                if improv:
-                    h = hs_cur
-                    improv = 0
-                else:
+                if not improved:
                     h /= 2.0
 
             if ql is not None:
