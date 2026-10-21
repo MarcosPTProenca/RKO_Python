@@ -423,9 +423,22 @@ def test_rng_replay_detects_intentional_grid_change(monkeypatch: pytest.MonkeyPa
                 control (int): Simulated legacy adaptive flag.
             """
 
+    class LatticeOnly(GRASP):
+        """Advertise the earlier lattice correction without corrected construction counts.
+
+        Responsibilities:
+        - Model the preceding full-search replay contract, not its execution body.
+
+        Attributes:
+            _replay_contract (str): Earlier diagnostic revision marker.
+        """
+
+        _replay_contract: str = "grasp-sampled-lattice-v1"
+
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[4] / "benchmarks"))
     replay = importlib.import_module("random_streams")
     assert replay.replay_modes(GRASP, Historical) == ()
+    assert replay.replay_modes(GRASP, LatticeOnly) == ()
     assert replay.replay_modes(GRASP, GRASP) == (0, 1)
     assert replay.replay_modes(MultiStart, MultiStart) == (0,)
 

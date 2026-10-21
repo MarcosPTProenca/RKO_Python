@@ -106,8 +106,9 @@ def test_grasp_rebuilds_candidates_from_committed_partial_solution(
 
     grasp._constructive(0.1, np.zeros(4))
 
-    assert len(evaluated) == 4
-    assert evaluated[2][1][0] == 0.5
+    assert len(evaluated) == 7
+    assert all(np.array_equal(keys, np.zeros(4)) for _, keys in evaluated[:4])
+    assert all(np.array_equal(keys, np.array([0.5, 0.0, 0.0, 0.0])) for _, keys in evaluated[4:])
 
 
 def test_brkga_cs_helpers_are_instance_methods(monkeypatch: pytest.MonkeyPatch) -> None:

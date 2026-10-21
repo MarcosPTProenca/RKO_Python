@@ -1,4 +1,4 @@
-# GRASP sampled line-search lattice
+# GRASP lattice and construction contracts
 
 ## Corrected behavior
 
@@ -6,7 +6,8 @@ GRASP now samples the wider coordinate lattice described by the pinned C++
 reference instead of exhaustively testing a small logarithmic-radius neighborhood.
 This changes **both `control=0` and `control=1`**, including random draw ordering,
 callback counts and timed search trajectories. There is no legacy-policy flag;
-pin the preceding revision when reproducing the old algorithm. SA's separate
+pin `1bf4ce3` for the old near-only lattice, or `0fac7f5` for the lattice-only
+correction before construction counts/subsets changed. SA's separate
 `control=0` migration does not restore the old GRASP neighborhood.
 
 The correction is domain-neutral. No decoder, feasibility repair, parameter value,
@@ -67,6 +68,27 @@ candidate loop and quota. Decimal/tiny steps follow the explicit safe binary64
 contract above. All draws use the existing `RandomStreams` scope (or the documented
 standalone global fallback), not a new unseeded generator.
 
+## Construction intensity and coordinate subsets
+
+Each construction draws the existing intensity in `[0.3,0.7]` and commits
+`ceil(n*intensity)` coordinates, capped by the number of unfixed coordinates.
+This matches an integer loop tested against the real bound, rather than
+truncating it first. A one-variable problem therefore performs one construction
+step instead of zero. Integer bounds retain their existing iteration count.
+
+On **each pass**, compute `k=floor(0.1*remaining)`; if `k<2`, search **all** remaining
+coordinates. At 20 remaining coordinates this means two line searches, but at 19
+it means nineteen. The subset is recomputed after every commit. Each candidate
+sees the same committed partial solution; only the winning coordinate is fixed
+and removed. Existing in-place shuffle semantics and first-minimum tie handling
+are unchanged, not claims of matching C++ engines or seeded coordinate identities.
+
+These rules apply in both control modes and can increase construction work.
+Existing callback deadline/error boundaries and caller ownership are retained.
+This is a search-contract correction, **not a demonstrated performance or quality
+gain**. The preceding lattice-only revision also has different full-search RNG
+trajectories and is not an RNG-isolation replay baseline for this version.
+
 ## Validation and remaining differences
 
 Tests compare ordered callback traces/results/private RNG states against an
@@ -75,6 +97,9 @@ subsets, exercise incumbent omission/ties, preserve a solver's superior global
 incumbent, and cover boundaries, readonly strided float32 inputs, callback mutation,
 exceptions, deadline stopping, tiny/subnormal steps and bounded traced allocation.
 These are deterministic contract checks, not a full compiled-C++ application test.
+Construction tests independently enumerate real-bound iterations and candidate
+contexts, including one-variable progress, adjacent float bounds, the 21/20/19
+threshold transition, distinct committed coordinates and callback stopping/failures.
 Installed smoke exercises GRASP in serial/thread/spawn and both control modes.
 
 Historical RNG-only replays of the old GRASP algorithm are now reported as
@@ -82,8 +107,8 @@ Historical RNG-only replays of the old GRASP algorithm are now reported as
 not a user-selectable search policy. Older replay reference files retain their
 original scope; they are not evidence for the corrected candidate policy.
 
-Unchanged and still separate: small-coordinate subset selection, construction
-intensity rounding, `h` resets, initial RVND and the unused alpha axis. Full-driver
+Unchanged and still separate: `h` resets, initial RVND, in-place shuffle ordering
+versus the reference's shuffled copy, and the unused alpha axis. Full-driver
 initialization, quality, throughput and native-backend decisions still require
 matched comparisons. See [the contract table](cpp-compatibility.md) and
 [current limitations](status.md).

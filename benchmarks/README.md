@@ -636,8 +636,9 @@ three seeds, and checks 1,000 evaluations at 64 keys for all eleven algorithms,
 only where BOTH constructors share the search contract and requested control.
 SA now has an adaptive path absent from the historical pre-isolation baseline;
 that mode is `not_comparable`, never mislabeled as equivalent online runs.
-GRASP's sampled-lattice correction changes both modes, so old references without
-the matching internal replay-contract token are `not_comparable` for both. This
+GRASP's sampled-lattice and subsequent construction-count/subset corrections change
+both modes. Earlier near-only and lattice-only references without the matching
+internal replay-contract token are `not_comparable` for both. This
 avoids reporting intentional candidate/RNG changes as isolation regressions.
 Offline SA remains comparable; historical 342-pair reference files retain their
 original algorithm scope, not coverage of the new GRASP policy. Costs, keys, final elites and both final

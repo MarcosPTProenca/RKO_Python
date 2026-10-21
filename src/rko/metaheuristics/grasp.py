@@ -15,6 +15,7 @@ Technical approach:
 - Q-Learning selects initial/final step settings online; the reference alpha axis
   remains present but is not used by construction.
 - Sample a bounded subset of the wider reference lattice without materializing it.
+- Round the construction fraction upward and scan all small remaining coordinate sets.
 
 Flow (pseudocode):
 1. Build initial random solution, apply RVND, insert into pool.
@@ -79,7 +80,7 @@ class GRASP(MetaheuristicBase):
       _replay_contract (str): Internal RNG-replay compatibility token, not an option.
     """
 
-    _replay_contract: str = "grasp-sampled-lattice-v1"
+    _replay_contract: str = "grasp-construction-v2"
 
     def __init__(
         self,
@@ -206,7 +207,11 @@ class GRASP(MetaheuristicBase):
         return best_val, best_cost
 
     def _constructive(self, h: float, keys: np.ndarray) -> tuple[np.ndarray, float]:
-        """Build a solution via greedy randomized line search.
+        """Commit ceil(n*intensity) coordinates using the reference subset cardinality.
+
+        Each pass considers floor(0.1*remaining) coordinates, or every remaining
+        coordinate if that count is below two. Existing in-place shuffle order
+        is preserved; each candidate sees the same already committed partial state.
 
         Args:
             h (float): Line-search step size.
@@ -214,13 +219,19 @@ class GRASP(MetaheuristicBase):
 
         Returns:
             tuple[np.ndarray, float]: Constructed keys and their objective value.
+
+        Raises:
+            ValueError: If a line search rejects the step or varying coordinate.
+            Exception: Propagates callback failures and cooperative stop signals.
         """
         random = RandomStreams.python_rng()
-        intensity = int(random.uniform(0.3, 0.7) * self.tam_solution)
+        intensity = math.ceil(random.uniform(0.3, 0.7) * self.tam_solution)
         unfixed: list[int] = list(range(self.tam_solution))
         solution = keys.copy()
         for _ in range(min(intensity, len(unfixed))):
-            k_max = max(int(len(unfixed) * 0.1), 2)
+            k_max = int(len(unfixed) * 0.1)
+            if k_max < 2:
+                k_max = len(unfixed)
             random.shuffle(unfixed)
             chosen = unfixed[:k_max]
             best_pos = chosen[0]
