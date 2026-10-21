@@ -77,15 +77,17 @@ transition parity remains unproven.
 GRASP's [line-candidate correction](grasp-line-search.md) now restores the nominal
 reference lattice, sample quota and optional incumbent inclusion. Exact-ratio bounds
 and sparse sampling define safe behavior beyond the reference's float/int limits.
-Other audited construction/refinement policies remain unchanged:
+Construction iteration/subset counts now also match the nominal reference rules.
+Other audited construction/refinement policies remain separate:
 
 | Contract | Pinned C++ | Current Python |
 | --- | --- | --- |
 | Line candidate universe | Bounded lattice around the gene, then randomized subset | Same nominal lattice with exact-ratio bounds; no dense allocation |
 | Candidate evaluation count | At most `ceil(log2(int(1/h)))+1` sampled lattice values | Matching nominal quota, safely extended to tiny/large steps |
 | Incumbent in subset | May be omitted; construction can worsen | May be omitted; global solver best remains protected |
-| Small unfixed sets | Search every remaining coordinate when the 10% subset is below two | Search at most two |
-| Construction intensity | Integer loop against a real bound (effectively ceiling) | Truncated integer count |
+| Small unfixed sets | Search every remaining coordinate when the 10% subset is below two | Same fallback, recomputed after each commit |
+| Construction intensity | Integer loop against a real bound (effectively ceiling) | `ceil(n*intensity)`, including one construction step for n=1 |
+| Shuffle ordering | Shuffle a copy of unfixed coordinates | Shuffle unfixed coordinates in place; retained existing policy |
 | Improving fine-grid step | Keep the current h | Reset h to hs |
 | Initial refinement | Score the initial vector before construction | Apply initial RVND |
 | Alpha parameter | Read/selected but unused by construction | Adaptive axis selected but unused by construction |
@@ -99,7 +101,7 @@ benchmark remains unchanged; full validation is hosted to avoid local contention
 
 ## Still to resolve
 
-- GRASP small-coordinate subset/intensity/h transitions and an unused-alpha decision.
+- GRASP h transitions, shuffle ordering and an unused-alpha decision.
 - Full SA/GRASP transition and refinement comparisons beyond adaptive plumbing.
 - Full per-algorithm initialization, transition, restart and stopping contracts.
 - Full-driver population initialization and comparable timing/work accounting;

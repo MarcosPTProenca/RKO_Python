@@ -89,6 +89,8 @@ def main() -> None:
         for algorithm, dimension, control in (
             ("MultiStart", 3, 0),
             ("IPR", 64, 0),
+            ("GRASP", 1, 0),
+            ("GRASP", 1, 1),
             ("GRASP", 4, 0),
             ("GRASP", 4, 1),
             ("SA", 64, 0),
