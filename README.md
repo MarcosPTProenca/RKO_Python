@@ -82,7 +82,9 @@ IPR consumes elite pairs. If fewer than two elites exist at startup, it inserts
 its initial evaluated candidate and tries at most one additional random seed,
 using the same decoder/objective and assigned deadline. This makes standalone or
 first-in-group IPR able to relink without waiting for a producer queued behind it.
-An already usable pool retains its initialization draw order. Use a pool capacity
+An already usable pool retains its initialization draw order. Pair occupancy alone
+is not population diversity; see the [IPR fixed-work diagnosis](docs/ipr-diagnosis.md)
+for remaining clone/redundant-work findings and limits. Use a pool capacity
 of at least two; a pool unable to retain a pair still uses bounded waiting after
 those seed attempts. Seeds are not domain-specific feasibility repairs. Process
 occupancy queries transfer only a count rather than the entire pool.
