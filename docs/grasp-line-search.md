@@ -116,7 +116,8 @@ scratch; no memory or throughput improvement is claimed. Seeded candidate paths
 can differ despite the same number of shuffle calls; pin `a388e47` for the previous
 in-place policy. RNG engines still differ from C++, so this is not bitstream parity.
 
-Unchanged and still separate: the unused alpha axis. In-place subset shuffling was
+The [alpha axis is retained for reference compatibility](grasp-alpha.md): it
+influences adaptive state/action geometry, not construction directly. In-place subset shuffling was
 replaced by the reference's shuffled-copy semantics. Step decay and initial
 handling now follow the reference grid: h is halved only after a construction that
 fails to improve the global best, and the initial random vector is scored once and

@@ -56,8 +56,9 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   that fails to improve the global best, and the initial random vector is scored
   once and published without refinement. Construction subsets come from a
   shuffled copy, leaving the unfixed order intact like the reference. These
-  corrections are not demonstrated quality/speed gains. An unused alpha decision
-  remains separate. Six local
+  corrections are not demonstrated quality/speed gains. The [alpha axis is retained
+  for reference compatibility](grasp-alpha.md): it affects the adaptive state graph,
+  not construction directly; no RCL or deprecation is introduced. Six local
   neighborhood cases now match compiled C++ kernels: strategy 1 continues the
   sweep, and supplied indices are reshuffled. See [compatibility](cpp-compatibility.md).
   Corrected Q/reward/grid/IPR behavior is not a promise of unchanged C++ trajectories.

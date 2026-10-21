@@ -47,6 +47,8 @@ control modes; seeded trajectories and callback counts change without a new opti
 Its grid step is halved only after a construction that fails to improve the global
 best, and the initial random vector is scored and published without refinement,
 matching the reference grid progression; seeded trajectories also change here.
+The [alpha axis follows the reference compatibility policy](docs/grasp-alpha.md):
+it affects adaptive states/actions, not construction directly; no RCL is implied.
 With `control=0`, `hyperparameters` supplies partial
 per-algorithm scalar overrides without editing files. `params_dir` remains
 available for custom defaults and adaptive grids. Library calls are quiet by default; `verbose=True` on `RKO` prints lifecycle
