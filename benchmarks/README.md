@@ -640,6 +640,8 @@ GRASP's sampled-lattice and subsequent construction-count/subset corrections cha
 both modes. Earlier near-only and lattice-only references without the matching
 internal replay-contract token are `not_comparable` for both. This
 avoids reporting intentional candidate/RNG changes as isolation regressions.
+IPR's unchanged-block callback pruning also requires a matching replay token;
+older unpruned IPR is explicitly `not_comparable` for RNG-only comparisons.
 Offline SA remains comparable; historical 342-pair reference files retain their
 original algorithm scope, not coverage of the new GRASP policy. Costs, keys, final elites and both final
 RNG states must match exactly. Adaptive policy clocks are frozen, not real timed
@@ -693,8 +695,17 @@ unique chromosomes and select zero identical-parent pairs. Equal-budget producti
 traces now match the isolated control; initialization remains fully charged. Scores
 are unchanged in the two-seed cases and mixed versus old ten-seed production.
 The header also fingerprints the pool source so admission changes are identifiable.
-Unchanged-block work remains unpruned. This is not a throughput, feasibility,
-C++ parity or native-backend result.
+The subsequent [unchanged-block correction](../docs/ipr-block-pruning.md) has its
+own `ipr-pruned-blocks-reference.jsonl`: the direct one-differing-block case falls
+from 55 to two callbacks, preserving the virtual path and deterministic minimum.
+All 36 cases still charge exactly 1,024 completed evaluations; full-search path/RNG
+counts can therefore differ from older work records. Stateful/stochastic callback
+results can change. This is not a throughput, feasibility, C++ parity or native
+backend result.
+
+The per-gene `ScalarIPR` control in `benchmarks/ipr.py` shares current pruning and
+virtual-step rules, so new copy-kernel comparisons vary copying alone. Historical
+IPR speed data retains its original policy/version; no new speedup is measured.
 
 RNG-isolation replay deliberately injects the current `SolutionPool` into both
 historical and current algorithm implementations. That controls the shared pool

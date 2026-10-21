@@ -86,7 +86,10 @@ An already usable pool retains its initialization draw order. Pair occupancy alo
 is not population diversity for custom providers. Stock pools now retain
 [one best observation per chromosome](docs/elite-diversity.md), including managed
 pools; IPR skips identical effective parents. See the
-[fixed-work diagnosis](docs/ipr-diagnosis.md) for remaining redundant-work limits. Use a pool capacity
+[fixed-work diagnosis](docs/ipr-diagnosis.md) for limits. IPR now
+[omits unchanged-block evaluations](docs/ipr-block-pruning.md), retaining virtual
+path decisions for deterministic scoring; stochastic/stateful callbacks receive
+fewer observations and can change results. Use a pool capacity
 of at least two; a pool unable to retain a pair still uses bounded waiting after
 those seed attempts. Seeds are not domain-specific feasibility repairs. Process
 occupancy queries transfer only a count rather than the entire pool.

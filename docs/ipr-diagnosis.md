@@ -3,7 +3,9 @@
 **Historical baseline:** the findings below describe `0c3a573`, before production
 chromosome uniqueness. The [elite-diversity correction](elite-diversity.md) now
 prevents duplicate admission and skips identical effective parents. The original
-reference remains unchanged; a separate post-fix work record is maintained.
+reference remains unchanged; separate post-fix work records are maintained.
+[Unchanged-block pruning](ipr-block-pruning.md) subsequently reduces the direct
+one-differing-block case from 55 to two evaluations, retaining virtual decisions.
 
 The empty-pool bootstrap enables standalone IPR to start relinking. It does not
 establish adequate population diversity, efficient path work or solution quality.
@@ -107,13 +109,14 @@ Read-only reference: `RKO_Cpp_v2.0` revision
   blocks, and its block count truncates. Python safely covers partial blocks; do
   not reproduce reference indexing/edge defects to claim parity.
 
-## Remaining correction to isolate
+## Subsequent corrections and remaining scope
 
 Exact duplicate admission/identical-parent selection is now addressed by the linked
 production correction, retaining valid tied vectors and bounded deficient-pair
-behavior. Next remove unchanged-block evaluations while preserving the meaningful candidate
-path, tie policy, parent ownership and incumbent/deadline recovery. Only afterward
-choose a full-population policy from controlled evidence.
+behavior. The linked unchanged-block correction now reuses known current costs for
+representation-identical moves, retaining virtual steps and deterministic path/tie
+results. Stochastic callback counts change explicitly. A full-population policy
+still requires controlled evidence; this diagnosis does not choose one.
 
 The original diagnosis itself changed no production transition/admission policy;
 the linked subsequent correction is a separately identified behavior change.

@@ -73,8 +73,9 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   A [bounded-work diagnosis](ipr-diagnosis.md) exposed duplicate elite collapse
   and redundant unchanged-block evaluations. Stock pools now retain
   [one best observation per chromosome](elite-diversity.md), and IPR skips
-  identical effective parents. Unchanged-block pruning and general quality gains
-  remain unestablished.
+  identical effective parents. [Unchanged-block callback pruning](ipr-block-pruning.md)
+  retains virtual path decisions for deterministic scoring but changes stochastic
+  callback counts. General quality/speed/feasibility gains remain unestablished.
   Full-driver initialization parity, more instance families, seeds, fixed-work
   measurements and domain-specific validation remain necessary.
 - **Licensing:** confirm imported-code ownership/terms before release; see

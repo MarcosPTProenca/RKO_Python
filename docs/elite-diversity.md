@@ -58,9 +58,10 @@ The older `ipr-diagnosis-reference.jsonl` remains the identified pre-fix baselin
 
 The two-seed scores remain unchanged in that matrix; ten-seed scores change in
 mixed directions relative to old production admission. **No general quality,
-feasibility or end-to-end speed improvement is established.** Unchanged-block
-pruning is deliberately deferred: the one-differing-block kernel still performs
-55 evaluations for two unique vectors, preserving its current path/tie behavior.
+feasibility or end-to-end speed improvement is established.** A subsequent
+[unchanged-block correction](ipr-block-pruning.md) now reduces the controlled
+one-differing-block kernel from 55 to two callbacks while retaining virtual path
+and deterministic tie behavior. Stochastic callback trajectories can change.
 
 ## Migration and scope
 
