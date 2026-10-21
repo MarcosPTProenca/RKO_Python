@@ -6,15 +6,15 @@ Objective:
 
 Technical approach:
 - Use a threading lock to protect concurrent reads and writes.
-- Keep solutions sorted in ascending order of cost so index 0 is always best.
+- Keep one best observation per coordinate-equal chromosome, sorted by cost.
 - Expose an insert method compatible with the duck-typed pool contract already
   used by SA, and a get_elite query required by IPR and pool-aware Nelder-Mead.
 - Copy two requested ranks atomically for sparse process-client snapshots.
 
 Flow (pseudocode):
 1. Initialise an empty pool with a fixed capacity.
-2. On insert: acquire lock; if pool not full or candidate beats worst, add and
-   re-sort; release lock.
+2. On insert: validate; acquire lock; reject equal/worse duplicate observations,
+   replace better duplicates or admit competitive novel vectors; re-sort; release.
 3. On get_elite: acquire lock; return detached copies of the top-k entries.
 
 Important criteria:
@@ -210,9 +210,12 @@ class SolutionPool:
     def insert(self, entry: tuple[float, list[float]], source: str = "") -> None:
         """Inserts a candidate solution if it improves the pool.
 
-        The pool keeps at most *capacity* solutions sorted by cost (ascending).
-        A new entry is accepted when the pool is not yet full, or when the
-        candidate cost is strictly better than the current worst elite.
+        The pool keeps at most *capacity* coordinate-distinct solutions, sorted
+        by cost. Equal/worse observations of the same chromosome are ignored;
+        a strictly better observation replaces that chromosome's retained entry.
+        Different chromosomes with tied costs remain eligible. A novel entry is
+        accepted if capacity remains or its cost strictly beats the worst elite.
+        Admission is atomic, not a fitness cache: callbacks have already run.
 
         Args:
           entry: A ``(cost, keys_list)`` pair describing the candidate.
@@ -230,6 +233,12 @@ class SolutionPool:
         if not math.isfinite(cost) or not keys or not all(math.isfinite(key) for key in keys):
             raise ValueError("Pool entries require a finite cost and a nonempty finite key vector.")
         with self._lock:
+            for index, (old_cost, old_keys, _) in enumerate(self._pool):
+                if old_keys == keys:
+                    if cost >= old_cost:
+                        return
+                    del self._pool[index]
+                    break
             if len(self._pool) < self.capacity or cost < self._pool[-1][0]:
                 improved = not self._pool or cost < self._pool[0][0]
                 self._pool.append((cost, keys, source))

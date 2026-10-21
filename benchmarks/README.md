@@ -677,8 +677,8 @@ admission control, each charged exactly 1,024 completed objective evaluations.
 Production two-seed cases use 2 seed + 1,022 path evaluations; ten-elite cases use
 11 + 1,013, including production IPR's unconditional extra initial draw.
 
-All three ordinary-bootstrap sphere cases collapse to one distinct vector in ten
-pool slots. Rejecting exact clones in the isolated control eliminates identical
+In the historical `0c3a573` reference, all three ordinary-bootstrap sphere cases
+collapse to one distinct vector in ten pool slots. Rejecting exact clones in the isolated control eliminates identical
 parents but does not improve the best score in any of the nine two-seed cases.
 A direct one-differing-block pair makes 55 evaluations for only two unique vectors.
 More initial seeds improve the sphere/threshold examples here, not all domains;
@@ -686,5 +686,17 @@ combining larger populations with duplicate rejection has mixed relative outcome
 
 See [diagnostic contracts and findings](../docs/ipr-diagnosis.md) for seed-prefix
 matching, source fingerprints, work accounting and reference-source limitations.
-No production admission/transition policy, runtime API or active Knapsack benchmark
-is changed. This is not a throughput, feasibility, C++ parity or native-backend result.
+The diagnosis itself changed no production policy or active Knapsack benchmark.
+The subsequent [chromosome-uniqueness correction](../docs/elite-diversity.md) is
+recorded separately in `ipr-unique-elites-reference.jsonl`: all 36 cases retain
+unique chromosomes and select zero identical-parent pairs. Equal-budget production
+traces now match the isolated control; initialization remains fully charged. Scores
+are unchanged in the two-seed cases and mixed versus old ten-seed production.
+The header also fingerprints the pool source so admission changes are identifiable.
+Unchanged-block work remains unpruned. This is not a throughput, feasibility,
+C++ parity or native-backend result.
+
+RNG-isolation replay deliberately injects the current `SolutionPool` into both
+historical and current algorithm implementations. That controls the shared pool
+context; it is not a replay of historical application admission semantics or a
+reinterpretation of historical timing/result files.

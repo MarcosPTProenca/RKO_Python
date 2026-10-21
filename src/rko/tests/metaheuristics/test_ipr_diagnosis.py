@@ -70,9 +70,8 @@ def test_probe_counts_every_evaluation(
     assert row["unique_pool_vectors"] <= row["pool_size"] <= 10
     assert row["unique_pool_decoded"] <= row["unique_pool_vectors"]
     assert row["path_outside_seed_alleles"] == 0
-    if distinct:
-        assert row["equal_parent_pairs"] == 0
-        assert row["unique_pool_vectors"] == row["pool_size"]
+    assert row["equal_parent_pairs"] == 0
+    assert row["unique_pool_vectors"] == row["pool_size"]
     assert pickle.dumps((random.getstate(), np.random.get_state())) == before
 
 
@@ -90,6 +89,8 @@ def test_replay_and_seed_prefix(diagnosis: ModuleType) -> None:
                 for _ in range(2)
             ]
             assert rows[0] == rows[1]
+            assert rows[0]["unique_pool_vectors"] == rows[0]["pool_size"]
+            assert rows[0]["equal_parent_pairs"] == 0
             prefixes.add(rows[0]["seed_prefix_sha256"])
     assert len(prefixes) == 1
 

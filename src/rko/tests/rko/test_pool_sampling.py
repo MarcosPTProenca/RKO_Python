@@ -31,6 +31,7 @@ import pytest
 import random
 from collections.abc import Iterator
 from multiprocessing.synchronize import Event
+from rko.components.random_streams import RandomStreams
 from rko.components.solution_pool import SolutionPool
 from rko.metaheuristics.ipr import IPR
 from rko.orchestration.processes import PoolManager
@@ -80,6 +81,26 @@ def test_pair_rejects_invalid_ranks(indices: object) -> None:
     with pytest.raises(ValueError, match="Elite rank"):
         pool._get_elite_pair(indices)
     assert pool.get_elite(10) == before
+
+
+def test_managed_pool_keeps_unique_vectors_and_best_repeat_observations(
+    manager: PoolManager,
+) -> None:
+    """Apply the same authoritative admission rule through actual manager RPCs.
+
+    Args:
+        manager (PoolManager): Spawned pool server.
+    """
+    pool = manager.SolutionPool(10)
+    for index in range(32):
+        pool.insert((float(-index), [index % 2, 0.25]), str(index))
+    assert pool.size == 2
+    assert pool.get_elite(10) == [(-31.0, [1, 0.25]), (-30.0, [0, 0.25])]
+    with RandomStreams(42).activate():
+        pair = pool._sample_elite_pair(2)
+    assert len(pair) == 2 and pair[0][1] != pair[1][1]
+    pool.insert((-31.0, [0.5, 0.25]), "tied novel")
+    assert pool.size == 3
 
 
 def test_pair_preserves_requested_order_bits_types_and_ownership() -> None:

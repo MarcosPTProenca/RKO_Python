@@ -58,9 +58,11 @@ or capacity-one pool cannot retain a pair; existing backoff then applies.
 
 This restores usable standalone relinking, **not full-driver parity**: C++ seeds
 its configured pool population, whereas Python only bootstraps the missing pair
-locally in IPR. A [fixed-work diagnosis](ipr-diagnosis.md) also exposes duplicate
-elite collapse and redundant unchanged-block evaluations in current Python IPR;
-its isolated controls are not production policy changes or quality guarantees.
+locally in IPR. A [fixed-work diagnosis](ipr-diagnosis.md) exposed clone collapse
+and redundant block evaluations. Stock Python pools now enforce
+[chromosome uniqueness](elite-diversity.md), retaining different tied-cost vectors;
+IPR skips identical effective parents. C++ update rejects objective duplicates,
+which is a different policy. Unchanged-block pruning remains separate.
 Global initialization, random engines, block-path transitions and
 throughput still require separate matched comparisons. Random seeds are not generic
 feasibility repairs; no C++-matching quality claim follows from this correction.

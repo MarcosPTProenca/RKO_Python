@@ -83,8 +83,10 @@ its initial evaluated candidate and tries at most one additional random seed,
 using the same decoder/objective and assigned deadline. This makes standalone or
 first-in-group IPR able to relink without waiting for a producer queued behind it.
 An already usable pool retains its initialization draw order. Pair occupancy alone
-is not population diversity; see the [IPR fixed-work diagnosis](docs/ipr-diagnosis.md)
-for remaining clone/redundant-work findings and limits. Use a pool capacity
+is not population diversity for custom providers. Stock pools now retain
+[one best observation per chromosome](docs/elite-diversity.md), including managed
+pools; IPR skips identical effective parents. See the
+[fixed-work diagnosis](docs/ipr-diagnosis.md) for remaining redundant-work limits. Use a pool capacity
 of at least two; a pool unable to retain a pair still uses bounded waiting after
 those seed attempts. Seeds are not domain-specific feasibility repairs. Process
 occupancy queries transfer only a count rather than the entire pool.
