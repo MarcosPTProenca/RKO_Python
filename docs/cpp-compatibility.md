@@ -74,27 +74,32 @@ explicit corrections, not claims of identical trajectories or scientific quality
 Python's legacy refinement/current-incumbent transition is retained; full SA
 transition parity remains unproven.
 
-The read-only GRASP audit identified these differences, **not corrected yet**:
+GRASP's [line-candidate correction](grasp-line-search.md) now restores the nominal
+reference lattice, sample quota and optional incumbent inclusion. Exact-ratio bounds
+and sparse sampling define safe behavior beyond the reference's float/int limits.
+Other audited construction/refinement policies remain unchanged:
 
 | Contract | Pinned C++ | Current Python |
 | --- | --- | --- |
-| Line candidate universe | Bounded lattice around the gene, then randomized subset | Nearby plus/minus shifts up to a logarithmic radius |
-| Candidate evaluation count | At most `ceil(log2(int(1/h)))+1` sampled lattice values | Current value plus both signs of each logarithmic shift when valid |
+| Line candidate universe | Bounded lattice around the gene, then randomized subset | Same nominal lattice with exact-ratio bounds; no dense allocation |
+| Candidate evaluation count | At most `ceil(log2(int(1/h)))+1` sampled lattice values | Matching nominal quota, safely extended to tiny/large steps |
+| Incumbent in subset | May be omitted; construction can worsen | May be omitted; global solver best remains protected |
 | Small unfixed sets | Search every remaining coordinate when the 10% subset is below two | Search at most two |
 | Construction intensity | Integer loop against a real bound (effectively ceiling) | Truncated integer count |
 | Improving fine-grid step | Keep the current h | Reset h to hs |
 | Initial refinement | Score the initial vector before construction | Apply initial RVND |
 | Alpha parameter | Read/selected but unused by construction | Adaptive axis selected but unused by construction |
 
-A dense-step line search can therefore miss candidates available to C++ while
-making more callback evaluations. This is a contract finding, not evidence that
-all reference choices should replace Python's behavior. Isolate candidate-coverage
-correction from alpha policy, initialization and refinement changes, and validate
-without editing or competing with the ongoing paired benchmark.
+The former near-only Python grid could miss available candidates while making
+more callback evaluations. Bounded dyadic oracle cases now cover the wider universe,
+ordered samples and callback budget; this is not a full compiled-C++ quality test or
+bitstream/rounding equivalence. Alpha, initialization and refinement choices remain
+separate, not blindly replaced just to match reference code. The ongoing paired
+benchmark remains unchanged; full validation is hosted to avoid local contention.
 
 ## Still to resolve
 
-- GRASP candidate-coverage/subset semantics and an explicit unused-alpha decision.
+- GRASP small-coordinate subset/intensity/h transitions and an unused-alpha decision.
 - Full SA/GRASP transition and refinement comparisons beyond adaptive plumbing.
 - Full per-algorithm initialization, transition, restart and stopping contracts.
 - Full-driver population initialization and comparable timing/work accounting;

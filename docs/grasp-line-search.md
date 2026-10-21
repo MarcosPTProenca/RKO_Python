@@ -1,0 +1,89 @@
+# GRASP sampled line-search lattice
+
+## Corrected behavior
+
+GRASP now samples the wider coordinate lattice described by the pinned C++
+reference instead of exhaustively testing a small logarithmic-radius neighborhood.
+This changes **both `control=0` and `control=1`**, including random draw ordering,
+callback counts and timed search trajectories. There is no legacy-policy flag;
+pin the preceding revision when reproducing the old algorithm. SA's separate
+`control=0` migration does not restore the old GRASP neighborhood.
+
+The correction is domain-neutral. No decoder, feasibility repair, parameter value,
+new dependency or public setting was added. The running C++64/Python benchmark
+remains pinned and must finish unchanged; later comparisons need a new identified
+source revision rather than mixing old/new rows.
+
+## Candidate and evaluation contract
+
+For the current coordinate `z` and step `h`:
+
+1. Compute `m = max(1, floor(1/h))` and `K = floor(m/2)+1`.
+2. The incumbent is one candidate position. Eligible shifted positions are
+   `z + tau*h` and `z - tau*h`, for integer `tau` from one through K, restricted
+   to `[0,1)`.
+3. Uniformly sample `min(eligible_count, ceil(log2(m))+1)` positions **without
+   replacement**, in random order, and evaluate only those positions.
+4. Return the first sampled minimum, retaining the first sample on objective ties.
+
+The incumbent is **not forced into the subset**. A line search can therefore
+return a worse point, as the randomized reference construction permits. Existing
+GRASP global-incumbent tracking and Metropolis acceptance remain in charge of
+retaining/accepting constructed solutions; the solver still preserves an already
+known superior incumbent.
+
+For example, with `z=0.875` and `h=1/1024`, the old implementation evaluated 23
+points only in `[0.8642578125,0.8857421875]`. The corrected lattice contains 641
+positions and samples 11. The coordinate `0.375` is now eligible; a controlled
+sample test reaches it. A random subset need not include that point, so this is
+**coverage and callback-budget evidence, not a quality or speed benchmark**.
+
+## Bounded representation and numeric safety
+
+The implementation counts positive/negative positions analytically and maps sampled
+ranks back to the interleaved reference order. Sparse swap-removal samples slots
+without constructing a list of size `1/h`. Auxiliary lattice storage is O(q), plus
+ordinary candidate-vector storage; each score receives a detached binary64 vector.
+Callback retention/mutation cannot change caller inputs or later sample contexts.
+
+Bounds and shifted coordinates use exact integer ratios of the supplied binary64
+values. This avoids reciprocal overflow and machine-integer limits. Even the
+smallest positive binary64 step requires at most **1075 objective calls** for a
+complete line search, subject to the existing callback deadline. Inputs must have
+a positive finite representable step and a finite varying coordinate in `[0,1]`;
+invalid inputs fail before RNG/callback effects. Larger-than-unit steps safely
+reduce to available positions rather than computing an undefined logarithm.
+
+An existing endpoint-one incumbent is retained for compatibility with mirror
+operators/reference initialization. Shifted positions remain half-open: if an
+exact valid position rounds to `1.0`, it is rounded inward to the largest binary64
+value below one. At extremely fine precision, distinct lattice positions may
+round to equal coordinate values; sampling is without replacement over **positions**,
+not unique rounded keys or decoded solutions.
+
+This is not a reproduction of C++'s binary32 step conversions, integer overflow
+or random-device bitstream. Bounded dyadic examples match the literal reference
+candidate loop and quota. Decimal/tiny steps follow the explicit safe binary64
+contract above. All draws use the existing `RandomStreams` scope (or the documented
+standalone global fallback), not a new unseeded generator.
+
+## Validation and remaining differences
+
+Tests compare ordered callback traces/results/private RNG states against an
+independent materialized reference lattice, enumerate all 24 ordered three-of-four
+subsets, exercise incumbent omission/ties, preserve a solver's superior global
+incumbent, and cover boundaries, readonly strided float32 inputs, callback mutation,
+exceptions, deadline stopping, tiny/subnormal steps and bounded traced allocation.
+These are deterministic contract checks, not a full compiled-C++ application test.
+Installed smoke exercises GRASP in serial/thread/spawn and both control modes.
+
+Historical RNG-only replays of the old GRASP algorithm are now reported as
+`not_comparable` for both modes. The internal replay-contract token is diagnostic,
+not a user-selectable search policy. Older replay reference files retain their
+original scope; they are not evidence for the corrected candidate policy.
+
+Unchanged and still separate: small-coordinate subset selection, construction
+intensity rounding, `h` resets, initial RVND and the unused alpha axis. Full-driver
+initialization, quality, throughput and native-backend decisions still require
+matched comparisons. See [the contract table](cpp-compatibility.md) and
+[current limitations](status.md).

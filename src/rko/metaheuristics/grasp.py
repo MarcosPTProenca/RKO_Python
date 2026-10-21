@@ -12,8 +12,9 @@ Technical approach:
 - Step h is halved whenever no global improvement is found; it is reset when a
   new best is discovered.  A Metropolis criterion based on elapsed time controls
   acceptance of non-improving moves.
-- Q-Learning (control=1) adapts alpha_grasp, initial step hs, and final step he
-  online via an epsilon-greedy policy over a discrete state space.
+- Q-Learning selects initial/final step settings online; the reference alpha axis
+  remains present but is not used by construction.
+- Sample a bounded subset of the wider reference lattice without materializing it.
 
 Flow (pseudocode):
 1. Build initial random solution, apply RVND, insert into pool.
@@ -28,8 +29,10 @@ Flow (pseudocode):
    c. [Q-Learning] reward, update Q-table.
 
 Important criteria:
-- Line-search generates ceil(log2(1/h))+1 shift candidates around the current
-  gene value at each constructive step.
+- Line-search samples at most ceil(log2(max(1,floor(1/h))))+1 eligible positions.
+- The incumbent may be omitted, allowing exploratory non-improving construction.
+- Exact-ratio bounds avoid reciprocal overflow; tiny steps need only O(log(1/h)) slots.
+- Selected shifted values stay in [0,1); an existing endpoint-one incumbent is retained.
 - Temperature for Metropolis decreases linearly from 100 to 0 over limit_time.
 
 Inputs/Outputs:
@@ -51,6 +54,7 @@ from ..components.validation import ParameterValidator
 from .base import LocalSearchOperator
 from .base import MetaheuristicBase
 from collections.abc import Callable
+from numbers import Real
 from typing import Any
 from typing import override
 
@@ -69,10 +73,13 @@ class GRASP(MetaheuristicBase):
       tam_solution (int): Length of the random-key vector.
       hs (float): Initial line-search step size.
       he (float): Minimum line-search step size.
-      control (int): 0 = offline (fixed hs/he, random alpha); 1 = Q-Learning.
+      control (int): Zero for fixed hs/he, one for adaptive step settings.
       parameters (list[list[float]]): Discrete Q-Learning parameter grid
-        ``[[alpha_grasp values], [hs values], [he values]]``.
+        ``[[alpha_grasp values], [hs values], [he values]]``; alpha is currently unused.
+      _replay_contract (str): Internal RNG-replay compatibility token, not an option.
     """
+
+    _replay_contract: str = "grasp-sampled-lattice-v1"
 
     def __init__(
         self,
@@ -128,31 +135,74 @@ class GRASP(MetaheuristicBase):
         self._state_filter = ParameterValidator.check(self, "GRASP")
 
     def _line_search(self, pos: int, h: float, keys: np.ndarray) -> tuple[float, float]:
-        """Find the best shifted value for one gene using a step-size search.
+        """Sample the reference lattice uniformly without replacement using sparse slots.
+
+        Exact float ratios define eligible shifts through floor(1/h)/2+1 steps
+        per sign. Rank zero is the incumbent; subsequent ranks interleave signs
+        until one side ends. Sparse swap-removal samples only the logarithmic
+        callback budget, including when reciprocal counts exceed machine integers.
 
         Args:
-            pos (int): Index of the gene to optimize.
-            h (float): Step size for generating candidate shifts.
-            keys (np.ndarray): Current random-key vector.
+            pos (int): Coordinate to vary; other coordinates remain fixed.
+            h (float): Positive finite representable step.
+            keys (np.ndarray): Caller-owned random keys, never mutated.
 
         Returns:
-            tuple[float, float]: Best gene value and its objective value.
+            tuple[float, float]: First sampled minimum and its objective, possibly
+                worse than an incumbent omitted from the subset.
+
+        Raises:
+            ValueError: If the step is invalid or the coordinate is outside [0,1].
+            IndexError: If the coordinate is out of range.
+            Exception: Original callback or cooperative stopping failures propagate.
         """
-        z = keys[pos]
-        num_candidates = math.ceil(math.log2(1.0 / h)) + 1 if h > 0 else 1
-        best_val = z
-        candidate = keys.copy()
-        best_cost = self.cost(self.decoder(candidate))
-        for tau in range(1, num_candidates + 1):
-            for shift in (tau * h, -tau * h):
-                value = z + shift
-                if 0.0 <= value < 1.0:
-                    candidate[pos] = value
-                    candidate_cost = self.cost(self.decoder(candidate))
-                    if candidate_cost < best_cost:
-                        best_cost = candidate_cost
-                        best_val = value
-                    candidate[pos] = z
+        message = "GRASP line-search step must be a positive finite number."
+        if isinstance(h, bool) or not isinstance(h, Real):
+            raise ValueError(message)
+        try:
+            step = float(h)
+        except OverflowError as exc:
+            raise ValueError(message) from exc
+        if not math.isfinite(step) or step <= 0:
+            raise ValueError(message)
+        z = float(keys[pos])
+        if not 0 <= z <= 1:
+            raise ValueError("GRASP line-search coordinate must be finite and in [0,1].")
+        step_num, step_den = step.as_integer_ratio()
+        z_num, z_den = z.as_integer_ratio()
+        divisions = max(1, step_den // step_num)
+        max_shift = divisions // 2 + 1
+        origin = z_num * step_den
+        stride = step_num * z_den
+        denominator = z_den * step_den
+        positive = min(max_shift, max(0, (denominator - origin - 1) // stride))
+        negative = min(max_shift, origin // stride)
+        paired = min(positive, negative)
+        remaining = 1 + positive + negative
+        samples = min(remaining, (divisions - 1).bit_length() + 1)
+        random = RandomStreams.python_rng()
+        swaps: dict[int, int] = {}
+        best_val, best_cost = z, math.inf
+        for _ in range(samples):
+            index = random.randrange(remaining)
+            rank = swaps.get(index, index)
+            remaining -= 1
+            swaps[index] = swaps.get(remaining, remaining)
+            value = z
+            if rank:
+                if rank <= 2 * paired:
+                    tau = (rank + 1) // 2
+                    direction = 1 if rank % 2 else -1
+                else:
+                    tau = rank - paired
+                    direction = 1 if positive > negative else -1
+                value = (origin + direction * tau * stride) / denominator
+                value = min(value, math.nextafter(1.0, 0.0))
+            candidate = np.asarray(keys, dtype=float).copy()
+            candidate[pos] = value
+            candidate_cost = self.cost(self.decoder(candidate))
+            if candidate_cost < best_cost:
+                best_cost, best_val = candidate_cost, value
         return best_val, best_cost
 
     def _constructive(self, h: float, keys: np.ndarray) -> tuple[np.ndarray, float]:
