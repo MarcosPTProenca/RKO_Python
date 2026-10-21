@@ -79,7 +79,35 @@ startup accounting throughout. Profile callback cost versus framework work befor
 selecting any Rust/native kernel; this pilot measures no throughput and makes no
 C++ quality/trajectory parity claim.
 
-Reproduce (bounded serial work, no timings):
+## Hosted expansion
+
+The manual `.github/workflows/prefill-study.yml` keeps this pilot's controls while
+expanding to dimensions 20/100/500, budgets 256/1024, capacity 10 and seeds 200–219.
+Six Ubuntu shards run the original serial runner, at most three jobs concurrently,
+with launch-configured OpenBLAS/OMP/MKL thread limits of one. This is 1,440 pairs /
+2,880 trials; none runs on the machine hosting the protected benchmark. Real-time
+or adaptive-control evidence is still outside this study.
+
+```bash
+gh workflow run prefill-study.yml --ref main
+```
+
+The final job validates provenance, complete/nonoverlapping pairs, exact work and
+seed controls using `benchmarks/prefill_report.py`. It recomputes per-family
+outcomes and medians from trial rows. The report artifact contains compact paired
+CSV and summary/provenance JSON; six separate raw-trace artifacts are retained for
+90 days. Persist the compact pairs/summary as an identified reference before
+artifact expiry; those rows suffice to recompute quality summaries without storing
+all full trace records in Git. Input SHA256 values and the workflow URL identify
+the raw shards.
+
+The expanded seeds include the original five pilot seeds. Do not merge both data
+sets and count overlapping cases as independent observations; the report compiler
+rejects duplicate pair keys. Do not average raw objective costs across families.
+Expanded outcome claims require completed, validated artifacts, not just a launched
+workflow or a passing pilot test.
+
+Reproduce the original pilot (bounded serial work, no timings):
 
 ```bash
 uv run --locked python benchmarks/prefill_work.py > /tmp/prefill-work.jsonl
