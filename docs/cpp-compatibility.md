@@ -109,6 +109,15 @@ compatibility, not interpreted as an RCL. Its indirect adaptive effects and the
 remaining offline RNG-draw difference are documented in [the alpha policy](grasp-alpha.md). The ongoing paired
 benchmark remains unchanged; full validation is hosted to avoid local contention.
 
+## Full-driver initialization
+
+The [startup contract audit](driver-initialization.md) separates shared-pool
+seeding from private algorithm populations. C++ fills its shared pool before
+launching searches and makes one cost-tie perturbation pass; Python starts empty
+and treats `pool_size` as capacity. Equal nominal capacities and durations do not
+imply equal startup evaluations, diversity or available search time. No Python
+prefill policy or result-accounting change is introduced by the audit.
+
 ## Still to resolve
 
 - GRASP offline unused-alpha RNG draw differs; exact random-engine/trajectory parity is not claimed.
