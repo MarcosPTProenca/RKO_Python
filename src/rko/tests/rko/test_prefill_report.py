@@ -24,10 +24,15 @@ Inputs/Outputs:
 import csv
 import importlib
 import json
+import numpy as np
 import pytest
 import statistics
 import sys
 from pathlib import Path
+from rko.components.random_streams import RandomStreams
+from rko.components.solution_pool import SolutionPool
+from rko.metaheuristics.grasp import GRASP
+from rko.parameters.loader import load_offline
 from types import ModuleType
 
 
@@ -130,6 +135,122 @@ def test_report_rejects_corrupted_shards(
         reporter.compile_report([target])
 
 
+def test_expanded_reference_matches_compact_observations(reporter: ModuleType) -> None:
+    """Recompute all expanded outcomes and medians after raw workflow artifacts expire.
+
+    Args:
+        reporter (ModuleType): Report compiler location.
+    """
+    directory = Path(reporter.__file__).parent
+    report = json.loads((directory / "prefill-expanded-summary.json").read_text())
+    with (directory / "prefill-expanded-pairs.csv").open(newline="") as stream:
+        pairs = list(csv.DictReader(stream))
+    assert report["pairs"] == len(pairs) == 1440 and len(report["groups"]) == 72
+    keys = [
+        (row["dimension"], row["evaluations"], row["algorithm"], row["workload"], row["seed"])
+        for row in pairs
+    ]
+    assert len(set(keys)) == len(keys)
+    assert {(int(row["dimension"]), int(row["evaluations"])) for row in pairs} == {
+        (dimension, budget) for dimension in (20, 100, 500) for budget in (256, 1024)
+    }
+    for group in report["groups"]:
+        selected = [
+            row
+            for row in pairs
+            if (int(row["dimension"]), int(row["evaluations"]), row["algorithm"], row["workload"])
+            == (group["dimension"], group["evaluations"], group["algorithm"], group["workload"])
+        ]
+        assert group["pairs"] == len(selected) == 20
+        assert {int(row["seed"]) for row in selected} == set(range(200, 220))
+        outcomes = {"better": 0, "tied": 0, "worse": 0}
+        for row in selected:
+            before, after = float(row["default_cost"]), float(row["prefilled_cost"])
+            outcomes["better" if after < before else "worse" if after > before else "tied"] += 1
+            assert 10 <= int(row["startup_evaluations"]) <= 19
+            assert after <= float(row["startup_best_cost"])
+        assert all(group[key] == count for key, count in outcomes.items())
+        assert group["default_median"] == statistics.median(
+            float(row["default_cost"]) for row in selected
+        )
+        assert group["prefilled_median"] == statistics.median(
+            float(row["prefilled_cost"]) for row in selected
+        )
+        assert group["search_improved_startup"] == sum(
+            row["search_improved_startup"] == "True" for row in selected
+        )
+    winners = [
+        row
+        for row in pairs
+        if row["algorithm"] == "GRASP"
+        and row["dimension"] == "500"
+        and float(row["prefilled_cost"]) < float(row["default_cost"])
+    ]
+    assert len(winners) == 102
+    assert all(row["search_improved_startup"] == "False" for row in winners)
+
+
+@pytest.mark.parametrize(
+    "dimension, searches, lower_bound", [(20, 87, 350), (100, 243, 974), (500, 6315, 25262)]
+)
+def test_grasp_first_construction_lower_bound(
+    monkeypatch: pytest.MonkeyPatch,
+    dimension: int,
+    searches: int,
+    lower_bound: int,
+) -> None:
+    """Check documented minimum-stage work through actual construction and line-search seams.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Fix minimum intensity and deterministic order.
+        dimension (int): Studied chromosome length.
+        searches (int): Required coordinate line searches at the minimum intensity.
+        lower_bound (int): Objectives through construction, including initial/final scores.
+    """
+    visits: list[int] = []
+    costs: list[float] = []
+
+    def score(keys: np.ndarray) -> float:
+        """Count actual line-search or final construction objective observations.
+
+        Args:
+            keys (np.ndarray): Candidate chromosome.
+
+        Returns:
+            float: Flat finite objective.
+        """
+        costs.append(0.0)
+        return 0.0
+
+    def search(pos: int, step: float, keys: np.ndarray) -> tuple[float, float]:
+        """Count coordinate requests without spending full candidate callbacks.
+
+        Args:
+            pos (int): Candidate coordinate.
+            step (float): Reference offline step.
+            keys (np.ndarray): Current partial solution.
+
+        Returns:
+            tuple[float, float]: Unchanged coordinate and tied score.
+        """
+        visits.append(pos)
+        return float(keys[pos]), 0.0
+
+    algorithm = GRASP(SolutionPool(), lambda keys: keys, score, dimension)
+    streams = RandomStreams(42)
+    monkeypatch.setattr(streams.python, "uniform", lambda lower, upper: 0.3)
+    monkeypatch.setattr(streams.python, "shuffle", lambda values: None)
+    monkeypatch.setattr(algorithm, "_line_search", search)
+    step = load_offline("GRASP")["hs"]
+    assert step == 0.125
+    with streams.activate():
+        algorithm._constructive(step, np.full(dimension, 0.5))
+        assert len(visits) == searches and len(costs) == 1
+        GRASP._line_search(algorithm, 0, step, np.full(dimension, 0.5))
+    quota = len(costs) - 1
+    assert quota == 4 and 2 + quota * searches == lower_bound
+
+
 def test_report_cli_writes_compact_evidence(
     reporter: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
@@ -163,6 +284,7 @@ def test_report_cli_writes_compact_evidence(
     reporter.main()
     summary = json.loads(prefix.with_name(prefix.name + "-summary.json").read_text())
     assert summary["pairs"] == 60 and summary["workflow_run_url"] == "https://example.test/study"
+    assert b"\r" not in prefix.with_name(prefix.name + "-pairs.csv").read_bytes()
     with prefix.with_name(prefix.name + "-pairs.csv").open(newline="") as stream:
         rows = list(csv.DictReader(stream))
     assert len(rows) == 60 and all(row["evaluations"] == "256" for row in rows)

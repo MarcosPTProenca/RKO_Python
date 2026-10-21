@@ -690,6 +690,17 @@ Knapsack feasibility or C++ parity were measured. See
 [controls, results and limits](../docs/prefill-matched-work.md). The runner uses an
 internal cooperative stop seam; it does not add a public fixed-evaluation API.
 
+The [hosted expansion](../docs/prefill-expanded-work.md) covers 20/100/500 keys,
+256/1024 total evaluations and 20 paired seeds: 1,440 pairs / 2,880 trials.
+`prefill-expanded-pairs.csv` and `prefill-expanded-summary.json` retain compact
+paired evidence/provenance; `prefill_report.py` validates raw controls and recomputes
+family-specific summaries. Across non-flat pairs, IPR is 342 better/18 worse,
+GRASP 150/139/71 and MultiStart 7/342/11 (better/tied/worse). No default switch.
+All 102 GRASP wins at 500 keys retain the startup best; neither budget can finish
+its first construction (minimum 25,262 objectives at packaged settings). Interpret
+these as limited-budget observations, not improved complete-GRASP cycles. Adaptive,
+real-time, application and native-performance evidence remains separate.
+
 ## IPR work and population diagnosis (not timing)
 
 ```bash

@@ -267,7 +267,7 @@ def main() -> None:
     with prefix.with_name(prefix.name + "-pairs.csv").open(
         "w", newline="", encoding="utf-8"
     ) as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     print(f"Validated {report['pairs']} pairs in {len(report['groups'])} family-specific groups.")

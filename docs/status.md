@@ -90,8 +90,13 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   A [bounded matched-work pilot](prefill-matched-work.md) found better IPR costs on
   15/15 non-flat pairs, while GRASP regressed on 3/15. It used five seeds, 20 keys,
   256 total objectives and a frozen offline clock, not application/timing evidence.
-  Keep prefill opt-in; wider dimensions/budgets, adaptive policies, instance families
-  and callback profiling are still needed before default/native decisions.
+  The [hosted expansion](prefill-expanded-work.md) adds 20/100/500 keys, 256/1024
+  objectives and 20 seeds: IPR improves on 342/360 non-flat pairs but regresses on 18.
+  GRASP/MultiStart remain mixed. All 102 GRASP wins at 500 keys retain startup best;
+  its first construction needs at least 25,262 objectives, beyond both study caps.
+  Keep prefill opt-in. Stage-completion instrumentation, sufficient per-algorithm
+  budgets, adaptive/real-clock policies, instance families and callback profiling
+  are still needed before default/native decisions.
 - **Licensing:** confirm imported-code ownership/terms before release; see
   [NOTICE](../NOTICE). An existing license file does not settle that review.
 
