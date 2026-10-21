@@ -54,9 +54,10 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   remaining coordinates when the 10% subset is below two. Step decay and initial
   handling now follow the reference grid: h is halved only after a construction
   that fails to improve the global best, and the initial random vector is scored
-  once and published without refinement. These corrections are not demonstrated
-  quality/speed gains. Shuffle ordering and an unused alpha decision remain
-  separate. Six local
+  once and published without refinement. Construction subsets come from a
+  shuffled copy, leaving the unfixed order intact like the reference. These
+  corrections are not demonstrated quality/speed gains. An unused alpha decision
+  remains separate. Six local
   neighborhood cases now match compiled C++ kernels: strategy 1 continues the
   sweep, and supplied indices are reshuffled. See [compatibility](cpp-compatibility.md).
   Corrected Q/reward/grid/IPR behavior is not a promise of unchanged C++ trajectories.

@@ -13,6 +13,7 @@ Technical approach:
   current value when a new best is discovered and restarts from hs at each new
   Q-Learning state, matching the reference grid progression.  A Metropolis
   criterion based on elapsed time controls acceptance of non-improving moves.
+- Construction shuffles a fresh copy of unfixed coordinates, retaining their order.
 - Q-Learning selects initial/final step settings online; the reference alpha axis
   remains present but is not used by construction.
 - Sample a bounded subset of the wider reference lattice without materializing it.
@@ -81,7 +82,7 @@ class GRASP(MetaheuristicBase):
       _replay_contract (str): Internal RNG-replay compatibility token, not an option.
     """
 
-    _replay_contract: str = "grasp-construction-v3"
+    _replay_contract: str = "grasp-construction-v4"
 
     def __init__(
         self,
@@ -211,8 +212,9 @@ class GRASP(MetaheuristicBase):
         """Commit ceil(n*intensity) coordinates using the reference subset cardinality.
 
         Each pass considers floor(0.1*remaining) coordinates, or every remaining
-        coordinate if that count is below two. Existing in-place shuffle order
-        is preserved; each candidate sees the same already committed partial state.
+        coordinate if that count is below two. A fresh shuffled copy selects the
+        subset, leaving unfixed order intact like the reference; each candidate
+        sees the same already committed partial state.
 
         Args:
             h (float): Line-search step size.
@@ -233,8 +235,9 @@ class GRASP(MetaheuristicBase):
             k_max = int(len(unfixed) * 0.1)
             if k_max < 2:
                 k_max = len(unfixed)
-            random.shuffle(unfixed)
-            chosen = unfixed[:k_max]
+            chosen = unfixed.copy()
+            random.shuffle(chosen)
+            chosen = chosen[:k_max]
             best_pos = chosen[0]
             best_cost = math.inf
             best_value = solution[best_pos]

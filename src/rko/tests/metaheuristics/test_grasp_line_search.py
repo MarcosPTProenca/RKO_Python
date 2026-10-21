@@ -436,10 +436,23 @@ def test_rng_replay_detects_intentional_grid_change(monkeypatch: pytest.MonkeyPa
 
         _replay_contract: str = "grasp-sampled-lattice-v1"
 
+    class InPlace(GRASP):
+        """Represent the prior grid-aligned constructor with in-place subset shuffling.
+
+        Responsibilities:
+        - Supply the preceding replay identity without executing historical code.
+
+        Attributes:
+            _replay_contract (str): Previous diagnostic revision marker.
+        """
+
+        _replay_contract: str = "grasp-construction-v3"
+
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[4] / "benchmarks"))
     replay = importlib.import_module("random_streams")
     assert replay.replay_modes(GRASP, Historical) == ()
     assert replay.replay_modes(GRASP, LatticeOnly) == ()
+    assert replay.replay_modes(GRASP, InPlace) == ()
     assert replay.replay_modes(GRASP, GRASP) == (0, 1)
     assert replay.replay_modes(MultiStart, MultiStart) == (0,)
 
