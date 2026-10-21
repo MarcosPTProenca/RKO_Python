@@ -37,6 +37,7 @@ from rko import RKO
 from rko.components.random_streams import RandomStreams
 from rko.components.solution_pool import SolutionPool
 from rko.orchestration import processes
+from rko.orchestration.search import _BudgetExpired
 from rko.orchestration.types import CostFn
 from rko.orchestration.types import DecoderFn
 from rko.orchestration.types import RunConfig
@@ -63,6 +64,7 @@ class InitialCost:
 
     Responsibilities:
     - Record the PID and first Python random sample for each search.
+    - Stop after that one completed observation rather than exhausting wall time.
 
     Attributes:
         directory (Path): Destination for one observation per algorithm.
@@ -87,6 +89,7 @@ class InitialCost:
 
         Raises:
             OSError: If a test observation cannot be written.
+            _BudgetExpired: After the first observed candidate, or for an unknown seed.
         """
         for index, expected in enumerate(self.expected):
             if (
@@ -105,7 +108,8 @@ class InitialCost:
                     ),
                     encoding="utf-8",
                 )
-        return float(np.dot(keys, keys))
+                return float(np.dot(keys, keys))
+        raise _BudgetExpired
 
 
 @dataclass
@@ -193,7 +197,7 @@ def test_worker_limit_runs_every_seeded_algorithm(
         control=0,
         n_jobs=n_jobs,
         random_state=42,
-    ).solve(0.9)
+    ).solve(2.0)
     observations = [
         json.loads(tmp_path.joinpath(f"{index}.json").read_text()) for index in range(5)
     ]
@@ -209,6 +213,7 @@ def test_worker_limit_runs_every_seeded_algorithm(
     assert len(result.keys) == 2
     assert all(0 <= key < 1 for key in result.keys)
     assert result.cost == pytest.approx(np.dot(result.keys, result.keys))
+    assert all(report.n_evaluations == 1 for report in result.searches)
     assert {child.pid for child in mp.active_children()} == before
 
 
@@ -233,7 +238,7 @@ def test_direct_process_dispatch_resolves_cpu_default(
         decode,
         InitialCost(tmp_path, expected, names),
         2,
-        0.9,
+        2.0,
         None,
         None,
         42,
