@@ -87,8 +87,11 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   own startup allowance/report, before fresh search budgets. It uses an existing
   child in process mode, not an extra worker or parent callback. Defaults, RNG
   engines and chromosome-unique admission remain distinct from full C++ parity.
-  Default-on policy, quality gains, more instance families/seeds and matched-work
-  comparisons still require separate evidence.
+  A [bounded matched-work pilot](prefill-matched-work.md) found better IPR costs on
+  15/15 non-flat pairs, while GRASP regressed on 3/15. It used five seeds, 20 keys,
+  256 total objectives and a frozen offline clock, not application/timing evidence.
+  Keep prefill opt-in; wider dimensions/budgets, adaptive policies, instance families
+  and callback profiling are still needed before default/native decisions.
 - **Licensing:** confirm imported-code ownership/terms before release; see
   [NOTICE](../NOTICE). An existing license file does not settle that review.
 
