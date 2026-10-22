@@ -106,13 +106,20 @@ are descriptive three-observation medians, not acceptance intervals.
 The VMs differed: startup Intel Xeon Platinum 8573C, portfolio AMD EPYC 7763,
 callbacks AMD EPYC 9V74. Do not compare absolute times across these probes.
 
-**Open correctness observation:** portfolio stderr retained four NumPy
-`RuntimeWarning: invalid value encountered in divide` occurrences during standard-
-deviation normalization. Final objective/seed/count checks passed, but the caller
-and implications for internal decisions are not yet localized. Do not suppress
-these warnings or declare them harmless; establish a deterministic reproducer
-before a further optimization or release claim. All raw rows and stderr remain
-available rather than excluding warning-producing runs.
+**Historical correctness observation:** this pre-fix portfolio reference retains
+four NumPy `RuntimeWarning: invalid value encountered in divide` occurrences during
+standard-deviation normalization. A deterministic two-elite/two-gene reproducer
+localized the same warning to BRKGA-CS community construction. The
+[defined-correlation contract](cpp-compatibility.md#brkga-cs-undefined-correlation)
+now explicitly excludes undefined/numerically non-normalizable edges rather than
+silencing warnings. It also removes constant-array edges fabricated by rounding,
+so those trajectories can change. The historical reference/stderr is not rewritten
+as warning-free data or merged with corrected-source measurements.
+
+The hosted invocation workflow now treats numerical RuntimeWarnings as errors,
+including in spawned children, and reruns for this correlation code/test. Original
+seed/objective/count checks remain. Passing these checks does not prove every
+algorithm invariant, C++ parity or release readiness.
 
 ## Reproduction and next decisions
 

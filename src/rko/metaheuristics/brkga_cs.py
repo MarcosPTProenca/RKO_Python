@@ -10,7 +10,8 @@ Technical approach:
 - Private instance methods detect elite communities and perturb chromosomes.
 - After every generation (or every 10 without improvement), the elite
   population is analysed via Pearson correlation:
-    * A graph is built where edge (i,j) exists if |corr(elite_i, elite_j)| >= sigma.
+    * A graph edge exists if a defined finite |corr(elite_i, elite_j)| >= sigma.
+    * Constant/one-gene elites and non-normalizable correlations add no edges.
     * Label Propagation identifies communities in the graph.
     * One random representative per community is marked as "promising".
     * Promising[0] is refined with RVND; other promising with Nelder-Mead.
@@ -72,10 +73,13 @@ class BRKGA_CS(MetaheuristicBase):
       pm (float): Per-gene mutation probability.
       rhoe (float): Elite inheritance probability per gene.
       sigma (float): Pearson correlation threshold for community edges.
+      _replay_contract (str): Diagnostic community-graph compatibility token.
       control (int): 0 = offline; 1 = online Q-Learning.
       parameters (list[list[float]]): Discrete Q-Learning grid
         ``[[p], [pe], [pm], [rhoe]]``.
     """
+
+    _replay_contract: str = "brkga-cs-defined-correlation-v1"
 
     def __init__(
         self,
@@ -214,7 +218,12 @@ class BRKGA_CS(MetaheuristicBase):
         return labels
 
     def _identify_promising(self, population: list[np.ndarray], elite_size: int) -> list[int]:
-        """Select one representative from each elite correlation community.
+        """Select representatives using only defined, finite elite correlations.
+
+        Constant chromosomes and fewer than two observations have no Pearson
+        correlation. They remain isolated even if rounding could fabricate a
+        coefficient. Numerical normalization failures also contribute no edge.
+        Defined pairs retain NumPy coefficients and the absolute sigma threshold.
 
         Args:
             population (list[np.ndarray]): Population sorted by ascending cost.
@@ -229,10 +238,22 @@ class BRKGA_CS(MetaheuristicBase):
         random = RandomStreams.python_rng()
         elite = [population[index] for index in range(elite_size)]
         adjacency: list[list[tuple[int, float]]] = [[] for _ in range(elite_size)]
+        correlatable = [
+            chromosome.size > 1 and bool(np.any(chromosome != chromosome[0]))
+            for chromosome in elite
+        ]
         for i in range(elite_size):
+            if not correlatable[i]:
+                continue
             for j in range(i + 1, elite_size):
-                correlation = float(np.corrcoef(elite[i], elite[j])[0, 1])
-                if abs(correlation) >= self.sigma:
+                if not correlatable[j]:
+                    continue
+                try:
+                    with np.errstate(invalid="raise", divide="raise"):
+                        correlation = float(np.corrcoef(elite[i], elite[j])[0, 1])
+                except FloatingPointError:
+                    continue
+                if np.isfinite(correlation) and abs(correlation) >= self.sigma:
                     weight = abs(correlation)
                     adjacency[i].append((j, weight))
                     adjacency[j].append((i, weight))
