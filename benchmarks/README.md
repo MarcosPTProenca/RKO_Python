@@ -3,6 +3,9 @@
 Each section identifies its workload and limits. Synthetic fixed-work and
 allocation probes complement the historical Knapsack reference; no single case
 establishes general optimization quality or native-code performance parity.
+See [the C++ acceptance target and native-backend gates](../docs/performance.md)
+for end-to-end quality/time/resource criteria; historical Python results must not
+be merged with corrected-revision observations as if they were one experiment.
 
 ## Spawn startup and installation layout
 
