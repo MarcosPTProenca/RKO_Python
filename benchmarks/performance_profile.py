@@ -207,8 +207,11 @@ class PerformanceProbe:
             random.setstate(saved_python)
             np.random.set_state(saved_numpy)
         functions = []
+        total_seconds = None
         if profiler is not None:
-            for (filename, line, name), values in pstats.Stats(profiler).stats.items():
+            statistics = pstats.Stats(profiler)
+            total_seconds = statistics.total_tt
+            for (filename, line, name), values in statistics.stats.items():
                 primitive, calls, exclusive, cumulative, _ = values
                 functions.append(
                     {
@@ -226,6 +229,7 @@ class PerformanceProbe:
             "schema_version": 1,
             "scope": "serial_fixed_work_search_only",
             "profiled": profile,
+            "profile_total_seconds": total_seconds,
             "profile_scope": (
                 "fixed_work_runner_including_construction_and_seed_pool" if profile else None
             ),

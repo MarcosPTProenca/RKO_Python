@@ -78,7 +78,9 @@ The record includes:
   whitelisted native-thread environment settings. These do not certify effective
   hierarchical quotas, actual native teams, host isolation or reproducible load.
 - With `--profile`, the top 20 functions by exclusive cProfile time, with inclusive
-  time and primitive/total calls. Inclusive values overlap: do not sum them.
+  time and primitive/total calls. `profile_total_seconds` retains the full
+  profiler total as a denominator; the truncated top 20 are not the whole run.
+  Unprofiled records use null. Inclusive values overlap: do not sum them.
 
 `result.seconds` and `cpu_seconds` cover search only; imports, provenance, algorithm
 construction, pool seeding and process startup/shutdown are excluded. Function
@@ -86,6 +88,63 @@ profiling covers the existing runner including construction and seeded-pool setu
 so its scope is explicitly different. Profiled times are diagnostic and must not
 be used as acceptance timings. cProfile cannot explain all native internals, and
 wall profiles are not memory measurements.
+
+## Hosted fixed-work screening
+
+The [baseline study workflow](../.github/workflows/performance-study.yml) runs on
+isolated hosted Ubuntu runners and retains raw records/host observations for 90
+days. It runs on relevant pull requests and can be dispatched manually after merge.
+Its registered screening matrix is six diagnostic algorithms, three objective
+families, dimensions 20/500, seeds 200–202 and 1,024 completed search objectives,
+each plain and profiled: 216 trials / 108 replay pairs / 36 three-seed groups.
+Plain/profiled order alternates by seed; profile versus plain is an equivalence
+check, not a speed comparison. Output goes outside the checkout to avoid creating
+a dirty source identity while collecting it.
+
+`benchmarks.performance_report` rejects incomplete or duplicate pairs, mixed source/
+runtime identities, changed result/pool/RNG fingerprints and invalid timing scopes.
+It reports unprofiled search medians separately from full-runner profile medians.
+Function fractions use the full profiler total, not search-only time or the sum
+of the truncated list. Only functions observed in every seed's top list are ranked;
+missing functions are not treated as zero. The workflow checks registered coverage.
+Raw artifacts remain necessary to inspect functions excluded by this selection.
+
+The three objective families are NOT the three callback-cost regimes in the larger
+investigation plan. This is a bounded preliminary use of existing instrumentation,
+not completion of Phase B. Small evaluation caps, especially GRASP at dimension500,
+can observe startup/partial construction rather than a completed search stage.
+Three seeds do not establish confidence bounds, quality or competitive superiority.
+Profiling biases Python/native cost shares; fractions nominate questions, not
+unprofiled headroom or guaranteed Amdahl gains. Different dimensions run on different
+VMs, so their latency difference is not a controlled hardware-scaling experiment.
+
+### First registered screen
+
+[Run 39809649686](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/39809649686)
+validated all 216 trials / 108 exact replay pairs / 36 groups. The selected compact
+[reference record](../benchmarks/performance-baseline-reference.json) retains input
+and analysis SHA256 digests, producer revision, run URL and explicit limits. Both
+raw shards had clean Git state and the same source/runtime identity: Python 3.14.9,
+NumPy 2.4.3. The dimension-20 VM reported Intel Xeon Platinum 8573C; dimension 500
+reported AMD EPYC 9V45. Both exposed four logical CPUs. This confirms why latency
+across these dimensions must not be treated as controlled scaling evidence.
+
+At dimension 500, the **current** shared `blending` function was consistently
+visible across SA, GA and BRKGA and all three objective families: its median
+exclusive **profile** fraction ranged 52.8%–60.3%. These are not unprofiled time
+shares. The operator already uses batched NumPy masks; the residual per-gene
+Python/RNG loop is the candidate to investigate, not a claim that its earlier
+optimization remains unimplemented. Smaller dimensions showed different costs.
+
+The next bounded question is whether that residual loop can be reduced while
+preserving the ordered Python RNG draws, mutation/inheritance rules, complement
+clipping, dtype/shape validation and downstream search replay. First confirm value
+in unprofiled current-versus-candidate whole-search experiments, including small
+vectors and expensive callbacks. Reject a microbenchmark-only win or a changed
+trajectory. This screen selects a question, not an implementation, speedup or
+native-backend decision. Whole-invocation, callback-regime and memory work remains.
+Raw artifacts expire after 90 days; re-collect evidence before relying on it for a
+later acceptance claim rather than treating this compact screen as a full archive.
 
 This first diagnostic does not yet cover whole public-API invocations, process
 portfolios, realistic expensive callbacks, stage counters, peak process-tree memory,
