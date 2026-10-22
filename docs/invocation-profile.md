@@ -2,9 +2,9 @@
 
 The [hosted invocation study](../.github/workflows/invocation-study.yml) reuses
 existing probes instead of implementing another solver or profiler. It measures
-public `RKO` calls, preparation and resource observations after the failed
-[uncommitted blending hypothesis](performance-baseline.md#uncommitted-blending-experiments).
-It does not establish a runtime improvement or choose a native backend.
+public `RKO` calls, preparation and resource observations, complementing the
+[fixed-work diagnostics](performance-baseline.md). It does not establish a runtime
+improvement or choose a native backend.
 
 ## Registered probes
 
@@ -76,6 +76,43 @@ Do not pool their latencies, subtract timings across probes or infer controlled
 hardware scaling. Automatic versus ten dedicated workers is not equal work per
 algorithm: scheduling, cooperation and per-search allowances differ. No quality,
 C++ parity or default-policy superiority follows from a shorter invocation.
+
+## First registered observations
+
+[Run 39843491836](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/39843491836)
+passed all registered cases and existing seed/objective/accounting/native-team
+checks. The selected [compact reference](../benchmarks/invocation-profile-reference.json)
+retains manifests, host summaries, input hashes and aggregation definitions. These
+are descriptive three-observation medians, not acceptance intervals.
+
+- In the online startup probe, parent factory construction was about 4 ms;
+  manager startup about 113 ms. All observed workers reached their first decode
+  around 250 ms (one worker) or 305 ms (four). Internal solve elapsed was about
+  500/558 ms with a 200 ms search allowance. Stages overlap: these are not additive.
+  This does not justify dropping required parent-side validation for speed.
+- In the offline portfolio probe, automatic selection used four workers on its VM.
+  Constructor-plus-solve medians were about 1.40 s versus 1.77 s with ten dedicated
+  workers; sampled coordinator/direct-child RSS-sum medians were about 317 versus
+  620 MiB. Allocations/search work differ, so this is not an equal-work speed or
+  quality comparison. Outer-minus-internal time was only about 38–41 microseconds,
+  including constructor/return overhead, in these cases.
+- In the four-worker GEMM initialization-prefix case, actual native teams were
+  four per worker when inherited and one when launch-limited. Internal solve
+  medians were about 1.94 s versus 0.34 s. This illustrates oversubscription risk,
+  not a general RKO speedup: prefixes, warm-up and callback budgets are specific.
+  The existing parent-only negative controls passed; limiting the coordinator did
+  not establish a limit in its spawned workers. See [launch guidance](native-threads.md).
+
+The VMs differed: startup Intel Xeon Platinum 8573C, portfolio AMD EPYC 7763,
+callbacks AMD EPYC 9V74. Do not compare absolute times across these probes.
+
+**Open correctness observation:** portfolio stderr retained four NumPy
+`RuntimeWarning: invalid value encountered in divide` occurrences during standard-
+deviation normalization. Final objective/seed/count checks passed, but the caller
+and implications for internal decisions are not yet localized. Do not suppress
+these warnings or declare them harmless; establish a deterministic reproducer
+before a further optimization or release claim. All raw rows and stderr remain
+available rather than excluding warning-producing runs.
 
 ## Reproduction and next decisions
 

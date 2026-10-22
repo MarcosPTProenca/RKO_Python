@@ -120,6 +120,10 @@ jobs:
               assert actual == expected
               controls = [row for row in rows if row.get('mode') == 'parent_only_negative_control']
               assert len(controls) == 2 and {row['workers'] for row in controls} == {1, 4}
+          after = PerformanceProbe.provenance()
+          assert after['source_sha256'] == manifest['provenance']['source_sha256']
+          assert hashlib.sha256(Path(script).read_bytes()).hexdigest() == manifest['helper_sha256']
+          manifest['post_probe_git'] = after['git']
           (output / 'coverage.json').write_text(json.dumps({'probe': name, 'validated_trials': len(trials), 'records': len(rows)}, indent=2) + '\n')
           manifest['validated'] = True
           (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
