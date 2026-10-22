@@ -1,6 +1,6 @@
 # Current limitations
 
-Status reviewed on 2026-10-20. This development version is **not release-ready**.
+Status reviewed on 2026-10-22. This development version is **not release-ready**.
 Removing internal audit documents does not mean their outstanding work is done.
 
 ## Delivered
@@ -18,6 +18,12 @@ streams in all backends, including seeded threads; standalone operators retain
 their global-RNG behavior. Custom callbacks must own their stochastic state.
 
 ## Outstanding
+
+The [performance target](performance.md) is to match or exceed pinned C++ RKO
+within declared workload/resource regimes. No Rust engine exists, no general C++
+performance parity is established, and native adoption is conditional on profiling,
+contract preservation, packaging and measured end-to-end benefit. The target is
+not a release guarantee.
 
 - **Callback concurrency:** library RNGs are isolated, but user callbacks and
   operator overrides must manage their own randomness and mutable state. Global
@@ -67,7 +73,10 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
   objective counts, per-search stopping classifications, actual seeds, initial
   scalar/grid snapshots, worker settings and runtime versions across all backends.
   Full callback/data/source provenance and adaptive trajectories are not recorded.
-  Full API/error documentation and a supported-version/release policy are needed.
+  A [usage/API guide](usage.md) now covers constructor options, common errors,
+  callbacks and result/time accounting. Exhaustive operator/API/error documentation
+  and a supported-version/deprecation policy still need release review; the
+  [contributor checklist](../CONTRIBUTING.md#before-a-release) is not a completed release.
 - **Stopping:** active callbacks cannot be interrupted cooperatively, blocked
   threads cannot be safely killed, and standalone operators receive no RKO
   deadline. A first valid evaluation may exceed the requested duration.
