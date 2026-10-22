@@ -78,7 +78,9 @@ The record includes:
   whitelisted native-thread environment settings. These do not certify effective
   hierarchical quotas, actual native teams, host isolation or reproducible load.
 - With `--profile`, the top 20 functions by exclusive cProfile time, with inclusive
-  time and primitive/total calls. Inclusive values overlap: do not sum them.
+  time and primitive/total calls. `profile_total_seconds` retains the full
+  profiler total as a denominator; the truncated top 20 are not the whole run.
+  Unprofiled records use null. Inclusive values overlap: do not sum them.
 
 `result.seconds` and `cpu_seconds` cover search only; imports, provenance, algorithm
 construction, pool seeding and process startup/shutdown are excluded. Function
@@ -86,6 +88,35 @@ profiling covers the existing runner including construction and seeded-pool setu
 so its scope is explicitly different. Profiled times are diagnostic and must not
 be used as acceptance timings. cProfile cannot explain all native internals, and
 wall profiles are not memory measurements.
+
+## Hosted fixed-work screening
+
+The [baseline study workflow](../.github/workflows/performance-study.yml) runs on
+isolated hosted Ubuntu runners and retains raw records/host observations for 90
+days. It runs on relevant pull requests and can be dispatched manually after merge.
+Its registered screening matrix is six diagnostic algorithms, three objective
+families, dimensions 20/500, seeds 200–202 and 1,024 completed search objectives,
+each plain and profiled: 216 trials / 108 replay pairs / 36 three-seed groups.
+Plain/profiled order alternates by seed; profile versus plain is an equivalence
+check, not a speed comparison. Output goes outside the checkout to avoid creating
+a dirty source identity while collecting it.
+
+`benchmarks.performance_report` rejects incomplete or duplicate pairs, mixed source/
+runtime identities, changed result/pool/RNG fingerprints and invalid timing scopes.
+It reports unprofiled search medians separately from full-runner profile medians.
+Function fractions use the full profiler total, not search-only time or the sum
+of the truncated list. Only functions observed in every seed's top list are ranked;
+missing functions are not treated as zero. The workflow checks registered coverage.
+Raw artifacts remain necessary to inspect functions excluded by this selection.
+
+The three objective families are NOT the three callback-cost regimes in the larger
+investigation plan. This is a bounded preliminary use of existing instrumentation,
+not completion of Phase B. Small evaluation caps, especially GRASP at dimension500,
+can observe startup/partial construction rather than a completed search stage.
+Three seeds do not establish confidence bounds, quality or competitive superiority.
+Profiling biases Python/native cost shares; fractions nominate questions, not
+unprofiled headroom or guaranteed Amdahl gains. Different dimensions run on different
+VMs, so their latency difference is not a controlled hardware-scaling experiment.
 
 This first diagnostic does not yet cover whole public-API invocations, process
 portfolios, realistic expensive callbacks, stage counters, peak process-tree memory,

@@ -87,6 +87,12 @@ def test_profile_preserves_replay_and_caller_random_streams() -> None:
         assert profiled["result"][field] == plain["result"][field]
     assert pickle.dumps((random.getstate(), np.random.get_state())) == before
     assert profiled["profiled"] is True
+    assert plain["profile_total_seconds"] is None
+    assert (
+        profiled["profile_total_seconds"]
+        >= sum(row["exclusive_seconds"] for row in profiled["profile"])
+        > 0
+    )
     assert profiled["profile_scope"] == "fixed_work_runner_including_construction_and_seed_pool"
     assert 1 <= len(profiled["profile"]) <= 20
     assert all(row["exclusive_seconds"] >= 0 for row in profiled["profile"])

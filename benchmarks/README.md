@@ -23,6 +23,25 @@ certify native teams or isolation. No memory, whole-solver or C++ claim follows.
 See the [contract checklist and measurement boundaries](../docs/performance-baseline.md).
 Do not run competing experiments on the protected historical benchmark's host.
 
+## Hosted fixed-work baseline screening
+
+The [baseline workflow](../.github/workflows/performance-study.yml) collects 216
+plain/profiled observations on hosted runners, never on the protected historical
+benchmark's host. It retains raw JSONL and host observations, validates 108 exact
+replay pairs across 36 groups, and uploads a compact report. Profile totals include
+runner setup; unprofiled search times do not. These are descriptive three-seed
+synthetic screens, not speedup, quality, stage-completion or C++ evidence.
+
+To validate downloaded raw shards:
+
+```bash
+uv run --locked python -m benchmarks.performance_report --input-dir raw --output report/summary.json
+```
+
+The report rejects duplicates, missing pairs, changed replay, invalid times and
+mixed source/runtime identities. It does not invent zero cost for functions missing
+from truncated top lists. See [scope and limits](../docs/performance-baseline.md#hosted-fixed-work-screening).
+
 ## Spawn startup and installation layout
 
 ```bash
