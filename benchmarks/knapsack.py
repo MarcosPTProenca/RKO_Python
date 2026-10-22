@@ -32,6 +32,7 @@ import resource
 import shutil
 import tempfile
 import time
+from benchmarks.knapsack_utils import exact_profit
 from pathlib import Path
 from rko import RKO
 from rko.examples.run_kp_cpp_instances import KpInstance
@@ -40,22 +41,6 @@ from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import make_cost
 from rko.examples.run_kp_cpp_instances import read_kp_instance
 from rko.parameters.loader import default_params_dir
-
-
-def exact_profit(instance: KpInstance) -> int:
-    """Compute the exact 0/1 optimum with a capacity-indexed DP table.
-
-    Args:
-        instance (KpInstance): Integer-weight Knapsack data.
-
-    Returns:
-        int: Optimal feasible profit, using O(n * capacity) time and O(capacity) memory.
-    """
-    values = np.zeros(instance.capacity + 1, dtype=np.int64)
-    for profit, weight in zip(instance.benefits, instance.weights, strict=True):
-        if weight <= instance.capacity:
-            values[weight:] = np.maximum(values[weight:], values[:-weight] + profit)
-    return int(values[-1])
 
 
 def main() -> None:
