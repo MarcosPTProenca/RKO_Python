@@ -20,6 +20,7 @@ mutants/
 htmlcov/
 results/
 /site/
+benchmarks/cpp-python-knapsack-reference-summary.csv
 
 # Local working notes and generated analysis, not library documentation.
 /docs/audits/
