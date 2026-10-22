@@ -120,6 +120,37 @@ startup reports and fresh search allowances. Coordinate-unique admission and RNG
 engines remain different. Equal nominal capacities/durations still do not imply
 exact startup work, diversity or trajectory parity.
 
+## BRKGA-CS undefined correlation
+
+Community construction now excludes constant chromosomes and chromosomes with
+fewer than two observations. Pearson correlation is undefined in those cases;
+there is no community edge, including when floating-point rounding previously
+fabricated a finite coefficient for a constant array. Nonconstant pairs whose
+normalization fails numerically (for example, covariance underflow) also add no
+edge. No epsilon cutoff is used: finite small-variance correlations remain valid.
+
+Python still calls NumPy for defined coefficients. A fresh local `np.errstate`
+turns invalid/divide faults into handled `FloatingPointError`, not ignored warnings;
+the caller's floating error policy is restored. Label propagation, representative
+selection and their RNG draws are unchanged for the same graph. Direct regressions
+cover the real warning, one-gene inputs, constants, small variance, error-policy
+restoration and a hand-worked two-component graph. Defined graph/RNG results were
+also checked against the unmodified prior Python source. The diagnostic replay
+contract is `brkga-cs-defined-correlation-v1`, not a new user option.
+
+This deliberately removes spurious constant-array edges and can change those
+search trajectories; it is not an exact replay or quality-improvement promise.
+The pinned C++ `Program/src/MH/BRKGA_CS.h::PearsonCorrelation` has an unchecked
+raw-moment denominator. Source inspection shows an ordinary zero-denominator NaN
+fails its graph threshold, but no compiled whole-solver equivalence follows.
+Python retains its existing **absolute** correlation and inclusive `>= sigma`
+rule; the reference uses signed `pearson > sigma`. This pre-existing difference
+is not silently changed by the numerical-warning fix. Full BRKGA-CS parity and
+current multi-instance quality remain unproven.
+
+See NumPy's [coefficient/rounding contract](https://numpy.org/doc/2.4/reference/generated/numpy.corrcoef.html)
+and [scoped floating error handling](https://numpy.org/doc/2.4/reference/generated/numpy.errstate.html).
+
 ## Still to resolve
 
 - GRASP offline unused-alpha RNG draw differs; exact random-engine/trajectory parity is not claimed.

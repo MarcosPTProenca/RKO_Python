@@ -35,6 +35,7 @@ anchors, not an assertion that every possible behavior is exhaustively specified
 | GRASP h and unused alpha policies | `metaheuristics/test_grasp_h_policy.py`, `metaheuristics/test_grasp_alpha_contract.py` | Preserve documented adaptive effects, not an invented alpha RCL |
 | IPR candidate trace, partial blocks, signed zero and no-op pruning | `metaheuristics/test_ipr_relink.py` | Pruning deliberately differs in callback counts; first-tie/path rules remain tested |
 | Nominal C++ neighborhood transitions | `components/test_cpp_operator_contracts.py` | Controlled deterministic kernel oracle, not full-driver bitstream equivalence |
+| BRKGA-CS defined correlation and representative RNG | `metaheuristics/test_brkga_cs_correlation.py` | Undefined edges are excluded; rounding-fabricated constant edges are deliberately corrected, not exact-replay compatible |
 | Sign-safe finite rewards and actual adaptive transitions | `components/test_reward_contracts.py` | Python deliberately corrects inherited behavior rather than reproducing defects |
 | Shared initialization and optional prefill accounting | `rko/test_pool_prefill.py`, `rko/test_driver_initialization.py` | Capacity is not a seed population; prefill has a separate allowance |
 | Standalone operators, legacy and public solver callers | `rko/test_solver.py`, `rko/test_rko_main_pytest.py`, `metaheuristics/test_standalone.py` | Preserve return formats and validation; scheduling backend is not a native-engine selector |
