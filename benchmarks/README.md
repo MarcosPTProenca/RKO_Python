@@ -42,6 +42,20 @@ The report rejects duplicates, missing pairs, changed replay, invalid times and
 mixed source/runtime identities. It does not invent zero cost for functions missing
 from truncated top lists. See [scope and limits](../docs/performance-baseline.md#hosted-fixed-work-screening).
 
+## Invocation and resource study
+
+The [hosted invocation workflow](../.github/workflows/invocation-study.yml) reuses
+`startup_stages.py`, `process_budget.py` and `native_threads.py`. It validates six
+startup solves, twelve portfolio/resource solves and 36 native-callback prefix
+observations plus two parent-only controls, preserving raw stdout/stderr, helper/
+source identity, host observations and copied native-thread settings.
+
+`process_budget.py` records constructor-plus-solve `invocation_seconds`, internal
+`elapsed_seconds` and per-search metadata. Sampled coordinator/direct-child RSS
+is not unique physical memory or an exact peak. A fresh entire probe process is
+not one cold solver invocation; the different probes/VMs must not be pooled.
+See [timing, memory and resource boundaries](../docs/invocation-profile.md).
+
 ## Spawn startup and installation layout
 
 ```bash
