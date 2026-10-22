@@ -57,6 +57,7 @@ candidates can limit it even when execution succeeds.
 | `pool_size=None` | Elite capacity from config, not initial population size |
 | `params_dir=None` | Optional directory with complete required TOML files |
 | `verbose=False` | Opt-in lifecycle and shared-pool progress |
+| `history_limit=0` | Disabled by default; 2–10000 caps incumbent observations per search for [reports](reporting.md) |
 
 `IPR` and `MultiStart` do not adapt, even if adaptive mode is requested. Inspect
 `result.searches[0].control` for the effective mode. Unknown parameters and invalid

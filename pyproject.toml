@@ -19,6 +19,11 @@ rko = "rko.examples.run_kp_cpp_instances:main"
 Repository = "https://github.com/MarcosPTProenca/RKO_Python"
 Issues = "https://github.com/MarcosPTProenca/RKO_Python/issues"
 
+[project.optional-dependencies]
+reports = [
+    "plotly>=6.0",
+]
+
 [tool.setuptools]
 include-package-data = false
 

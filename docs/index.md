@@ -13,6 +13,7 @@ development library, not a claim of release readiness or C++ equivalence.
 ## Apply and extend
 
 - [Standalone algorithms](standalone.md): all eleven classes, tuning and result metadata.
+- [Interactive reports](reporting.md): offline HTML charts, bounded histories and JSON export.
 - [Extension guide](extending.md): replace local search/shaking or implement a new algorithm.
 - [Portfolio and execution API](usage.md): sharing elites, processes, budgets and reproducibility.
 - [Terminal usage](running.md): the supplied Knapsack adapter and custom TOML files.

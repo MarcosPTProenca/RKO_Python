@@ -36,6 +36,24 @@ CostFn = Callable[[Any], float]
 Hyperparameters = Mapping[str, Mapping[str, int | float]]
 
 
+@dataclass(frozen=True, slots=True)
+class HistoryPoint:
+    """Retain one scalar incumbent observation without candidate payloads.
+
+    Responsibilities:
+    - Keep a local search timestamp, evaluation index and minimization incumbent.
+
+    Attributes:
+        elapsed_seconds (float): Seconds since this search session started.
+        n_evaluations (int): Completed finite objectives when observed.
+        cost (float): Best finite objective observed by this search session.
+    """
+
+    elapsed_seconds: float
+    n_evaluations: int
+    cost: float
+
+
 @dataclass(frozen=True)
 class SearchMetadata:
     """Preserve one algorithm's initial configuration and completed work.
@@ -54,6 +72,9 @@ class SearchMetadata:
         stop_reason (str): Completed, time_limit, cancelled, or not_started.
         time_limit (float): Assigned search seconds excluding startup; zero if not started.
         elapsed_seconds (float): Search/session duration, excluding startup and queueing.
+        history (tuple[HistoryPoint, ...]): Bounded incumbent samples in local search time.
+        history_limit (int): Requested per-search cap; zero disables recording.
+        history_observations (int): Samples observed before deterministic compaction.
     """
 
     algorithm: str
@@ -65,6 +86,9 @@ class SearchMetadata:
     stop_reason: Literal["completed", "time_limit", "cancelled", "not_started"] = "not_started"
     time_limit: float = 0.0
     elapsed_seconds: float = 0.0
+    history: tuple[HistoryPoint, ...] = ()
+    history_limit: int = 0
+    history_observations: int = 0
 
 
 @dataclass(frozen=True)

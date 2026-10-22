@@ -177,6 +177,7 @@ def _worker(
     initialization_start: Event | None = None,
     initialization_duration: float | None = None,
     initialization_random_state: int | None = None,
+    history_limit: int = 0,
 ) -> None:
     """Run assigned searches sequentially without extending the common deadline.
 
@@ -196,6 +197,7 @@ def _worker(
         initialization_start (Event | None): Gate supplied only to the designated initializer.
         initialization_duration (float | None): Separate cooperative startup allowance.
         initialization_random_state (int | None): Source for the reserved startup stream.
+        history_limit (int): Per-search scalar history cap; zero disables capture.
     """
     name = "startup"
     try:
@@ -248,6 +250,7 @@ def _worker(
                             queued._search_metadata or SearchMetadata(algorithm=queued.name),
                             random_state=queued_streams.seed,
                             time_limit=0.0,
+                            history_limit=history_limit,
                         )
                         for queued, queued_streams in prepared[index:]
                     )
@@ -255,7 +258,11 @@ def _worker(
             with streams.activate():
                 session = SearchSession(decoder, cost)
                 result = session.solve(
-                    mh, remaining, deadline=search_deadline, random_state=streams.seed
+                    mh,
+                    remaining,
+                    deadline=search_deadline,
+                    random_state=streams.seed,
+                    history_limit=history_limit,
                 )
             if collect_metadata:
                 assert session.metadata is not None
@@ -298,6 +305,7 @@ def run_processes(
     hyperparameters: Hyperparameters | None = None,
     search_metadata: list[SearchMetadata] | None = None,
     initialization_metadata: list[PoolInitializationMetadata] | None = None,
+    history_limit: int = 0,
 ) -> tuple[list[float], float]:
     """Execute a selected portfolio with a common start and managed pool.
 
@@ -316,6 +324,7 @@ def run_processes(
         hyperparameters (Hyperparameters | None): Partial offline scalar mappings.
         search_metadata (list[SearchMetadata] | None): Optional collector for all algorithms.
         initialization_metadata (list | None): Separate opt-in startup report collector.
+        history_limit (int): Per-search scalar history cap; zero disables capture.
 
     Returns:
         tuple[list[float], float]: Best keys and minimization objective.
@@ -385,6 +394,7 @@ def run_processes(
                         initialization_start if group_index == 0 else None,
                         limit_time,
                         random_state,
+                        history_limit,
                     ),
                 )
                 processes.append(process)

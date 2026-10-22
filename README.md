@@ -98,6 +98,28 @@ Serial mode gives **each selected algorithm** its own search allowance; process
 startup is excluded, and opted-in pool prefill has a separate allowance. A callback
 can overrun its deadline. `time_limit` is not a hard end-to-end timeout.
 
+## Interactive analysis reports
+
+Install the optional reporting dependency with `uv sync --locked --extra reports`.
+Then opt into bounded scalar history when solving:
+
+```python
+from rko.reporting import OptimizationReport
+
+result = SA.solve_one(
+    decode, objective, 20, time_limit=2.0, random_state=42, history_limit=1000,
+)
+report = OptimizationReport(result)
+report.write_html("run.html")
+report.write_json("run.json")
+```
+
+The HTML embeds Plotly once and works offline with hover, zoom and trace selection.
+Reports are generated after search, never by reevaluating callbacks. History is off
+by default; compacted curves are labelled approximate. See [interpretation and
+privacy boundaries](docs/reporting.md); automatic PDF export is not included.
+Core optimization still requires only NumPy.
+
 ## Run the supplied Knapsack adapter
 
 ```bash
@@ -123,6 +145,7 @@ parameter reference and contributor guidance.
 | Implement a decoder, constraints and objective | [Problem adapters](docs/problem-adapters.md) |
 | Understand fixed/adaptive modes and every search knob | [Parameter reference](docs/parameters.md) |
 | Replace operators or implement an algorithm | [Extension guide](docs/extending.md) |
+| Generate offline interactive HTML charts and data-only exports | [Analysis reports](docs/reporting.md) |
 | Configure the solver, callbacks, hyperparameters and results | [Usage and API guide](docs/usage.md) |
 | Choose workers and understand startup/time accounting | [Execution modes](docs/usage.md#execution-modes), [workers](docs/process-workers.md), [startup](docs/driver-initialization.md) |
 | Run from the terminal or avoid WSL setup overhead | [Running guide](docs/running.md) |

@@ -357,6 +357,7 @@ def test_worker_preserves_deadline_and_constructor_rng(
             *,
             deadline: float,
             random_state: int | None = None,
+            history_limit: int = 0,
         ) -> RunResult:
             """Check the reactivated owned stream and simulate one search slice.
 
@@ -365,10 +366,12 @@ def test_worker_preserves_deadline_and_constructor_rng(
                 limit_time (float): Supplied remaining slice duration.
                 deadline (float): Absolute deadline bounded by the portfolio.
                 random_state (int | None): Actual assigned search seed.
+                history_limit (int): Disabled capture for this scheduling-only test.
 
             Returns:
                 RunResult: Consistent synthetic incumbent.
             """
+            assert history_limit == 0
             assert constructed == [name for name, _ in assignments]
             seed = dict(assignments)[algorithm.name]
             assert random_state == seed
