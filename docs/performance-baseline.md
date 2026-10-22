@@ -118,6 +118,34 @@ Profiling biases Python/native cost shares; fractions nominate questions, not
 unprofiled headroom or guaranteed Amdahl gains. Different dimensions run on different
 VMs, so their latency difference is not a controlled hardware-scaling experiment.
 
+### First registered screen
+
+[Run 39809649686](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/39809649686)
+validated all 216 trials / 108 exact replay pairs / 36 groups. The selected compact
+[reference record](../benchmarks/performance-baseline-reference.json) retains input
+and analysis SHA256 digests, producer revision, run URL and explicit limits. Both
+raw shards had clean Git state and the same source/runtime identity: Python 3.14.9,
+NumPy 2.4.3. The dimension-20 VM reported Intel Xeon Platinum 8573C; dimension 500
+reported AMD EPYC 9V45. Both exposed four logical CPUs. This confirms why latency
+across these dimensions must not be treated as controlled scaling evidence.
+
+At dimension 500, the **current** shared `blending` function was consistently
+visible across SA, GA and BRKGA and all three objective families: its median
+exclusive **profile** fraction ranged 52.8%–60.3%. These are not unprofiled time
+shares. The operator already uses batched NumPy masks; the residual per-gene
+Python/RNG loop is the candidate to investigate, not a claim that its earlier
+optimization remains unimplemented. Smaller dimensions showed different costs.
+
+The next bounded question is whether that residual loop can be reduced while
+preserving the ordered Python RNG draws, mutation/inheritance rules, complement
+clipping, dtype/shape validation and downstream search replay. First confirm value
+in unprofiled current-versus-candidate whole-search experiments, including small
+vectors and expensive callbacks. Reject a microbenchmark-only win or a changed
+trajectory. This screen selects a question, not an implementation, speedup or
+native-backend decision. Whole-invocation, callback-regime and memory work remains.
+Raw artifacts expire after 90 days; re-collect evidence before relying on it for a
+later acceptance claim rather than treating this compact screen as a full archive.
+
 This first diagnostic does not yet cover whole public-API invocations, process
 portfolios, realistic expensive callbacks, stage counters, peak process-tree memory,
 real-clock adaptive quality or C++ equal-resource comparisons. Follow the
