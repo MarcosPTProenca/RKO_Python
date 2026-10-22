@@ -25,8 +25,10 @@ jobs:
       OMP_NUM_THREADS: "1"
       MKL_NUM_THREADS: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - name: Checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up uv v10.3.2
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
       - run: uv sync --locked --group dev
       - name: Run serial matched-work shard
         run: |
@@ -36,7 +38,8 @@ jobs:
             --evaluations "${{ matrix.evaluations }}" \
             --capacity 10 --seeds 20 \
             > "raw/prefill-${{ matrix.dimension }}-${{ matrix.evaluations }}.jsonl"
-      - uses: actions/upload-artifact@v4
+      - name: Upload raw shard v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: prefill-raw-${{ matrix.dimension }}-${{ matrix.evaluations }}
           path: raw/*.jsonl
@@ -49,10 +52,13 @@ jobs:
     env:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - name: Checkout v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Set up uv v10.3.2
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
       - run: uv sync --locked --group dev
-      - uses: actions/download-artifact@v4
+      - name: Download raw shards v8.0.2
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           pattern: prefill-raw-*
           path: raw
@@ -72,7 +78,8 @@ jobs:
           }
           PY
           echo 'Validated 1,440 paired comparisons / 2,880 trials. No timing measurements.' >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - name: Upload compact report v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: prefill-expanded-report
           path: report/*
