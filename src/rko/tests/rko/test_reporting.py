@@ -321,7 +321,7 @@ def test_html_without_history_is_honest(tmp_path: Path) -> None:
     """
     result = MultiStart.solve_one(decode, objective, 3, time_limit=0.01)
     report = OptimizationReport(result)
-    text = report.write_html(tmp_path / "summary.html").read_text()
+    text = report.write_html(tmp_path / "summary.html").read_text(encoding="utf-8")
     assert "Histories unavailable for: MultiStart" in text
     assert text.count('id="rko-chart-') == 2
     assert report.to_dict()["searches"][0]["history"] == []
