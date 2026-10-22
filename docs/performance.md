@@ -32,6 +32,11 @@ those changes. It still needs the additional resource/stage diagnostics below to
 serve as a full current-revision acceptance test. No unfinished long-run results
 are published by integrating its code.
 
+The [baseline contract checklist and fixed-work diagnostic](performance-baseline.md)
+provide source-identified records and optional function-level profiling for the
+initial investigation. This is a restricted serial diagnostic, not whole-solver
+performance evidence or a selected native backend.
+
 ## The C++ acceptance target
 
 Reference: [RKO C++ v2, revision
