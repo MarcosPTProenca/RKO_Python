@@ -37,6 +37,11 @@ provide source-identified records and optional function-level profiling for the
 initial investigation. This is a restricted serial diagnostic, not whole-solver
 performance evidence or a selected native backend.
 
+The [invocation and resource study](invocation-profile.md) reuses the startup,
+portfolio and native-callback probes in fresh hosted interpreters. Its registered
+scopes separate constructor-plus-solve time, internal search timing and sampled
+RSS; they are diagnostic evidence, not an achieved optimization or parity claim.
+
 ## The C++ acceptance target
 
 Reference: [RKO C++ v2, revision

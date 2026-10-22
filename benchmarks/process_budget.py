@@ -20,7 +20,8 @@ Important criteria:
 
 Inputs/Outputs:
 - Input: packaged ten-algorithm portfolio, 128 keys, one-second search budget.
-- Output: JSON records for latency, worker counts and sampled RSS, or failed assertions.
+- Output: JSON records for constructor-plus-solve latency, internal solve latency,
+  worker counts and sampled RSS, or failed assertions.
 """
 
 import json
@@ -237,8 +238,14 @@ def main() -> None:
                             n_jobs=limit,
                             random_state=seed,
                         ).solve(budget)
+                        invocation_seconds = time.perf_counter() - started
                     finally:
                         monitor.stop()
+                    assert invocation_seconds >= result.elapsed_seconds
+                    assert (
+                        sum(report.n_evaluations for report in result.searches)
+                        == result.n_evaluations
+                    )
                     records = [
                         json.loads(Path(directory, f"{index}.json").read_text())
                         for index in range(len(names))
@@ -271,7 +278,19 @@ def main() -> None:
                                 "search_workers": len(pids),
                                 "available_cpus": result.available_cpus,
                                 "n_evaluations": result.n_evaluations,
+                                "invocation_seconds": invocation_seconds,
                                 "elapsed_seconds": result.elapsed_seconds,
+                                "searches": [
+                                    {
+                                        "algorithm": report.algorithm,
+                                        "random_state": report.random_state,
+                                        "n_evaluations": report.n_evaluations,
+                                        "elapsed_seconds": report.elapsed_seconds,
+                                        "time_limit": report.time_limit,
+                                        "stop_reason": report.stop_reason,
+                                    }
+                                    for report in result.searches
+                                ],
                                 "first_decode_seconds": first - started,
                                 "last_first_decode_seconds": last - started,
                                 "sampled_peak_worker_rss_bytes": peak_workers,
