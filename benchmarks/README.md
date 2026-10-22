@@ -7,6 +7,22 @@ See [the C++ acceptance target and native-backend gates](../docs/performance.md)
 for end-to-end quality/time/resource criteria; historical Python results must not
 be merged with corrected-revision observations as if they were one experiment.
 
+## Source-identified fixed-work baseline
+
+```bash
+uv run --locked python -m benchmarks.performance_profile --dimension 20 --evaluations 64
+uv run --locked python -m benchmarks.performance_profile --dimension 20 --evaluations 64 --profile
+```
+
+This entry point reuses `fixed_work` and emits one JSON object with source/config/
+helper hashes, Git/environment observations and replay fingerprints. Optional
+cProfile output reports the top 20 functions by exclusive time. Search timing
+excludes setup/startup; profiling includes runner construction and pool seeding.
+Profiled times are diagnostic, not acceptance evidence. CPU observations do not
+certify native teams or isolation. No memory, whole-solver or C++ claim follows.
+See the [contract checklist and measurement boundaries](../docs/performance-baseline.md).
+Do not run competing experiments on the protected historical benchmark's host.
+
 ## Spawn startup and installation layout
 
 ```bash
