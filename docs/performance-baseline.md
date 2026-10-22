@@ -146,6 +146,43 @@ native-backend decision. Whole-invocation, callback-regime and memory work remai
 Raw artifacts expire after 90 days; re-collect evidence before relying on it for a
 later acceptance claim rather than treating this compact screen as a full archive.
 
+### Uncommitted blending experiments
+
+The same workflow accepts an optional `candidate_source_b64` manual input: base64
+of a **trusted** Python module exporting `blending(a, b, factor)`. This executes
+arbitrary Python, not a sandbox; never use unreviewed third-party source. The job
+has read-only repository permissions and does not persist checkout credentials.
+An empty input retains the ordinary baseline screen. A candidate is transmitted
+through an environment variable, never interpolated into shell/Python source.
+
+The experimental job uses `benchmarks.blending_work`: kernel checks compare exact
+values, ownership, validation and RNG; paired real SA/GA/BRKGA searches compare
+cost, keys, pool, completed work and RNG fingerprints. Only Nelder-Mead's shared
+blending binding changes, not GA/BRKGA's separate crossover implementations.
+Bindings and caller RNG state are restored on success or failure. A deterministic
+Python-heavy callback adds arithmetic but invokes the actual objective only once.
+This is a controlled overhead model, not a real expensive-domain benchmark.
+
+Defaults are dimensions20/500, five seeds starting200 and8192 completed search
+objectives. Each algorithm/regime is warmed outside timing; mode order alternates.
+Search-only timings exclude construction/startup. Separate same-seed operator
+tracemalloc diagnostics exclude source parents and are NOT process RSS evidence.
+Retained artifacts include the candidate source/hash so a failed hypothesis can
+be audited without committing its code. Kernel fixtures and fixed-work screening
+are not full correctness coverage or confirmation; production changes still need
+independent tests, fresh confirmation seeds and whole-workflow/quality evidence.
+
+To reproduce a trusted candidate locally on noncompeting resources:
+
+```bash
+uv run --locked python -m benchmarks.blending_work --candidate /tmp/candidate.py \
+  --dimension 500 --evaluations 8192 --seeds 5 --seed-start 200
+```
+
+Do not commit candidate code or open a performance PR based on a speculative or
+microbenchmark-only win. Record a failed hypothesis in the ignored plan and discard
+it; the comparison runner itself is independently tested measurement capability.
+
 This first diagnostic does not yet cover whole public-API invocations, process
 portfolios, realistic expensive callbacks, stage counters, peak process-tree memory,
 real-clock adaptive quality or C++ equal-resource comparisons. Follow the
