@@ -22,9 +22,15 @@ real-clock quality experiments answer different questions. We need both.
 The historical long-running Knapsack comparison uses Python revision `7ee93ca`,
 which predates subsequent contract and startup corrections. Preserve that run as
 historical evidence; do not combine its rows with current-code results or infer the
-current library's performance from it. A new current-revision comparison needs a
-separate, versioned harness and output after the protected run finishes. The
-canonical checkout does not currently ship that historical C++ comparison runner.
+current library's performance from it. The historical runner is now available as
+`benchmarks/cpp_python_knapsack.py`, with the completed two-second reference clearly
+separated in [benchmark documentation](../benchmarks/README.md#python-versus-c-knapsack-comparison).
+Fresh invocations execute the current checkout, not the archived implementation;
+use new source-identified output/cache locations after the protected run finishes.
+The integrated runner's TOML/helper fingerprint checks prevent unsafe resume across
+those changes. It still needs the additional resource/stage diagnostics below to
+serve as a full current-revision acceptance test. No unfinished long-run results
+are published by integrating its code.
 
 ## The C++ acceptance target
 
