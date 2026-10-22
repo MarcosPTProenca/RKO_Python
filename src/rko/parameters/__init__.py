@@ -11,6 +11,15 @@ Technical approach:
 - A custom minimal TOML serialiser handles writing (no third-party deps).
 - ``ParameterWatcher`` polls file modification times in a daemon thread.
 
+Flow (pseudocode):
+1. Resolve the packaged or caller-supplied parameter directory.
+2. Load fixed scalars or named adaptive axes from the selected TOML.
+3. Optionally watch files and report changes through a caller callback.
+
+Important criteria:
+- Reading defaults never changes the packaged configuration.
+- Watching files does not automatically reconfigure an active solver.
+
 Inputs/Outputs:
 - Input:  metaheuristic name string, optional directory override.
 - Output: offline scalar dict, online list-of-lists grid, or global config.

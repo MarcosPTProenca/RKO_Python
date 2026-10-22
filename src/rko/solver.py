@@ -31,6 +31,9 @@ import platform
 import time
 from .components.random_streams import RandomStreams
 from .components.solution_pool import SolutionPool
+from .orchestration.adaptation import Adaptation
+from .orchestration.adaptation import adaptation_name
+from .orchestration.adaptation import normalize_adaptation
 from .orchestration.configuration import parse_run_config
 from .orchestration.execution import run_metaheuristics_parallel
 from .orchestration.execution import select_best_result
@@ -137,6 +140,15 @@ class RKOResult:
             limit = self.available_cpus
         return min(limit or len(self.algorithms), len(self.algorithms))
 
+    @property
+    def adaptation(self) -> Adaptation | None:
+        """Return the public adaptation name for the requested control mode.
+
+        Returns:
+            Adaptation | None: "fixed", "adaptive", or None when unknown.
+        """
+        return adaptation_name(self.control)
+
 
 class RKO:
     """Configure and execute a cooperating portfolio of random-key searches.
@@ -150,7 +162,8 @@ class RKO:
         cost (CostFn): Objective applied to decoded candidates.
         n_variables (int): Positive key dimension.
         algorithms (Sequence[str] | None): Selection overriding TOML defaults.
-        control (int | None): Offline 0 or online 1; None uses TOML defaults.
+        control (int | None): Legacy mode override; None leaves configuration in charge.
+        adaptation (Adaptation | None): Readable fixed/adaptive mode override.
         pool_size (int | None): Shared elite capacity; None uses TOML defaults.
         prefill_pool (bool | None): Opt-in reference-style startup; None uses TOML.
         params_dir (Path | None): Optional parameter directory.
@@ -169,6 +182,7 @@ class RKO:
         n_variables: int,
         *,
         algorithms: Sequence[str] | None = None,
+        adaptation: Adaptation | None = None,
         control: int | None = None,
         pool_size: int | None = None,
         prefill_pool: bool | None = None,
@@ -186,7 +200,11 @@ class RKO:
             cost (CostFn): Objective to minimize after decoding.
             n_variables (int): Positive key dimension.
             algorithms (Sequence[str] | None): Portfolio overriding configuration.
-            control (int | None): Offline 0 or online 1, or configured default.
+            adaptation (Adaptation | None): "fixed" parameters chosen before the search
+                or "adaptive" Q-learning choices during it; None uses the configured
+                default. Prefer this readable name over the legacy integer code.
+            control (int | None): Legacy 0 (fixed) or 1 (adaptive); accepted on its own
+                for compatibility and rejected when it contradicts `adaptation`.
             pool_size (int | None): Elite capacity, or configured default.
             prefill_pool (bool | None): Reference startup override; adds a separately
                 accounted cooperative allowance equal to time_limit before fresh searches.
@@ -204,6 +222,7 @@ class RKO:
         self.cost = cost
         self.n_variables = n_variables
         self.algorithms = algorithms
+        self.adaptation = adaptation
         self.control = control
         self.pool_size = pool_size
         self.prefill_pool = prefill_pool
@@ -264,8 +283,11 @@ class RKO:
             ):
                 raise ValueError("'algorithms' must be a nonempty sequence of names.")
             raw["active_metaheuristics"] = {"list": list(self.algorithms)}
+        control = normalize_adaptation(self.adaptation, self.control)
+        if control is not None:
+            raw["run"].pop("adaptation", None)
         for key, value in (
-            ("control", self.control),
+            ("control", control),
             ("pool_size", self.pool_size),
             ("prefill_pool", self.prefill_pool),
         ):

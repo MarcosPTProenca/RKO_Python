@@ -12,7 +12,7 @@ Technical approach:
   and fires a callback whenever a file is edited externally.
 
 File layout (one TOML file per metaheuristic plus one global config):
-- ``config.toml``        – global settings (control, strategy, pool_size …)
+- ``config.toml``        – adaptation, pool capacity, prefill and algorithm selection
 - ``sa.toml``            – SA parameters
 - ``multi_start.toml``   – MultiStart (no parameters)
 - ``ils.toml``           – ILS parameters
@@ -24,6 +24,16 @@ File layout (one TOML file per metaheuristic plus one global config):
 - ``pso.toml``           – PSO parameters
 - ``brkga_cs.toml``      – BRKGA-CS parameters
 - ``ipr.toml``           – IPR (no parameters)
+
+Flow (pseudocode):
+1. Resolve the algorithm filename in the requested parameter directory.
+2. Parse TOML and validate scalar tables or named adaptive-grid axes.
+3. Return owned values; atomically replace files only for explicit write requests.
+4. Notify registered watcher callbacks when external file timestamps change.
+
+Important criteria:
+- Adaptive axes retain schema order independently of TOML key order.
+- Watching files does not automatically reconfigure an active solver.
 
 Inputs/Outputs:
 - Input:  metaheuristic name string, optional custom directory path.

@@ -2,6 +2,9 @@
 
 [Start with the quickstart](../README.md) for a first serial solve. This guide
 covers configuration, execution modes, callbacks, result accounting and stopping.
+For one algorithm without pool management use [`SA.solve_one(...)`](standalone.md).
+The [parameter reference](parameters.md) explains every fixed scalar and adaptive
+mode; the [extension guide](extending.md) covers custom operators and algorithms.
 Commands and example paths assume the repository root. The Python library needs
 neither a C++ checkout nor a Rust compiler.
 
@@ -58,7 +61,8 @@ The first three arguments are required. The others are keyword-only:
 | `cost` | Callable mapping that payload to a finite scalar to minimize |
 | `n_variables` | Positive integer chromosome length |
 | `algorithms=None` | Nonempty selection of canonical names, otherwise packaged TOML portfolio |
-| `control=None` | Configured mode; `0` offline or `1` adaptive where supported |
+| `adaptation=None` | Configured mode; `"fixed"` settings or `"adaptive"` Q-learning where supported |
+| `control=None` | Legacy alias: `0` fixed or `1` adaptive; conflicting aliases are rejected |
 | `pool_size=None` | Configured elite capacity; not a prebuilt population |
 | `prefill_pool=None` | Configured startup policy; packaged default is off |
 | `params_dir=None` | Custom TOML directory, otherwise installed resources |
@@ -163,7 +167,7 @@ Use the existing offline parameter names, grouped by selected algorithm:
 ```python
 solver = RKO(
     decode, objective, n_variables=64,
-    algorithms=["PSO", "GA"], control=0,
+    algorithms=["PSO", "GA"], adaptation="fixed",
     hyperparameters={
         "PSO": {"p_size": 12, "w": 0.6},
         "GA": {"size_pop": 20, "prob_mut": 0.1},
@@ -196,7 +200,7 @@ callables are optional overrides, not required problem callbacks. Their public
 contracts are `LocalSearchOperator` and `ShakingOperator` from
 `rko.metaheuristics`; local-search overrides receive `pool=` as a keyword.
 
-Only `control` and `pool_size` are supported under `[run]`. Remove the formerly
+`adaptation` (or legacy `control`), `pool_size` and `prefill_pool` are supported under `[run]`. Remove the formerly
 ignored `strategy`, `max_runs` and `debug` fields from custom configurations;
 unsupported keys now raise an error. Portfolio local search currently uses
 best-improvement defaults. Repeat `solve` for independent trials and use standard

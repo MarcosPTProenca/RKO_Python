@@ -45,7 +45,7 @@ Save this as `quickstart.py` and run it with the command above:
 
 ```python
 import numpy as np
-from rko import RKO
+from rko.metaheuristics import SA
 
 
 def decode(keys: np.ndarray) -> np.ndarray:
@@ -72,16 +72,14 @@ def objective(solution: np.ndarray) -> float:
     return float(np.dot(solution, solution))
 
 
-solver = RKO(
+result = SA.solve_one(
     decode,
     objective,
     n_variables=20,
-    algorithms=["SA"],
-    control=0,
-    backend="serial",
+    time_limit=1.0,
+    adaptation="fixed",
     random_state=42,
 )
-result = solver.solve(time_limit=1.0)
 print(result.cost, result.keys)
 print(result.n_evaluations, result.stop_reason, result.elapsed_seconds)
 ```
@@ -91,7 +89,9 @@ return a **finite scalar to minimize**. Readers and feasibility logic belong in
 your problem adapter. `random_state` owns library draws, not randomness inside
 user callbacks; timed runs can still differ because of scheduling.
 
-This example intentionally uses one serial algorithm. The constructor's default
+`SA.solve_one(...)` manages its own pool and runs one serial algorithm. Substitute
+any of the eleven [built-in classes](docs/standalone.md#algorithm-catalog) without
+changing your callbacks. Use `RKO(...)` for a cooperating portfolio; its default
 is a **process portfolio**: use importable callbacks and a guarded entry point
 as shown in the [process-safe example](docs/usage.md#spawn-compatible-callbacks).
 Serial mode gives **each selected algorithm** its own search allowance; process
@@ -113,8 +113,16 @@ TOMLs, progress output and worker limits.
 
 ## Documentation
 
+Start at the [documentation index](docs/index.md): tutorials, how-to guides,
+parameter reference and contributor guidance.
+
 | Need | Guide |
 | --- | --- |
+| Solve your first problem | [Getting started](docs/getting-started.md) |
+| Use any one algorithm without managing a pool | [Standalone algorithms](docs/standalone.md) |
+| Implement a decoder, constraints and objective | [Problem adapters](docs/problem-adapters.md) |
+| Understand fixed/adaptive modes and every search knob | [Parameter reference](docs/parameters.md) |
+| Replace operators or implement an algorithm | [Extension guide](docs/extending.md) |
 | Configure the solver, callbacks, hyperparameters and results | [Usage and API guide](docs/usage.md) |
 | Choose workers and understand startup/time accounting | [Execution modes](docs/usage.md#execution-modes), [workers](docs/process-workers.md), [startup](docs/driver-initialization.md) |
 | Run from the terminal or avoid WSL setup overhead | [Running guide](docs/running.md) |

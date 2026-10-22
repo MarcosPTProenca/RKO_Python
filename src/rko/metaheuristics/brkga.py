@@ -23,8 +23,8 @@ Flow (pseudocode):
    f. Sort PopInter; update best; [Q-Learning] reward & update Q-table.
 
 Important criteria:
-- Mutant count may cause index out of range if pe + pm >= 1; the caller is
-  responsible for providing valid fractions.
+- Constructor validation requires elite plus mutant counts below population size,
+  leaving at least one crossover offspring slot.
 - Pool update happens only when the global best improves.
 
 Inputs/Outputs:

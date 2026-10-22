@@ -40,7 +40,10 @@ import alone does not prove an installed package works. CI currently uses Python
 
 Documentation changes should keep relative links and runnable examples correct.
 Keep the [README](README.md) as the short entry point and detailed contracts in
-[the usage guide](docs/usage.md). Link new user-facing pages from an existing guide.
+[the documentation index](docs/index.md). Use [the extension guide](docs/extending.md)
+when implementing an algorithm or replacing operators. Update the
+[parameter reference](docs/parameters.md) alongside defaults or validation changes.
+Link new user-facing pages from an existing guide.
 
 ## Bugs and pull requests
 

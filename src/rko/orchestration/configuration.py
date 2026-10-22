@@ -1,4 +1,27 @@
-"""Configuration parsing and metaheuristic registry."""
+"""Configuration parsing and the metaheuristic registry.
+
+Objective:
+- Turn packaged or user-supplied TOML into validated, typed run settings.
+- Keep one registry that maps canonical algorithm names to their constructors.
+
+Technical approach:
+- Resolve display aliases, reject unsupported keys and validate scalar domains.
+- Accept either the readable `adaptation` name or the legacy integer `control`.
+
+Flow (pseudocode):
+1. Read the required `run` and `active_metaheuristics` tables.
+2. Reject unsupported keys and normalize the adaptation mode.
+3. Validate pool capacity, algorithm names and duplicates.
+4. Return an immutable RunConfig for the orchestration layer.
+
+Important criteria:
+- Missing or contradictory settings raise ValueError instead of defaulting silently.
+- Algorithm names are canonicalized before duplicate and membership checks.
+
+Inputs/Outputs:
+- Input: the parsed TOML mapping.
+- Output: RunConfig with mode, pool capacity and active algorithm names.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +36,7 @@ from ..metaheuristics.multi_start import MultiStart
 from ..metaheuristics.pso import PSO
 from ..metaheuristics.sa import SA
 from ..metaheuristics.vns import VNS
+from .adaptation import normalize_adaptation
 from .types import MhSpec
 from .types import RunConfig
 
@@ -96,19 +120,22 @@ def parse_run_config(cfg: dict[str, object]) -> RunConfig:
             "Invalid config.toml: sections 'run' and 'active_metaheuristics' must be tables."
         )
 
-    unsupported = set(run_section) - {"control", "pool_size", "prefill_pool"}
+    unsupported = set(run_section) - {"control", "adaptation", "pool_size", "prefill_pool"}
     if unsupported:
         raise ValueError(f"Unsupported run settings: {', '.join(sorted(unsupported))}")
 
     try:
-        control = run_section["control"]
+        control = normalize_adaptation(run_section.get("adaptation"), run_section.get("control"))
         pool_size = run_section["pool_size"]
         active_raw = active_section["list"]
     except KeyError as exc:
         raise ValueError("Invalid config.toml: required keys are missing.") from exc
 
-    if type(control) is not int or control not in (0, 1):
-        raise ValueError("Invalid config.toml: 'run.control' must be 0 (offline) or 1 (online).")
+    if control is None:
+        raise ValueError(
+            "Invalid config.toml: 'run.adaptation' must be 'fixed' or 'adaptive' "
+            "(or the legacy 'run.control' 0/1)."
+        )
     if type(pool_size) is not int or pool_size <= 0:
         raise ValueError("Invalid config.toml: 'run.pool_size' must be > 0.")
     if not isinstance(active_raw, list) or not active_raw:
