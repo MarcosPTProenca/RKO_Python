@@ -1,4 +1,23 @@
-"""Orchestration layer for RKO execution."""
+"""Validated search construction and backend execution exports.
+
+Objective:
+- Expose shared orchestration contracts without duplicating backend logic.
+
+Technical approach:
+- Re-export configuration parsing, construction, execution and callback types.
+
+Flow (pseudocode):
+1. Parse and validate the run configuration.
+2. Construct and execute selected searches.
+3. Select the best completed result.
+
+Important criteria:
+- Search backends share the same callback and result contracts.
+
+Inputs/Outputs:
+- Input: configuration, decoder and objective callbacks.
+- Output: configured algorithms and measured run results.
+"""
 
 from .configuration import parse_run_config
 from .execution import run_metaheuristics_parallel
