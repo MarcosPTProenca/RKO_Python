@@ -6,6 +6,7 @@ Objective:
 Technical approach:
 - Carry a monotonic deadline through the callbacks already passed to every operator.
 - Pair decoded payloads with copied keys without changing user callback payloads.
+- Optionally retain bounded scalar incumbent samples, never candidate histories.
 - Stop between callbacks and retain completed evaluations, including initialization.
 
 Flow (pseudocode):
@@ -31,6 +32,7 @@ import threading
 import time
 from .types import CostFn
 from .types import DecoderFn
+from .types import HistoryPoint
 from .types import RunResult
 from .types import SearchMetadata
 from dataclasses import dataclass
@@ -94,6 +96,23 @@ class SearchSession:
         self.n_evaluations = 0
         self.metadata: SearchMetadata | None = None
         self._stop_reason = "completed"
+        self._history_limit = 0
+        self._history: list[HistoryPoint] = []
+        self._history_observations = 0
+        self._started_at = 0.0
+
+    def _record_history(self, elapsed: float) -> None:
+        """Retain an incumbent sample and compact deterministically at the configured cap.
+
+        Args:
+            elapsed (float): Genuine elapsed search time of this observation.
+        """
+        if self.best is None:
+            return
+        self._history_observations += 1
+        self._history.append(HistoryPoint(elapsed, self.n_evaluations, self.best[1]))
+        if len(self._history) > self._history_limit:
+            self._history = self._history[:1] + self._history[2:-1:2] + self._history[-1:]
 
     def _check(self) -> None:
         """Stop after a valid result exists or when another worker failed.
@@ -144,6 +163,8 @@ class SearchSession:
         self.n_evaluations += 1
         if self.best is None or value < self.best[1]:
             self.best = (candidate.keys, value)
+            if self._history_limit:
+                self._record_history(time.perf_counter() - self._started_at)
         return value
 
     def solve(
@@ -154,6 +175,7 @@ class SearchSession:
         deadline: float | None = None,
         cancelled: threading.Event | None = None,
         random_state: int | None = None,
+        history_limit: int = 0,
     ) -> RunResult:
         """Execute an algorithm using budget-aware callbacks and preserve its incumbent.
 
@@ -163,15 +185,25 @@ class SearchSession:
             deadline (float | None): Common absolute deadline, or duration from now.
             cancelled (threading.Event | None): Shared peer-failure signal.
             random_state (int | None): Actual assigned seed for this search report.
+            history_limit (int): Per-search scalar sample cap, zero disables capture.
 
         Returns:
             RunResult: Extras, best evaluated keys and objective; an unevaluated
                 cancelled peer has empty keys and infinite cost.
 
         Raises:
+            ValueError: If the requested history cap is not zero or between 2 and 10000.
             Exception: Original decoder, objective or algorithm failure is propagated.
         """
+        if type(history_limit) is not int or (
+            history_limit != 0 and not 2 <= history_limit <= 10000
+        ):
+            raise ValueError("history_limit must be 0 or an integer from 2 to 10000.")
         started = time.perf_counter()
+        self._started_at = started
+        self._history_limit = history_limit
+        self._history = []
+        self._history_observations = 0
         self.best = None
         self.n_evaluations = 0
         self.metadata = None
@@ -196,6 +228,8 @@ class SearchSession:
                     reason = "cancelled"
                 elif finished >= self.deadline:
                     reason = "time_limit"
+            if history_limit:
+                self._record_history(finished - started)
             self.metadata = replace(
                 getattr(algorithm, "_search_metadata", None)
                 or SearchMetadata(algorithm=algorithm.name),
@@ -204,6 +238,9 @@ class SearchSession:
                 stop_reason=reason,
                 time_limit=duration,
                 elapsed_seconds=finished - started,
+                history=tuple(self._history),
+                history_limit=history_limit,
+                history_observations=self._history_observations,
             )
             return result
         finally:

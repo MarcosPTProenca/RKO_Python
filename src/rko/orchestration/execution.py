@@ -39,6 +39,7 @@ def run_metaheuristics_parallel(
     streams: list[RandomStreams] | None = None,
     *,
     search_metadata: list[SearchMetadata] | None = None,
+    history_limit: int = 0,
 ) -> list[RunResult]:
     """Run thread searches with callback-budget and failure cancellation checks.
 
@@ -47,6 +48,7 @@ def run_metaheuristics_parallel(
         limit_time (float): Search seconds per concurrently started algorithm.
         streams (list[RandomStreams] | None): Owned streams in portfolio order.
         search_metadata (list[SearchMetadata] | None): Optional completed report collector.
+        history_limit (int): Per-search scalar history cap; zero disables capture.
 
     Returns:
         list[RunResult]: Search outcomes in portfolio order.
@@ -78,6 +80,7 @@ def run_metaheuristics_parallel(
                     limit_time,
                     cancelled=cancelled,
                     random_state=streams[index].seed,
+                    history_limit=history_limit,
                 )
                 reports[index] = session.metadata
         except BaseException as exc:

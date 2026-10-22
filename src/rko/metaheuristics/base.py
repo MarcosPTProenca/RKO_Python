@@ -154,6 +154,7 @@ class MetaheuristicBase(ABC):
         pool_size: int | None = None,
         params_dir: Path | None = None,
         verbose: bool = False,
+        history_limit: int = 0,
     ) -> RKOResult:
         """Run this built-in algorithm alone with an automatically managed elite pool.
 
@@ -170,6 +171,8 @@ class MetaheuristicBase(ABC):
             pool_size (int | None): Elite capacity; None uses packaged configuration.
             params_dir (Path | None): Optional custom parameter directory.
             verbose (bool): Print progress when True.
+            history_limit (int): Zero disables recording; 2 through 10000 caps scalar
+                incumbent observations retained for interactive reporting.
 
         Returns:
             RKOResult: Immutable best keys, objective and measured search metadata.
@@ -198,6 +201,7 @@ class MetaheuristicBase(ABC):
             params_dir=params_dir,
             random_state=random_state,
             verbose=verbose,
+            history_limit=history_limit,
         ).solve(time_limit)
 
     @abstractmethod

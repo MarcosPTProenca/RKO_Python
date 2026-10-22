@@ -1,0 +1,384 @@
+"""Offline interactive analysis of completed random-key optimization runs.
+
+Objective:
+- Export honest single-run summaries and bounded convergence traces as standalone HTML.
+- Preserve data-only provenance without leaking chromosomes or calling problem callbacks.
+
+Technical approach:
+- Snapshot immutable result metadata into a versioned JSON-compatible document.
+- Import optional Plotly only for HTML rendering and embed its JavaScript once.
+- Render independent search histories on explicitly local clocks, never a synthetic portfolio curve.
+- Atomically replace output only after successful serialization/rendering.
+
+Flow (pseudocode):
+1. Validate user labels/metrics and snapshot a completed result without its keys.
+2. Build configuration tables, work/budget charts and available incumbent curves.
+3. Embed all chart assets and escaped metadata in one offline HTML document.
+4. Write HTML or data-only JSON through an adjacent temporary file and rename.
+
+Important criteria:
+- Reporting never reevaluates objectives, starts browsers or downloads remote assets.
+- Missing histories remain unavailable; compacted histories are explicitly approximate.
+- Portfolio members cooperate and must not be presented as independent competitors.
+- File generation is outside the measured search lifecycle and can raise independently.
+
+Inputs/Outputs:
+- Input: RKOResult, optional title and precomputed domain metric labels/values.
+- Output: self-contained HTML or versioned JSON, excluding candidate coordinates.
+"""
+
+from __future__ import annotations
+
+import importlib
+import json
+import math
+import os
+from .solver import RKOResult
+from collections.abc import Mapping
+from collections.abc import Sequence
+from dataclasses import asdict
+from html import escape
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import Any
+
+
+class OptimizationReport:
+    """Snapshot and export completed optimization observations without rerunning search.
+
+    Responsibilities:
+    - Keep summary, configuration, bounded histories and user metrics together.
+    - Render offline interactive charts and write outputs atomically.
+
+    Attributes:
+        title (str): User-facing report heading, escaped before HTML insertion.
+    """
+
+    def __init__(
+        self,
+        result: RKOResult,
+        *,
+        title: str = "RKO optimization report",
+        metrics: Mapping[str, str | int | float | bool] | None = None,
+    ) -> None:
+        """Snapshot finite result metadata and optional already-computed domain metrics.
+
+        Args:
+            result (RKOResult): Completed managed run or legacy result without histories.
+            title (str): Report title, not raw HTML.
+            metrics (Mapping[str, str | int | float | bool] | None): User-supplied
+                domain values such as feasibility or profit; never verified automatically.
+
+        Raises:
+            ValueError: If labels/metric types are invalid or numeric metadata is nonfinite.
+        """
+        if not isinstance(title, str):
+            raise ValueError("Report title must be a string.")
+        domain = dict(metrics) if metrics is not None else {}
+        for key, value in domain.items():
+            if not isinstance(key, str) or type(value) not in (str, int, float, bool):
+                raise ValueError("Domain metrics require string labels and scalar values.")
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("Domain metric numbers must be finite.")
+        self.title = title
+        data = {
+            "schema_version": 1,
+            "title": title,
+            "summary": {
+                "cost": result.cost,
+                "n_variables": result.n_variables,
+                "algorithms": result.algorithms,
+                "backend": result.backend,
+                "adaptation": result.adaptation,
+                "random_state": result.random_state,
+                "time_limit": result.time_limit,
+                "elapsed_seconds": result.elapsed_seconds,
+                "n_evaluations": result.n_evaluations,
+                "stop_reason": result.stop_reason,
+                "pool_size": result.pool_size,
+                "n_jobs": result.n_jobs,
+                "n_workers": result.n_workers,
+                "available_cpus": result.available_cpus,
+            },
+            "versions": dict(result.versions),
+            "initialization": asdict(result.initialization) if result.initialization else None,
+            "searches": [asdict(search) for search in result.searches],
+            "domain_metrics": domain,
+        }
+        self._data = json.loads(json.dumps(data, allow_nan=False))
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a detached JSON-compatible snapshot, without solution coordinates.
+
+        Returns:
+            dict[str, Any]: Versioned summary, histories, settings and supplied domain values.
+        """
+        return json.loads(json.dumps(self._data, allow_nan=False))
+
+    @staticmethod
+    def _table(headers: Sequence[str], rows: Sequence[Sequence[object]]) -> str:
+        """Escape plain values into an accessible scrollable HTML table.
+
+        Args:
+            headers (Sequence[str]): Column labels.
+            rows (Sequence[Sequence[object]]): Plain-text cell values, never trusted markup.
+
+        Returns:
+            str: Escaped HTML table with explicit column headers.
+        """
+        headings = "".join(f'<th scope="col">{escape(label)}</th>' for label in headers)
+        body = "".join(
+            "<tr>" + "".join(f"<td>{escape(str(value))}</td>" for value in row) + "</tr>"
+            for row in rows
+        )
+        return (
+            f'<div class="table"><table><thead><tr>{headings}</tr></thead>'
+            f"<tbody>{body}</tbody></table></div>"
+        )
+
+    def _charts(self) -> str:
+        """Render interactive figures with one inline Plotly bundle and no external assets.
+
+        Returns:
+            str: HTML fragments for scalar histories, evaluation counts and time budgets.
+
+        Raises:
+            ImportError: If the optional reports dependency is not installed.
+        """
+        try:
+            go = importlib.import_module("plotly.graph_objects")
+            pio = importlib.import_module("plotly.io")
+        except ImportError as exc:
+            raise ImportError(
+                "Interactive HTML reports require the 'reports' extra: "
+                "uv sync --extra reports (source checkout) or install 'rko[reports]'."
+            ) from exc
+        searches = self._data["searches"]
+        figures = []
+        traced = [search for search in searches if search["history"]]
+        for axis, label in (
+            ("elapsed_seconds", "Elapsed seconds since each search started"),
+            ("n_evaluations", "Completed objective evaluations in each search"),
+        ):
+            if not traced:
+                break
+            figure = go.Figure()
+            for search in traced:
+                points = search["history"]
+                compacted = search["history_observations"] > len(points)
+                name = escape(search["algorithm"]) + (" (compacted)" if compacted else "")
+                figure.add_trace(
+                    go.Scatter(
+                        x=[point[axis] for point in points],
+                        y=[point["cost"] for point in points],
+                        mode="lines+markers",
+                        name=name,
+                        line={"shape": "hv"},
+                    )
+                )
+            figure.update_layout(
+                title="Best observed objective — independent local search axes",
+                xaxis_title=label,
+                yaxis_title="Objective (minimize)",
+            )
+            figures.append(figure)
+        if searches:
+            labels = [escape(search["algorithm"]) for search in searches]
+            work = go.Figure(
+                go.Bar(
+                    x=labels,
+                    y=[search["n_evaluations"] for search in searches],
+                    name="Completed evaluations",
+                )
+            )
+            work.update_layout(title="Observed search work", yaxis_title="Finite objective calls")
+            figures.append(work)
+            timing = go.Figure()
+            for field, label in (
+                ("time_limit", "Assigned search seconds"),
+                ("elapsed_seconds", "Measured session seconds"),
+            ):
+                timing.add_trace(
+                    go.Bar(
+                        x=labels,
+                        y=[search[field] for search in searches],
+                        name=label,
+                    )
+                )
+            timing.update_layout(
+                title="Assigned budget versus session duration",
+                yaxis_title="Seconds",
+                barmode="group",
+            )
+            figures.append(timing)
+        fragments = []
+        for index, figure in enumerate(figures):
+            figure.update_layout(template="plotly_white", font={"family": "Arial, sans-serif"})
+            fragments.append(
+                pio.to_html(
+                    figure,
+                    include_plotlyjs=index == 0,
+                    include_mathjax=False,
+                    full_html=False,
+                    div_id=f"rko-chart-{index}",
+                    config={"responsive": True, "displaylogo": False},
+                )
+            )
+        return "\n".join(fragments)
+
+    @staticmethod
+    def _write(path: Path, content: str, suffix: str) -> Path:
+        """Atomically write UTF-8 output after rendering has completed.
+
+        Args:
+            path (Path): Target with the required suffix and an existing parent directory.
+            content (str): Already-rendered complete document.
+            suffix (str): Required lower-case suffix, including the dot.
+
+        Returns:
+            Path: Target path after successful replacement.
+
+        Raises:
+            ValueError: If the target suffix is unsupported.
+            OSError: If temporary creation, writing or atomic replacement fails.
+        """
+        if path.suffix.lower() != suffix:
+            raise ValueError(f"Expected a {suffix} output path.")
+        temporary = None
+        try:
+            with NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=path.parent, suffix=".tmp", delete=False
+            ) as stream:
+                temporary = Path(stream.name)
+                stream.write(content)
+            os.replace(temporary, path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        return path
+
+    def write_json(self, path: str | Path) -> Path:
+        """Export versioned data without requiring Plotly or including candidate keys.
+
+        Args:
+            path (str | Path): JSON target; existing files are atomically replaced.
+
+        Returns:
+            Path: Written file.
+
+        Raises:
+            ValueError: If the file suffix is not .json.
+            OSError: If output cannot be written.
+        """
+        return self._write(Path(path), json.dumps(self._data, indent=2, allow_nan=False), ".json")
+
+    def write_html(self, path: str | Path) -> Path:
+        """Write one offline HTML file with hover, zoom and legend-based trace selection.
+
+        Args:
+            path (str | Path): HTML target; existing files are atomically replaced.
+
+        Returns:
+            Path: Written self-contained report.
+
+        Raises:
+            ImportError: If the optional reports dependency is unavailable.
+            ValueError: If the target suffix is not .html.
+            OSError: If output cannot be written.
+        """
+        target = Path(path)
+        if target.suffix.lower() != ".html":
+            raise ValueError("Expected a .html output path; automatic PDF export is not supported.")
+        data = self._data
+        summary = self._table(("Run metric", "Value"), list(data["summary"].items()))
+        searches = self._table(
+            (
+                "Algorithm",
+                "Adaptation",
+                "Seed",
+                "Stop reason",
+                "Evaluations",
+                "History kept/observed",
+            ),
+            [
+                (
+                    search["algorithm"],
+                    "adaptive" if search["control"] else "fixed",
+                    search["random_state"],
+                    search["stop_reason"],
+                    search["n_evaluations"],
+                    f"{len(search['history'])}/{search['history_observations']}",
+                )
+                for search in data["searches"]
+            ],
+        )
+        configuration = self._table(
+            ("Algorithm", "Initial fixed values", "Adaptive axes (not visited states)"),
+            [
+                (search["algorithm"], search["parameters"], search["parameter_grid"])
+                for search in data["searches"]
+            ],
+        )
+        domain = self._table(
+            ("User metric", "User-supplied value"), list(data["domain_metrics"].items())
+        )
+        provenance = self._table(("Runtime", "Version"), list(data["versions"].items()))
+        initialization = self._table(
+            ("Startup metric", "Value"), list((data["initialization"] or {}).items())
+        )
+        missing = [search["algorithm"] for search in data["searches"] if not search["history"]]
+        unavailable = (
+            (
+                "No search histories recorded. Enable history_limit=1000 before solving."
+                if not data["searches"]
+                else "Histories unavailable for: " + ", ".join(missing)
+            )
+            if missing or not data["searches"]
+            else "All search histories were recorded."
+        )
+        embedded = (
+            json.dumps(data, allow_nan=False)
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+        )
+        charts = self._charts()
+        heading = escape(self.title)
+        document = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>{heading}</title><style>
+body{{font:16px/1.5 Arial,sans-serif;max-width:1150px;margin:auto;padding:24px;color:#172b4d}}
+h1,h2{{line-height:1.2}}.notice{{background:#fff3cd;padding:16px;border-left:4px solid #bf8700}}
+.table{{overflow:auto}}table{{border-collapse:collapse;width:100%;margin:16px 0}}
+th,td{{text-align:left;padding:8px;border:1px solid #dfe1e6;vertical-align:top}}
+th{{background:#f4f5f7}}nav a{{margin-right:16px}}section{{margin-top:32px}}
+@media print{{body{{max-width:none}}nav{{display:none}}.table{{overflow:visible}}}}
+</style></head><body><header><h1>{heading}</h1><p>Single-run observations · minimized objective</p>
+<nav><a href="#summary">Summary</a><a href="#analysis">Charts</a>
+<a href="#configuration">Configuration</a><a href="#provenance">Provenance</a></nav></header>
+<p class="notice">No feasibility or optimality certificate is inferred from finite costs.
+Portfolio members cooperate: these are not independent benchmark comparisons.
+Completed does not mean converged. Timed runs depend on scheduling.</p>
+<section id="summary"><h2>Run summary</h2>{summary}<h3>User-supplied domain metrics</h3>
+<p>Values below are supplied by the caller, not independently verified by this report.</p>
+{domain}</section>
+<section id="analysis"><h2>Interactive analysis</h2><p>{escape(unavailable)}</p>
+<p>Hover for observations, zoom to inspect, and click legend labels to select curves.
+Each convergence curve starts at its own search start, excluding queueing and shared prefill;
+it is not a synchronized portfolio timeline. No global shared-pool trajectory is recorded.
+Compacted step curves are approximate: intermediate improvements may be omitted.
+Terminal observations retain actual timestamps, including cooperative deadline overruns.
+No exact time-to-target is inferred from compacted curves.</p>{charts}
+<h3>Search accounting</h3>{searches}<p>Session durations can overlap; their sum is not wall time.
+Evaluation counts are not CPU utilization or equivalent work across objectives.</p></section>
+<section id="configuration"><h2>Effective initial search settings</h2>{configuration}
+<h3>Separate shared initialization</h3>{initialization}
+<p>Shared initialization is outside search histories; its result can be better than a search's
+local incumbent. Final cost and search curves need not originate from the same publication.</p>
+</section>
+<section id="provenance"><h2>Runtime provenance</h2>{provenance}
+<p>Seeds and settings are not a complete replay artifact. No callbacks, candidate keys or
+input datasets are included by default. Export JSON for a separate data-only artifact.</p></section>
+<script type="application/json" id="rko-report-data">{embedded}</script>
+</body></html>"""
+        return self._write(target, document, ".html")

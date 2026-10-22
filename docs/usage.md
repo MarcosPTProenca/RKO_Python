@@ -70,6 +70,7 @@ The first three arguments are required. The others are keyword-only:
 | `n_jobs=None` | Process-only worker cap; default uses discovered CPU capacity |
 | `random_state=None` | Nonnegative library seed, or fresh assigned seeds |
 | `verbose=False` | Opt-in lifecycle/shared-pool progress to stdout |
+| `history_limit=0` | Opt-in per-search scalar history cap, 2–10000; see [interactive reports](reporting.md) |
 | `hyperparameters=None` | Partial named scalar overrides, requiring `control=0` |
 
 `solve(time_limit)` requires positive finite seconds. Invalid dimensions/settings,
@@ -251,6 +252,12 @@ for search in result.searches:
     print(search.algorithm, search.n_evaluations, search.stop_reason)
     print(search.random_state, dict(search.parameters), search.parameter_grid)
 ```
+
+With `history_limit > 0`, each search also exposes immutable `.history` points
+(local elapsed seconds, evaluations, incumbent cost), `.history_limit` and
+`.history_observations`. Recording is bounded; compacted curves are approximate.
+[Interactive reports](reporting.md) explains offline HTML/JSON exports and their
+privacy and interpretation limits. Capture is disabled by default.
 
 `n_evaluations` counts **successfully completed finite objective callback calls**
 across every algorithm, including initialization and local search—not just

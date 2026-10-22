@@ -172,6 +172,7 @@ class RKO:
         random_state (int | None): Nonnegative per-search seed in every backend.
         verbose (bool): Print lifecycle and attributed shared-pool updates; default False.
         hyperparameters (Hyperparameters | None): Partial named offline scalar overrides.
+        history_limit (int): Per-search scalar history cap; zero disables recording.
         result_ (RKOResult | None): Last successful solve; cleared before each attempt.
     """
 
@@ -192,6 +193,7 @@ class RKO:
         random_state: int | None = None,
         verbose: bool = False,
         hyperparameters: Hyperparameters | None = None,
+        history_limit: int = 0,
     ) -> None:
         """Store problem and solver settings without I/O or search execution.
 
@@ -217,6 +219,8 @@ class RKO:
             verbose (bool): Flush lifecycle and shared-pool progress to stdout.
             hyperparameters (Hyperparameters | None): Per-algorithm offline overrides;
                 require control=0 and merge with TOML defaults without writing files.
+            history_limit (int): Zero disables history; 2 through 10000 bounds retained
+                scalar observations per search. Compacted curves are approximate.
         """
         self.decoder = decoder
         self.cost = cost
@@ -232,6 +236,7 @@ class RKO:
         self.random_state = random_state
         self.verbose = verbose
         self.hyperparameters = hyperparameters
+        self.history_limit = history_limit
         self.result_: RKOResult | None = None
 
     def solve(self, time_limit: float) -> RKOResult:
@@ -262,6 +267,10 @@ class RKO:
             or time_limit <= 0
         ):
             raise ValueError("'time_limit' must be positive and finite.")
+        if type(self.history_limit) is not int or (
+            self.history_limit != 0 and not 2 <= self.history_limit <= 10000
+        ):
+            raise ValueError("'history_limit' must be 0 (disabled) or an integer from 2 to 10000.")
         if type(self.verbose) is not bool:
             raise ValueError("'verbose' must be a boolean.")
         if self.backend not in ("process", "thread", "serial"):
@@ -419,6 +428,7 @@ class RKO:
                 hyperparameters=hyperparameters,
                 search_metadata=search_metadata,
                 initialization_metadata=initialization_metadata,
+                history_limit=self.history_limit,
             )
         pool.start_progress()
         try:
@@ -437,7 +447,11 @@ class RKO:
             if self.backend == "thread":
                 return select_best_result(
                     run_metaheuristics_parallel(
-                        metaheuristics, time_limit, streams, search_metadata=search_metadata
+                        metaheuristics,
+                        time_limit,
+                        streams,
+                        search_metadata=search_metadata,
+                        history_limit=self.history_limit,
                     ),
                     pool,
                 )
@@ -445,7 +459,14 @@ class RKO:
             for mh, stream in zip(metaheuristics, streams, strict=True):
                 with stream.activate():
                     session = SearchSession(self.decoder, self.cost)
-                    results.append(session.solve(mh, time_limit, random_state=stream.seed))
+                    results.append(
+                        session.solve(
+                            mh,
+                            time_limit,
+                            random_state=stream.seed,
+                            history_limit=self.history_limit,
+                        )
+                    )
                     if search_metadata is not None:
                         assert session.metadata is not None
                         search_metadata.append(session.metadata)
