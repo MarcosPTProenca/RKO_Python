@@ -15,7 +15,7 @@ objective. Adaptive control has overhead and is **not** guaranteed to improve
 quality. IPR and MultiStart have no adaptive parameter axes.
 
 `RKO(..., adaptation=None)` retains the configured default (the packaged config
-currently requests adaptive control). `Class.solve_one(...)` defaults to fixed
+currently requests adaptive control). `Class.optimize(...)` defaults to fixed
 mode for an explicit, easily tuned standalone starting point. Existing `control`
 calls continue to work without warnings. The legacy name is retained for
 compatibility, not removed in this change. If both names are supplied, they must
@@ -30,7 +30,7 @@ rejected. Existing `[offline]` and `[online]` table names stay unchanged.
 ```python
 from rko.metaheuristics import SA
 
-result = SA.solve_one(
+result = SA.optimize(
     decode, objective, 20, time_limit=60.0,
     adaptation="fixed",
     hyperparameters={"sa_max": 100, "t0": 1000.0, "alpha": 0.98},
@@ -56,7 +56,7 @@ adaptive choices in `[online]` named TOML axes through `params_dir` instead.
 
 ## Algorithm parameters
 
-The defaults below are the **packaged fixed TOML defaults** used by `solve_one`
+The defaults below are the **packaged fixed TOML defaults** used by `optimize`
 and `RKO`, not necessarily the defaults of direct class constructors. They are
 starting points, not recommendations for every problem. Costs are assumed to be
 minimized; temperature scales depend on your objective's magnitude.

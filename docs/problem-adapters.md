@@ -102,7 +102,7 @@ def main() -> None:
     """
     instance = read_data(Path("my_instance.json"))
     problem = SchedulingProblem(instance)
-    result = SA.solve_one(
+    result = SA.optimize(
         problem.decode,
         problem.cost,
         n_variables=problem.n_variables,
@@ -127,7 +127,7 @@ uv run --locked python solve_schedule.py
 
 Substitute `PSO`, `GRASP`, `GeneticAlgorithm` or any other
 [built-in class](standalone.md#algorithm-catalog) without changing the reader or
-adapter. `solve_one` handles its private pool and runs serially. These classes are
+adapter. `optimize` handles its private pool and runs serially. These classes are
 metaheuristics, not trained models that need their own input-file loader.
 
 ### 4. Use the same instance in RKO

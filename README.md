@@ -14,20 +14,24 @@ vectors without assuming a problem format or solution representation.
 
 ## What you implement
 
-**Your only problem-specific implementations are the data reader, decoder and
-objective function. RKO provides the optimization algorithms.**
+**For optimization, you provide the data reader, decoder and objective function.
+You may also provide `validate` for optional post-solve checks. RKO provides the
+optimization algorithms; all of these are ordinary Python functions.**
 
 | Your code | Responsibility |
 | --- | --- |
 | `read_data(source)` | Read your instance and return the data needed by your problem. Skip this function if the data is already in memory. |
 | `decoder(keys)` | Use the loaded data to convert a key vector into your domain solution. |
 | `objective(solution)` | Use the loaded data to return a finite scalar to **minimize**. This callable is passed as `cost` in the library API. |
+| `validate(solution)` **(optional)** | Check your domain constraints after solving and return a `ValidationReport`. Omit it if you do not need final-solution checking. |
 
 Load the data once in your application, then bind it to the decoder and objective.
 RKO calls those two callbacks during search; it does **not** invoke `read_data`.
 Function names are yours to choose. Module-level functions with `functools.partial`
 or methods holding the data both work; **an adapter class is optional**, not a
-fourth required implementation.
+required interface. Optional validation uses the Python API `assess_result(...)`,
+not a CLI-only feature; it runs outside the search budget and never implicitly
+reevaluates the objective.
 
 You do **not** need to implement a metaheuristic, population, elite pool, local
 search, shaking or Q-learning controller. Select an algorithm and configure values
@@ -64,62 +68,198 @@ The previous implementation is preserved at
 
 ## First solve
 
-Save this as `quickstart.py` and run it with the command above:
+This complete Python example loads a small instance, binds its data to your
+functions, solves, and optionally checks the returned solution. No CLI or adapter
+class is required. Replace the example's file format and domain logic with yours.
+
+Save this as `instance.json` in the repository root:
+
+```json
+{
+  "lower": [-5.0, -5.0, -5.0],
+  "upper": [5.0, 5.0, 5.0],
+  "target": [1.0, -2.0, 0.5]
+}
+```
+
+Save this as `quickstart.py` beside it:
 
 ```python
+import json
 import numpy as np
-from rko.metaheuristics import SA
+from functools import partial
+from pathlib import Path
+from rko import RKO
+from rko import ValidationCheck
+from rko import ValidationReport
+from rko import assess_result
 
 
-def decode(keys: np.ndarray) -> np.ndarray:
-    """Return the candidate vector as the domain solution.
+def read_data(path: Path) -> dict[str, np.ndarray]:
+    """Load the example's bounds and target once before searching.
+
+    Args:
+        path (Path): UTF-8 JSON instance file.
+
+    Returns:
+        dict[str, np.ndarray]: Equal-length lower, upper and target vectors.
+
+    Raises:
+        OSError: If the file cannot be read.
+        ValueError: If JSON, fields, dimensions or bounds are invalid.
+        TypeError: If values cannot be converted into numerical arrays.
+    """
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or set(raw) != {"lower", "upper", "target"}:
+        raise ValueError("Expected lower, upper and target fields.")
+    data = {name: np.asarray(value, dtype=float) for name, value in raw.items()}
+    shape = data["lower"].shape
+    if data["lower"].ndim != 1 or data["lower"].size == 0 or any(
+        value.shape != shape or not np.isfinite(value).all() for value in data.values()
+    ):
+        raise ValueError("Expected nonempty, equal-length finite vectors.")
+    if np.any(data["lower"] >= data["upper"]):
+        raise ValueError("Each lower bound must be smaller than its upper bound.")
+    return data
+
+
+def decoder(keys: np.ndarray, *, data: dict[str, np.ndarray]) -> np.ndarray:
+    """Map random keys into the loaded variable bounds.
 
     Args:
         keys (np.ndarray): Random-key chromosome.
+        data (dict[str, np.ndarray]): Loaded instance data, bound before search.
 
     Returns:
         np.ndarray: Decoded numerical solution.
     """
-    return keys
+    return data["lower"] + (data["upper"] - data["lower"]) * keys
 
 
-def objective(solution: np.ndarray) -> float:
-    """Evaluate the squared Euclidean norm.
+def objective(solution: np.ndarray, *, data: dict[str, np.ndarray]) -> float:
+    """Minimize squared distance to the loaded target.
 
     Args:
         solution (np.ndarray): Decoded numerical solution.
+        data (dict[str, np.ndarray]): Loaded instance data, bound before search.
 
     Returns:
-        float: Finite objective to minimize.
+        float: Finite objective for this example's input.
     """
-    return float(np.dot(solution, solution))
+    difference = solution - data["target"]
+    return float(np.dot(difference, difference))
 
 
-result = SA.solve_one(
-    decode,
-    objective,
-    n_variables=20,
-    time_limit=1.0,
-    adaptation="fixed",
-    random_state=42,
-)
-print(result.cost, result.keys)
-print(result.n_evaluations, result.stop_reason, result.elapsed_seconds)
+def validate(solution: np.ndarray, *, data: dict[str, np.ndarray]) -> ValidationReport:
+    """Optionally check final dimensions, finiteness and domain bounds.
+
+    Args:
+        solution (np.ndarray): Post-run reconstructed solution.
+        data (dict[str, np.ndarray]): Same loaded instance used during search.
+
+    Returns:
+        ValidationReport: Declared feasibility for the implemented bound checks.
+    """
+    valid = solution.shape == data["lower"].shape and bool(
+        np.isfinite(solution).all()
+        and np.all(solution >= data["lower"])
+        and np.all(solution <= data["upper"])
+    )
+    return ValidationReport(
+        checks=(ValidationCheck(
+            "variable_bounds", "passed" if valid else "failed",
+            message="Check the declared shape, finite values and variable bounds.",
+        ),),
+        feasible=valid,
+    )
+
+
+def main() -> None:
+    """Load once, optimize with data-bound callbacks, then optionally validate.
+
+    Raises:
+        OSError: If the instance cannot be read.
+        ValueError: If the input or solver settings are invalid.
+        TypeError: If instance values are not numerical.
+    """
+    data = read_data(Path("instance.json"))
+    decode = partial(decoder, data=data)
+    cost = partial(objective, data=data)
+    solver = RKO(
+        decoder=decode, cost=cost, n_variables=data["lower"].size,
+        algorithms=["SA", "PSO"], adaptation="fixed",
+        backend="serial", random_state=42,
+    )
+    result = solver.solve(time_limit=1.0)
+    assessment = assess_result(
+        result, decoder=decode, validator=partial(validate, data=data),
+    )
+    print("Solution:", assessment.solution)
+    print("Objective:", result.cost)
+    print("Validation:", assessment.validation.status)
+    print("Evaluations:", result.n_evaluations)
+
+
+if __name__ == "__main__":
+    main()
 ```
+
+Run `uv run --locked --no-dev python quickstart.py` from that directory.
+The wiring is explicit:
+
+1. **`data = read_data(...)`** runs in your application before constructing RKO.
+2. **`partial(decoder, data=data)`** and **`partial(objective, data=data)`** bind
+   loaded data to the callbacks passed to `RKO(decoder=..., cost=...)`.
+3. **`solver.solve(...)`** runs the selected metaheuristics using those callbacks.
+4. **`assess_result(..., validator=partial(validate, data=data))`** optionally checks
+   the post-run solution. Neither `read_data` nor `validate` runs inside search.
+
+**To skip validation**, omit `validate` and all `assessment`-related lines. Use
+`solution = decode(np.asarray(result.keys))` and print that solution instead.
+Assessment validates a post-run reconstruction, not optimality or an original
+execution witness. See [validation details](docs/solution-validation.md).
 
 The decoder receives a one-dimensional NumPy key vector; the objective must
 return a **finite scalar to minimize**. Readers and feasibility logic belong in
 your problem adapter. `random_state` owns library draws, not randomness inside
 user callbacks; timed runs can still differ because of scheduling.
 
-`SA.solve_one(...)` manages its own pool and runs one serial algorithm. Substitute
-any of the eleven [built-in classes](docs/standalone.md#algorithm-catalog) without
-changing your callbacks. Use `RKO(...)` for a cooperating portfolio; its default
-is a **process portfolio**: use importable callbacks and a guarded entry point
+The main API is `RKO(...)`: the example runs a cooperating SA/PSO portfolio with
+shared elites. It explicitly selects serial execution for a simple first run.
+RKO's default is a **process portfolio**: use importable callbacks and a guarded entry point
 as shown in the [process-safe example](docs/usage.md#spawn-compatible-callbacks).
 Serial mode gives **each selected algorithm** its own search allowance; process
 startup is excluded, and opted-in pool prefill has a separate allowance. A callback
 can overrun its deadline. `time_limit` is not a hard end-to-end timeout.
+
+## Run one metaheuristic instead
+
+Keep `read_data`, the data-bound `decode`/`cost` functions and optional assessment
+unchanged. Replace only the solver block inside `main`.
+
+**Through the main RKO API**, select one algorithm:
+
+```python
+solver = RKO(
+    decoder=decode, cost=cost, n_variables=data["lower"].size,
+    algorithms=["SA"], adaptation="fixed", backend="serial", random_state=42,
+)
+result = solver.solve(time_limit=1.0)
+```
+
+**Through the direct algorithm API**, import `SA` from `rko.metaheuristics`
+alongside the other imports, then use:
+
+```python
+result = SA.optimize(
+    decoder=decode, cost=cost, n_variables=data["lower"].size,
+    time_limit=1.0, adaptation="fixed", random_state=42,
+)
+```
+
+`SA.optimize(...)` manages its own pool, runs serially and returns the same
+`RKOResult` type. Substitute another [built-in class](docs/standalone.md#algorithm-catalog)
+without changing your problem functions. `optimize` is the standalone entry point.
 
 ## Use your own instance data
 
@@ -137,7 +277,7 @@ A complete [file-to-solution tutorial](docs/problem-adapters.md) shows a JSON
 scheduling instance where the decoder uses loaded processing times and the objective
 uses loaded due dates. The tutorial groups these two callbacks in an importable
 class for convenience; you can use functions instead. The same callbacks work
-unchanged with `SA.solve_one`, other built-in classes and RKO portfolios. There is
+unchanged with `SA.optimize`, other built-in classes and RKO portfolios. There is
 no required base class.
 
 Run the packaged example without creating an input file:
@@ -150,39 +290,20 @@ For your own file, use the tutorial's schema or replace its reader/adapter with 
 application's format. Loading once does not mean shared RAM across process workers;
 keep callbacks pickleable and account for copied data when choosing `n_jobs`.
 
-## Optional final-solution checks
-
-A domain validator is **optional**, not another requirement to run optimization.
-If you supply one, [`assess_result(...)`](docs/solution-validation.md) decodes final
-keys once, runs your checker after search, and returns structured diagnostics.
-It does not reevaluate the objective, repair the result or change search counts.
-Reports distinguish passed/failed/missing checks from declared domain feasibility.
-
-Try the packaged scheduling checker:
-
-```bash
-uv run --locked --no-dev python -m rko.examples.instance_pipeline --validate-solution
-```
-
-A passed check is not proof that all domain constraints were checked or that the
-solution is optimal. See the [validation guide](docs/solution-validation.md) for
-checker functions, reconstruction caveats and report integration.
-
 ## Interactive analysis reports
 
 Install the optional reporting dependency with `uv sync --locked --extra reports`.
-Then opt into bounded scalar history when solving:
+To plot convergence, add `history_limit=1000` to the solve call above. Import
+`OptimizationReport` from `rko.reporting` alongside your other imports, then add
+this after assessment inside `main`:
 
 ```python
-from rko.reporting import OptimizationReport
-
-result = SA.solve_one(
-    decode, objective, 20, time_limit=2.0, random_state=42, history_limit=1000,
-)
-report = OptimizationReport(result)
+report = OptimizationReport(result, assessment=assessment)
 report.write_html("run.html")
 report.write_json("run.json")
 ```
+
+If you skipped optional validation, use `OptimizationReport(result)` instead.
 
 The HTML embeds Plotly once and works offline with hover, zoom and trace selection.
 Reports are generated after search, never by reevaluating callbacks. History is off

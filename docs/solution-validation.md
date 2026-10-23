@@ -32,7 +32,7 @@ def main() -> None:
     """
     path = Path(instance_pipeline.__file__).with_name("instances") / "scheduling.json"
     problem = SchedulingProblem(read_data(path))
-    result = SA.solve_one(
+    result = SA.optimize(
         problem.decode, problem.cost, problem.n_variables,
         time_limit=2.0, random_state=42,
     )

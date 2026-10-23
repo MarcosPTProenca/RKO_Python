@@ -24,7 +24,7 @@ with the objective value. Preserve bounds and dimension; do not assume that
 mutating an argument is harmless. Use owned RNGs if the operator is stochastic.
 Do not silently suppress callback exceptions or report uncomputed objectives.
 
-`Class.solve_one` deliberately exposes the small, managed API, not every low-level
+`Class.optimize` deliberately exposes the small, managed API, not every low-level
 constructor argument. Operator overrides are currently an advanced direct-constructor
 feature, with the lifecycle limitations documented in [standalone usage](standalone.md#advanced-direct-constructors).
 
@@ -51,7 +51,7 @@ than a minimal skeleton that omits validation, RNG or stopping behavior.
 To integrate with the configured high-level API, update the single `MH_SPECS`
 registry, canonical aliases if needed, parameter-file mapping/axis schema,
 packaged TOML defaults and public exports. Registry membership connects a built-in
-class to inherited `solve_one`; arbitrary subclasses are **not** auto-registered.
+class to inherited `optimize`; arbitrary subclasses are **not** auto-registered.
 There is no third-party plugin-registration API in this change.
 
 ## Required tests and documentation

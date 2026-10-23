@@ -2,7 +2,7 @@
 
 [Start with the quickstart](../README.md) for a first serial solve. This guide
 covers configuration, execution modes, callbacks, result accounting and stopping.
-For one algorithm without pool management use [`SA.solve_one(...)`](standalone.md).
+For one algorithm without pool management use [`SA.optimize(...)`](standalone.md).
 The [parameter reference](parameters.md) explains every fixed scalar and adaptive
 mode; the [extension guide](extending.md) covers custom operators and algorithms.
 Commands and example paths assume the repository root. The Python library needs

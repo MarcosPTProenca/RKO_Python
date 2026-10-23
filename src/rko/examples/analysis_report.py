@@ -61,7 +61,7 @@ def main() -> None:
         OSError: If the output directory or files cannot be written.
         ValueError: If example settings or objective values fail validation.
     """
-    result = SA.solve_one(
+    result = SA.optimize(
         decode,
         objective,
         10,

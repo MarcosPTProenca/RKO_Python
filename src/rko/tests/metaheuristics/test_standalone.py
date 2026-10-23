@@ -64,7 +64,7 @@ def test_each_algorithm_runs_alone(name: str, adaptation: str) -> None:
         name (str): Canonical algorithm name.
         adaptation (str): Requested readable parameter mode.
     """
-    result = MH_SPECS[name].constructor.solve_one(
+    result = MH_SPECS[name].constructor.optimize(
         decode, objective, 3, time_limit=0.01, random_state=42, adaptation=adaptation
     )
     assert result.algorithms == (name,)
@@ -117,7 +117,7 @@ def test_conflicting_modes_are_rejected() -> None:
 
 def test_standalone_scalar_overrides() -> None:
     """Merge single-algorithm scalar overrides with packaged fixed defaults."""
-    result = MH_SPECS["GA"].constructor.solve_one(
+    result = MH_SPECS["GA"].constructor.optimize(
         decode,
         objective,
         3,
@@ -128,10 +128,18 @@ def test_standalone_scalar_overrides() -> None:
     assert dict(result.searches[0].parameters)["prob_mut"] == 0.1
 
 
+def test_managed_standalone_entry_point_is_unambiguous() -> None:
+    """Expose a single class-level optimization method rather than redundant aliases."""
+    methods = {
+        name for name, value in MetaheuristicBase.__dict__.items() if isinstance(value, classmethod)
+    }
+    assert methods == {"optimize"}
+
+
 def test_base_class_is_not_a_registered_algorithm() -> None:
     """Reject invoking the convenience entry point on the abstract base itself."""
     with pytest.raises(ValueError, match="registered"):
-        MetaheuristicBase.solve_one(decode, objective, 3, time_limit=0.01)
+        MetaheuristicBase.optimize(decode, objective, 3, time_limit=0.01)
 
 
 def test_readable_toml_configuration_and_python_override(tmp_path: Path) -> None:

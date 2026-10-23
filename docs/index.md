@@ -25,7 +25,7 @@ development library, not a claim of release readiness or C++ equivalence.
 - [Limitations](status.md) and [C++ compatibility](cpp-compatibility.md).
 - [Measurements](../benchmarks/README.md), not general performance promises.
 - Algorithm module docstrings describe technical strategy, pseudocode and stopping
-  criteria. Read `help(SA.solve_one)` for the standalone call contract and
+  criteria. Read `help(SA.optimize)` for the standalone call contract and
   `help(SA.__init__)` for the advanced constructor contract.
 
 Guides use `adaptation="fixed"` and `adaptation="adaptive"` rather than legacy

@@ -28,6 +28,7 @@ import subprocess
 import sys
 from dataclasses import FrozenInstanceError
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 from rko import RKO
 from rko import SolutionAssessment
@@ -301,7 +302,7 @@ def test_scheduling_checks_are_independent_of_cost_and_decode(
     assert problem.validate(((9, 3), (1, 5))).feasible is False
     assert problem.validate(((0, 3),)).feasible is False
     assert problem.validate(((True, 3), (1, 5))).feasible is False
-    outcome = SA.solve_one(problem.decode, problem.cost, 2, time_limit=0.02)
+    outcome = SA.optimize(problem.decode, problem.cost, 2, time_limit=0.02)
     assessment = assess_result(outcome, decoder=problem.decode, validator=problem.validate)
     assert outcome.cost > 0
     assert assessment.validation.feasible is True
@@ -371,3 +372,71 @@ def test_documented_assessment_script_runs(tmp_path: Path) -> None:
     )
     assert "Check status: passed" in process.stdout
     assert "Declared feasibility: True" in process.stdout
+
+
+def test_readme_first_solve_includes_all_user_function_templates(tmp_path: Path) -> None:
+    """Run the README's file-backed Python API example, including optional validation.
+
+    Args:
+        tmp_path (Path): Isolated application directory for the copied tutorial.
+    """
+    page = Path(__file__).resolve().parents[4] / "README.md"
+    text = page.read_text(encoding="utf-8")
+    data = text.split("```json\n", 1)[1].split("```", 1)[0]
+    code = text.split("```python\n", 1)[1].split("```", 1)[0]
+    for name in ("read_data", "decoder", "objective", "validate"):
+        assert f"def {name}(" in code
+    assert "solver = RKO(" in code
+    assert "result = solver.solve(" in code
+    (tmp_path / "instance.json").write_text(data, encoding="utf-8")
+    script = tmp_path / "quickstart.py"
+    script.write_text(code, encoding="utf-8")
+    process = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    assert "Solution:" in process.stdout
+    assert "Objective:" in process.stdout
+    assert "Validation: passed" in process.stdout
+    assert "Evaluations:" in process.stdout
+
+
+def test_readme_individual_algorithm_examples_run(tmp_path: Path) -> None:
+    """Execute both secondary single-algorithm examples with the same loaded callbacks.
+
+    Args:
+        tmp_path (Path): Isolated directory for the README input file.
+    """
+    page = Path(__file__).resolve().parents[4] / "README.md"
+    text = page.read_text(encoding="utf-8")
+    code = text.split("```python\n", 1)[1].split("```", 1)[0]
+    data_text = text.split("```json\n", 1)[1].split("```", 1)[0]
+    path = tmp_path / "instance.json"
+    path.write_text(data_text, encoding="utf-8")
+    namespace = {"__name__": "readme_example"}
+    exec(compile(code, "README.md", "exec"), namespace)
+    data = namespace["read_data"](path)
+    namespace.update(
+        {
+            "data": data,
+            "decode": partial(namespace["decoder"], data=data),
+            "cost": partial(namespace["objective"], data=data),
+            "SA": SA,
+        }
+    )
+    section = text.split("## Run one metaheuristic instead", 1)[1]
+    section = section.split("## Use your own instance data", 1)[0]
+    snippets = section.split("```python\n")[1:]
+    assert len(snippets) == 2
+    for snippet in snippets:
+        exec(compile(snippet.split("```", 1)[0], "README.md", "exec"), namespace)
+        result = namespace["result"]
+        assert result.algorithms == ("SA",)
+        assert result.backend == "serial"
+        assert result.cost == pytest.approx(
+            namespace["cost"](namespace["decode"](np.asarray(result.keys)))
+        )
