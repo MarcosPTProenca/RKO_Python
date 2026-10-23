@@ -42,6 +42,41 @@ portfolio and native-callback probes in fresh hosted interpreters. Its registere
 scopes separate constructor-plus-solve time, internal search timing and sampled
 RSS; they are diagnostic evidence, not an achieved optimization or parity claim.
 
+## Scoped Knapsack decoder improvement
+
+The bundled `decode_knapsack` uses NumPy for plain, finite, one-dimensional
+numeric arrays of at least 500 keys. It still returns a fresh list of Python
+integers using the strict `key > 0.5` rule. Small arrays, lists, array subclasses,
+nonfinite or unsupported dtypes, and other dimensions retain scalar iteration.
+No user callback, RNG, mutation-isolation, objective validation or budget policy
+is replaced.
+
+The [selected confirmation reference](../benchmarks/knapsack-decoder-reference.json)
+retains all 600 paired timing observations from
+[run39888458850](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/39888458850):
+30 fresh seeds per algorithm/dimension/instance group, five hash-pinned 500-item
+KPLIB cases, offline SA/IPR, and 8192 completed search evaluations. Each variant
+runs in a fresh interpreter, so measured invocation time includes imports, setup,
+search and result serialization. This is **serial single-metaheuristic fixed
+work**, not a process-portfolio or online-quality claim.
+
+At 500 items, per-family paired median invocation latency fell **24.9–26.2% for
+IPR** and **15.9–16.5% for SA**. Every target confidence interval excludes no
+improvement. All pairs match final cost, keys, pool and Python/NumPy RNG state.
+The confirmation prototype's derived 20-item cases protect the small-input path:
+their measured median overhead was at most 1.3%, with 95% slowdown bounds below
+2%, inside the preregistered 5% guard. Reported median child peak-RSS ratios were 1.0, but these peaks include
+imports/setup and do not prove zero temporary-allocation growth.
+
+The confirmation prototype delegated its scalar fallback; production inlines the
+unchanged scalar return. A separate
+[final-source check](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/39889715546)
+matched the implementation's function-body AST and passed 100 additional exact
+replay/timing-guard pairs. Cohorts are not pooled. Full raw/source artifacts have
+90-day hosted retention; the compact selected measurements remain in Git.
+These results do not establish C++ parity, gains for arbitrary callbacks or
+unmeasured dimensions/hardware, or a selected native engine.
+
 ## The C++ acceptance target
 
 Reference: [RKO C++ v2, revision

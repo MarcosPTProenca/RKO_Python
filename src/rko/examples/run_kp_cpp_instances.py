@@ -6,7 +6,8 @@ Objective:
 
 Technical approach:
 - Parse the C++ KP text format (`n_items`, `capacity`, then `benefit weight`).
-- Decode keys with the C++ threshold rule (`rk > 0.5`).
+- Decode keys with the C++ threshold rule (`rk > 0.5`), using NumPy for large
+  plain finite numeric arrays and scalar iteration for other inputs.
 - Evaluate cost exactly like `Problem.h` and persist execution summaries to CSV.
 
 Flow (pseudocode):
@@ -141,14 +142,26 @@ def read_kp_instance(path: Path) -> KpInstance:
 
 
 def decode_knapsack(keys: list[float] | np.ndarray) -> list[int]:
-    """Decode random keys with the C++ reference threshold rule.
+    """Decode large numeric arrays in NumPy without changing scalar fallbacks.
 
     Args:
       keys (list[float] | np.ndarray): Random-key chromosome.
 
     Returns:
-      list[int]: Binary vector where 1 means selected item.
+      list[int]: Fresh Python-integer decisions, selected strictly above 0.5.
+
+    Raises:
+      TypeError: If scalar fallback elements cannot be compared with 0.5.
+      ValueError: If fallback comparisons have ambiguous array truth values.
     """
+    if (
+        type(keys) is np.ndarray
+        and keys.ndim == 1
+        and keys.size >= 500
+        and keys.dtype.kind in "buif"
+        and np.isfinite(keys).all()
+    ):
+        return (keys > 0.5).astype(np.uint8).tolist()
     return [1 if key > 0.5 else 0 for key in keys]
 
 
