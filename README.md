@@ -98,6 +98,32 @@ Serial mode gives **each selected algorithm** its own search allowance; process
 startup is excluded, and opted-in pool prefill has a separate allowance. A callback
 can overrun its deadline. `time_limit` is not a hard end-to-end timeout.
 
+## Use your own instance data
+
+The application loads data **once before searching** and binds it to the decoder
+and objective. Metaheuristics do not need their own file readers:
+
+```text
+read_data(path) -> instance -> problem adapter
+                           -> decode(keys) / cost(solution)
+                           -> any algorithm or RKO -> final decoded solution
+```
+
+A complete [file-to-solution tutorial](docs/problem-adapters.md) shows a JSON
+scheduling instance where the decoder uses loaded processing times and the objective
+uses loaded due dates. Its importable adapter works unchanged with `SA.solve_one`,
+other built-in classes and RKO portfolios. There is no required base class.
+
+Run the packaged example without creating an input file:
+
+```bash
+uv run --locked --no-dev python -m rko.examples.instance_pipeline
+```
+
+For your own file, use the tutorial's schema or replace its reader/adapter with your
+application's format. Loading once does not mean shared RAM across process workers;
+keep callbacks pickleable and account for copied data when choosing `n_jobs`.
+
 ## Interactive analysis reports
 
 Install the optional reporting dependency with `uv sync --locked --extra reports`.
@@ -142,7 +168,7 @@ parameter reference and contributor guidance.
 | --- | --- |
 | Solve your first problem | [Getting started](docs/getting-started.md) |
 | Use any one algorithm without managing a pool | [Standalone algorithms](docs/standalone.md) |
-| Implement a decoder, constraints and objective | [Problem adapters](docs/problem-adapters.md) |
+| Load instance data and implement decoder/objective callbacks | [File-to-solution tutorial](docs/problem-adapters.md) |
 | Understand fixed/adaptive modes and every search knob | [Parameter reference](docs/parameters.md) |
 | Replace operators or implement an algorithm | [Extension guide](docs/extending.md) |
 | Generate offline interactive HTML charts and data-only exports | [Analysis reports](docs/reporting.md) |
