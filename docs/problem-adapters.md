@@ -2,6 +2,20 @@
 
 [Documentation index](index.md) · [Getting started](getting-started.md)
 
+## Your three problem-specific functions
+
+You implement **only the reader, decoder and objective** for your problem:
+
+1. `read_data(source)` loads the instance; omit it when your data is already in memory.
+2. `decoder(keys)` constructs your domain solution using the loaded data.
+3. `objective(solution)` returns a finite scalar to minimize, using the loaded data.
+   Pass this callable as the library's `cost` argument.
+
+The library supplies the metaheuristics, pool and default search operators. Selecting
+an algorithm and setting its dimension/budget are configuration, not additional
+implementations. This guide uses a class to hold data conveniently, **not** because
+a class or a fourth problem interface is required. Functions with bound data work too.
+
 ## Where does `read_data` go?
 
 **Read your instance once before calling the solver.** Keep the resulting data in

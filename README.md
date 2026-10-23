@@ -12,6 +12,29 @@ vectors without assuming a problem format or solution representation.
 > Read the [limitations](docs/status.md), [compatibility](docs/cpp-compatibility.md)
 > and [licensing boundaries](NOTICE) before relying on this development line.
 
+## What you implement
+
+**Your only problem-specific implementations are the data reader, decoder and
+objective function. RKO provides the optimization algorithms.**
+
+| Your code | Responsibility |
+| --- | --- |
+| `read_data(source)` | Read your instance and return the data needed by your problem. Skip this function if the data is already in memory. |
+| `decoder(keys)` | Use the loaded data to convert a key vector into your domain solution. |
+| `objective(solution)` | Use the loaded data to return a finite scalar to **minimize**. This callable is passed as `cost` in the library API. |
+
+Load the data once in your application, then bind it to the decoder and objective.
+RKO calls those two callbacks during search; it does **not** invoke `read_data`.
+Function names are yours to choose. Module-level functions with `functools.partial`
+or methods holding the data both work; **an adapter class is optional**, not a
+fourth required implementation.
+
+You do **not** need to implement a metaheuristic, population, elite pool, local
+search, shaking or Q-learning controller. Select an algorithm and configure values
+such as `n_variables`, `time_limit` and `random_state`; the library supplies the
+search machinery and default operators. Custom operators are advanced overrides,
+not prerequisites. See the [complete data-loading example](docs/problem-adapters.md).
+
 ## What it provides
 
 - Configurable portfolios: BRKGA, BRKGA-CS, GA, GRASP, ILS, IPR, LNS, MultiStart,
@@ -104,15 +127,18 @@ The application loads data **once before searching** and binds it to the decoder
 and objective. Metaheuristics do not need their own file readers:
 
 ```text
-read_data(path) -> instance -> problem adapter
-                           -> decode(keys) / cost(solution)
-                           -> any algorithm or RKO -> final decoded solution
+your read_data(path) -> loaded data
+                    -> your decoder + objective (data bound once)
+                    -> chosen algorithm or RKO (provided by the library)
+                    -> best keys -> explicit final decoding
 ```
 
 A complete [file-to-solution tutorial](docs/problem-adapters.md) shows a JSON
 scheduling instance where the decoder uses loaded processing times and the objective
-uses loaded due dates. Its importable adapter works unchanged with `SA.solve_one`,
-other built-in classes and RKO portfolios. There is no required base class.
+uses loaded due dates. The tutorial groups these two callbacks in an importable
+class for convenience; you can use functions instead. The same callbacks work
+unchanged with `SA.solve_one`, other built-in classes and RKO portfolios. There is
+no required base class.
 
 Run the packaged example without creating an input file:
 
