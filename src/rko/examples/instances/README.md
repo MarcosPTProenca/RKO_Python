@@ -1,4 +1,14 @@
-# Knapsack reference instances
+# Bundled example instances
+
+## Synthetic scheduling tutorial
+
+`scheduling.json` is a four-job synthetic input authored for the
+`rko.examples.instance_pipeline` tutorial. It supplies a name, positive integer
+processing times and nonnegative integer due dates. It is not imported from C++
+and is not a competitive-performance benchmark. See the file-backed adapter guide
+in `docs/problem-adapters.md` in the repository.
+
+## Knapsack reference instances
 
 `kp10.txt` and `kp50.txt` contain the reference numeric data from
 [RKO-solver/RKO_Cpp_v2.0](https://github.com/RKO-solver/RKO_Cpp_v2.0/tree/126e35873e50dc308795b58b8c75d37f8de4c857/Instances/KP),

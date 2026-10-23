@@ -29,12 +29,14 @@ import pickle
 import random
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from rko import RKO
 from rko import PoolInitializationMetadata
 from rko import SearchMetadata
 from rko.components.adaptive_control.q_learning import QLearningController
+from rko.examples import instance_pipeline
 from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import read_kp_instance
 from rko.parameters.loader import default_params_dir
@@ -206,9 +208,35 @@ def main() -> None:
     assert bounded.n_evaluations == sum(report.n_evaluations for report in bounded.searches)
     assert dict(bounded.searches[-1].parameters)["p_size"] == 4
     assert pickle.dumps((random.getstate(), np.random.get_state())) == global_rng
+    instance = instance_pipeline.read_data(
+        Path(instance_pipeline.__file__).with_name("instances") / "scheduling.json"
+    )
+    problem = instance_pipeline.SchedulingProblem(instance)
+    for backend in ("serial", "thread", "process"):
+        scheduled = RKO(
+            problem.decode,
+            problem.cost,
+            problem.n_variables,
+            algorithms=["SA"],
+            adaptation="fixed",
+            backend=backend,
+            random_state=42,
+        ).solve(0.1)
+        assert scheduled.cost == problem.cost(problem.decode(np.asarray(scheduled.keys)))
+        assert scheduled.n_variables == len(instance.processing_times)
     executable = shutil.which("rko")
     assert executable is not None
     with tempfile.TemporaryDirectory(prefix="rko-installed-cli-") as temporary:
+        pipeline = subprocess.run(
+            [sys.executable, "-I", "-m", "rko.examples.instance_pipeline", "--time-limit", "0.05"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=90,
+            cwd=temporary,
+        )
+        assert "four-job scheduling tutorial" in pipeline.stdout
+        assert "Schedule (job index, completion time):" in pipeline.stdout
         output = Path(temporary) / "result.csv"
         subprocess.run(
             [

@@ -97,5 +97,7 @@ A seed controls library randomness, not callback RNGs or wall-clock scheduling.
 The solver cannot infer feasibility from an arbitrary numeric objective. Your
 adapter must enforce or penalize constraints and check the returned solution.
 
-Next: [implement your own problem adapter](problem-adapters.md) and
-[understand parameter selection](parameters.md#fixed-versus-adaptive).
+This numerical example needs no input file. For real instances, the application
+calls `read_data` before solving and binds the loaded data to decoder/objective
+methods. Follow the [complete file-backed scheduling tutorial](problem-adapters.md)
+and then [understand parameter selection](parameters.md#fixed-versus-adaptive).

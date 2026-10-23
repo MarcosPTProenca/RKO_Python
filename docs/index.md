@@ -7,7 +7,7 @@ development library, not a claim of release readiness or C++ equivalence.
 ## Learn
 
 1. [Getting started](getting-started.md): solve your first problem with one algorithm.
-2. [Problem adapters](problem-adapters.md): encode solutions, constraints and maximization.
+2. [Read instance data and bind callbacks](problem-adapters.md): a complete file-to-solution tutorial, representations and constraints.
 3. [Parameter reference](parameters.md): choose fixed or adaptive settings and understand each knob.
 
 ## Apply and extend
