@@ -245,9 +245,11 @@ but a finite penalty is **not** a domain-feasibility certificate.
 
 Reader checks establish input shape/domains before any search worker starts;
 existing solver checks handle settings and finite costs. Domain validation of a
-final solution is an application responsibility. A generic optional validator is
-a separate feature, not added by this tutorial. Independently inspect your returned
-solution and report feasibility separately when appropriate.
+final solution is an application responsibility. You can opt into
+[`assess_result`](solution-validation.md) after solving; the scheduling adapter
+supplies an optional `validate` method, but no checker is required to optimize.
+Use `--validate-solution` in the example CLI to enable it. Independently inspect
+your returned solution and report feasibility separately when appropriate.
 
 `result.keys` contains coordinates, not the decoded application solution. Final
 `problem.decode(np.asarray(result.keys))` is an explicit post-run reconstruction.

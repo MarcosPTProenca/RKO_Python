@@ -35,6 +35,7 @@ from pathlib import Path
 from rko import RKO
 from rko import PoolInitializationMetadata
 from rko import SearchMetadata
+from rko import assess_result
 from rko.components.adaptive_control.q_learning import QLearningController
 from rko.examples import instance_pipeline
 from rko.examples.run_kp_cpp_instances import default_instances_dir
@@ -224,11 +225,23 @@ def main() -> None:
         ).solve(0.1)
         assert scheduled.cost == problem.cost(problem.decode(np.asarray(scheduled.keys)))
         assert scheduled.n_variables == len(instance.processing_times)
+        assessment = assess_result(scheduled, decoder=problem.decode, validator=problem.validate)
+        assert assessment.validation.status == "passed"
+        assert assessment.validation.feasible is True
+        assert assessment.result is scheduled
     executable = shutil.which("rko")
     assert executable is not None
     with tempfile.TemporaryDirectory(prefix="rko-installed-cli-") as temporary:
         pipeline = subprocess.run(
-            [sys.executable, "-I", "-m", "rko.examples.instance_pipeline", "--time-limit", "0.05"],
+            [
+                sys.executable,
+                "-I",
+                "-m",
+                "rko.examples.instance_pipeline",
+                "--time-limit",
+                "0.05",
+                "--validate-solution",
+            ],
             check=True,
             capture_output=True,
             text=True,
@@ -237,6 +250,7 @@ def main() -> None:
         )
         assert "four-job scheduling tutorial" in pipeline.stdout
         assert "Schedule (job index, completion time):" in pipeline.stdout
+        assert "Validation: passed; feasible=True" in pipeline.stdout
         output = Path(temporary) / "result.csv"
         subprocess.run(
             [

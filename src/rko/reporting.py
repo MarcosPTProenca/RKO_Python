@@ -33,6 +33,8 @@ import importlib
 import json
 import math
 import os
+from .assessment import SolutionAssessment
+from .assessment import ValidationReport
 from .solver import RKOResult
 from collections.abc import Mapping
 from collections.abc import Sequence
@@ -60,6 +62,7 @@ class OptimizationReport:
         *,
         title: str = "RKO optimization report",
         metrics: Mapping[str, str | int | float | bool] | None = None,
+        assessment: SolutionAssessment[object] | None = None,
     ) -> None:
         """Snapshot finite result metadata and optional already-computed domain metrics.
 
@@ -68,9 +71,12 @@ class OptimizationReport:
             title (str): Report title, not raw HTML.
             metrics (Mapping[str, str | int | float | bool] | None): User-supplied
                 domain values such as feasibility or profit; never verified automatically.
+            assessment (SolutionAssessment[object] | None): Optional completed post-run
+                assessment for this result; only diagnostics, not its payload, are exported.
 
         Raises:
-            ValueError: If labels/metric types are invalid or numeric metadata is nonfinite.
+            ValueError: If labels/metric types are invalid, numbers are nonfinite,
+                or the supplied assessment belongs to a different result.
         """
         if not isinstance(title, str):
             raise ValueError("Report title must be a string.")
@@ -80,6 +86,9 @@ class OptimizationReport:
                 raise ValueError("Domain metrics require string labels and scalar values.")
             if isinstance(value, float) and not math.isfinite(value):
                 raise ValueError("Domain metric numbers must be finite.")
+        if assessment is not None:
+            if not isinstance(assessment, SolutionAssessment) or assessment.result != result:
+                raise ValueError("Assessment belongs to a different result or has an invalid type.")
         self.title = title
         data = {
             "schema_version": 1,
@@ -104,6 +113,13 @@ class OptimizationReport:
             "initialization": asdict(result.initialization) if result.initialization else None,
             "searches": [asdict(search) for search in result.searches],
             "domain_metrics": domain,
+            "assessment": assessment.to_dict()
+            if assessment is not None
+            else {
+                "origin": None,
+                "elapsed_seconds": None,
+                "validation": ValidationReport().to_dict(),
+            },
         }
         self._data = json.loads(json.dumps(data, allow_nan=False))
 
@@ -322,6 +338,32 @@ class OptimizationReport:
         domain = self._table(
             ("User metric", "User-supplied value"), list(data["domain_metrics"].items())
         )
+        validation = data["assessment"]["validation"]
+        validation_summary = self._table(
+            ("Assessment field", "Value"),
+            [
+                ("Check status", validation["status"]),
+                ("Checker-declared feasibility", validation["feasible"]),
+                ("Checker", validation["checker"]),
+                ("Checker version", validation["checker_version"]),
+                ("Origin", data["assessment"]["origin"]),
+                ("Separate postprocessing seconds", data["assessment"]["elapsed_seconds"]),
+            ],
+        )
+        validation_checks = self._table(
+            ("Constraint", "Status", "Diagnostic", "Value", "Limit", "Unit"),
+            [
+                (
+                    check["name"],
+                    check["status"],
+                    check["message"],
+                    check["value"],
+                    check["limit"],
+                    check["unit"],
+                )
+                for check in validation["checks"]
+            ],
+        )
         provenance = self._table(("Runtime", "Version"), list(data["versions"].items()))
         initialization = self._table(
             ("Startup metric", "Value"), list((data["initialization"] or {}).items())
@@ -355,13 +397,23 @@ th{{background:#f4f5f7}}nav a{{margin-right:16px}}section{{margin-top:32px}}
 @media print{{body{{max-width:none}}nav{{display:none}}.table{{overflow:visible}}}}
 </style></head><body><header><h1>{heading}</h1><p>Single-run observations · minimized objective</p>
 <nav><a href="#summary">Summary</a><a href="#analysis">Charts</a>
-<a href="#configuration">Configuration</a><a href="#provenance">Provenance</a></nav></header>
+<a href="#validation">Validation</a><a href="#configuration">Configuration</a>
+<a href="#provenance">Provenance</a></nav></header>
 <p class="notice">No feasibility or optimality certificate is inferred from finite costs.
 Portfolio members cooperate: these are not independent benchmark comparisons.
 Completed does not mean converged. Timed runs depend on scheduling.</p>
 <section id="summary"><h2>Run summary</h2>{summary}<h3>User-supplied domain metrics</h3>
 <p>Values below are supplied by the caller, not independently verified by this report.</p>
 {domain}</section>
+<section id="validation"><h2>Optional solution validation</h2>{validation_summary}
+{validation_checks}<p>Checks are supplied by the application, not a proof of complete
+constraint coverage or global optimality. None means unknown: neither feasible nor infeasible
+has been declared.
+Missing/incomplete checks remain not_checked. Passed subsets do not declare feasibility.
+Post-run decoding is reconstruction: stateful/stochastic decoders may produce a different
+solution from the original evaluation. No objective consistency check, repair or reranking
+is performed. Assessment time is separate from solve time; decoded payloads are not exported.</p>
+</section>
 <section id="analysis"><h2>Interactive analysis</h2><p>{escape(unavailable)}</p>
 <p>Hover for observations, zoom to inspect, and click legend labels to select curves.
 Each convergence curve starts at its own search start, excluding queueing and shared prefill;

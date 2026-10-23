@@ -150,6 +150,24 @@ For your own file, use the tutorial's schema or replace its reader/adapter with 
 application's format. Loading once does not mean shared RAM across process workers;
 keep callbacks pickleable and account for copied data when choosing `n_jobs`.
 
+## Optional final-solution checks
+
+A domain validator is **optional**, not another requirement to run optimization.
+If you supply one, [`assess_result(...)`](docs/solution-validation.md) decodes final
+keys once, runs your checker after search, and returns structured diagnostics.
+It does not reevaluate the objective, repair the result or change search counts.
+Reports distinguish passed/failed/missing checks from declared domain feasibility.
+
+Try the packaged scheduling checker:
+
+```bash
+uv run --locked --no-dev python -m rko.examples.instance_pipeline --validate-solution
+```
+
+A passed check is not proof that all domain constraints were checked or that the
+solution is optimal. See the [validation guide](docs/solution-validation.md) for
+checker functions, reconstruction caveats and report integration.
+
 ## Interactive analysis reports
 
 Install the optional reporting dependency with `uv sync --locked --extra reports`.
@@ -198,6 +216,7 @@ parameter reference and contributor guidance.
 | Understand fixed/adaptive modes and every search knob | [Parameter reference](docs/parameters.md) |
 | Replace operators or implement an algorithm | [Extension guide](docs/extending.md) |
 | Generate offline interactive HTML charts and data-only exports | [Analysis reports](docs/reporting.md) |
+| Optionally check the final domain solution | [Post-solve validation](docs/solution-validation.md) |
 | Configure the solver, callbacks, hyperparameters and results | [Usage and API guide](docs/usage.md) |
 | Choose workers and understand startup/time accounting | [Execution modes](docs/usage.md#execution-modes), [workers](docs/process-workers.md), [startup](docs/driver-initialization.md) |
 | Run from the terminal or avoid WSL setup overhead | [Running guide](docs/running.md) |

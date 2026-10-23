@@ -6,6 +6,7 @@ Objective:
 Technical approach:
 - Mark `src/rko` as a regular Python package for tooling compatibility.
 - Export RKO and RKOResult as the primary class-based API.
+- Expose optional post-solve assessment and bounded domain-check records.
 - Preserve run as a compatibility adapter.
 
 Flow (pseudocode):
@@ -20,10 +21,24 @@ Inputs/Outputs:
 - Output: package-level exports.
 """
 
+from .assessment import SolutionAssessment
+from .assessment import ValidationCheck
+from .assessment import ValidationReport
+from .assessment import assess_result
 from .orchestration.types import PoolInitializationMetadata
 from .orchestration.types import SearchMetadata
 from .rko_main import run
 from .solver import RKO
 from .solver import RKOResult
 
-__all__ = ["RKO", "RKOResult", "SearchMetadata", "PoolInitializationMetadata", "run"]
+__all__ = [
+    "RKO",
+    "RKOResult",
+    "SearchMetadata",
+    "PoolInitializationMetadata",
+    "run",
+    "ValidationCheck",
+    "ValidationReport",
+    "SolutionAssessment",
+    "assess_result",
+]
