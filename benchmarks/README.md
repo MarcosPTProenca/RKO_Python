@@ -7,6 +7,78 @@ See [the C++ acceptance target and native-backend gates](../docs/performance.md)
 for end-to-end quality/time/resource criteria; historical Python results must not
 be merged with corrected-revision observations as if they were one experiment.
 
+## Installed native portfolio screen
+
+The [qualification workflow](../.github/workflows/native-qualification.yml) builds
+one mixed wheel per shard, installs it outside the checkout, then collects raw
+paired timed observations with `benchmarks/native_portfolio.py`. Use an explicitly
+installed interpreter, a NEW output directory, and an otherwise idle hosted runner:
+
+```bash
+uv run --locked python -m benchmarks.native_portfolio \
+  --python /path/to/installed/bin/python --output /tmp/new-native-screen \
+  --backend process --adaptation adaptive --repeats 3 --seconds 2
+```
+
+The configured limit is per algorithm in serial, concurrent for threads, and
+shared among assigned searches in process workers; a three-algorithm serial call
+therefore lasts approximately six search seconds for a two-second setting.
+Only pair within the same backend; do not compare unlike end-to-end budgets.
+
+The fixed protocol covers both opaque-object and permutation fixtures, 20/500
+keys, seeds40000–40002, alternating runtime0/1 using byte-identical installed
+sources/binary. No application callback is tuned. Other backend/adaptation shards
+use the same settings. It preserves worker stdout/stderr, source/helper identity,
+final independently recomputed quality, evaluations, complete fresh-process latency
+and sampled recursive process-tree PSS. Only complete memory snapshots enter the
+sampled maximum; missing snapshots are reported, not converted to zero. Sampler
+and callback-observation overhead are present in BOTH modes.
+
+The collector is not in the measured process tree. PSS includes proportional
+shared pages and solver/manager/tracker processes, not RSS double-counting or an
+exact high-water mark. Functional kernel probes are explicitly excluded from
+measurement collection. This is a descriptive three-seed screen, **not** timed
+quality, speedup, memory noninferiority or universal C++-parity certification.
+Do not require equal timed trajectories, pool with fixed-work evidence, publish
+only favorable groups or run beside the protected historical experiment.
+
+## Independent thirty-seed timed confirmation
+
+The separate frozen confirmation uses seeds50000–50029, never the three pilot
+seeds or pooled CI repeats. Each backend/adaptation shard runs:
+
+```bash
+uv run --locked python -m benchmarks.native_confirmation collect \
+  --python /path/to/installed/bin/python --output /tmp/new-confirmation-shard \
+  --backend process --adaptation adaptive
+```
+
+Download all six completed shards, check out the exact frozen source revision,
+then validate coverage and compute every predeclared gate:
+
+```bash
+uv run --locked python -m benchmarks.native_confirmation analyze /tmp/all-six-shards
+```
+
+Source/helper/native/workflow hashes, completion markers and thirty distinct seeds
+per group are mandatory. The report includes720pairs/24groups with simultaneous
+paired-median intervals for quality, complete-process time per evaluation and
+sampled process-tree PSS. Exact binomial order statistics and Bonferroni correction
+replace post-hoc margin choice. Quality allows no positive median loss; the
+[full frozen gates](../docs/performance.md) distinguish validated collection from
+established qualification. A technically successful analysis with
+`qualification_status=not_established` must not be called an acceptance pass.
+No experiment result authorizes a release or changes Python defaults.
+
+`native-timed-confirmation-reference.json` is the explicitly identified completed
+measurement from run40109493113/source667001b, not an agent plan or rolling CI
+summary. It retains all24groups and frozen criteria:720independentpairs, time per
+evaluation and sampledPSS gates passed24/24, strictzero-loss quality established
+18/24. Overall qualification is **not_established**. Do not remove the six
+inconclusive groups, overwrite this reference with a more favorable CI repeat or
+pool repeated seeds. Full raw evidence and source identity remain in that run's
+artifacts; public results describe this scope only.
+
 ## Source-identified fixed-work baseline
 
 ```bash

@@ -1,6 +1,6 @@
 # Performance target and native-backend evaluation
 
-**Status: evaluation, not an implemented Rust engine or a parity claim.**
+**Status: experimental optional Rust blending kernel; not a Rust engine or C++ parity claim.**
 The target is to **match or exceed the pinned C++ RKO on declared workloads**, in
 solution quality and time under comparable resources. A language change, passing
 CI, higher evaluations/second or a faster isolated kernel does not meet that target
@@ -8,7 +8,7 @@ by itself. Results outside the evaluated workload/resource envelope remain unkno
 
 ## What the current evidence establishes
 
-The implementation is Python plus NumPy, with no compiler dependency for users.
+The default implementation is Python plus NumPy, with no compiler dependency for users.
 Several kernels and allocation paths have measured improvements over earlier Python
 versions; [each benchmark identifies its workload and limits](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md).
 Those measurements do not establish whole-solver C++ performance parity.
@@ -41,6 +41,230 @@ The [invocation and resource study](invocation-profile.md) reuses the startup,
 portfolio and native-callback probes in fresh hosted interpreters. Its registered
 scopes separate constructor-plus-solve time, internal search timing and sampled
 RSS; they are diagnostic evidence, not an achieved optimization or parity claim.
+
+## Optional native blending
+
+The mixed package retains the setuptools Python build. Neither building nor using
+Rust is enabled by default. The optional component accelerates only shared
+Nelder-Mead blending; SA, GA and BRKGA control and user callbacks remain Python.
+`backend` continues to mean `process`, `thread` or `serial`, never a language.
+
+Two explicit controls have different purposes:
+
+| Control | Default | Meaning |
+| --- | --- | --- |
+| `RKO_BUILD_NATIVE=1` | `0` | Build the optional release extension; requires Rust 1.90.0 and normal-GIL CPython 3.14. A requested compilation failure aborts the build. |
+| `RKO_USE_NATIVE=1` | `0` | Activate a compatible installed extension before the first `rko` import. Missing/incompatible binaries produce an actionable warning and use Python. |
+
+```bash
+# Ordinary Python wheel/sdist; no Rust compiler required.
+uv build
+
+# Explicit mixed build. The pinned Rust toolchain must be available.
+RKO_BUILD_NATIVE=1 uv build --wheel
+
+# Development editable build, then explicit runtime activation.
+RKO_BUILD_NATIVE=1 uv sync --locked --group dev --reinstall-package rko
+RKO_USE_NATIVE=1 uv run --locked --no-sync rko src/rko/examples/instances/kp50.txt
+```
+
+In PowerShell, set the equivalent variables with
+`$env:RKO_BUILD_NATIVE = "1"` or `$env:RKO_USE_NATIVE = "1"` before the command;
+remove them afterward when returning to the default Python mode. A binary wheel
+built elsewhere does not require a compiler at installation time. Native source
+builds do; ordinary source builds remain Python-only. Build flags do not implicitly
+enable runtime acceleration, and changing a runtime variable after imports does
+not reconfigure already imported worker modules.
+
+The supported native path requires finite, aligned, C-contiguous float64 parent
+arrays and the normal library-owned/builtin Python RNG. Other representations,
+custom RNGs and unusual factors retain reference behavior. Parents and output are
+not exposed as borrowed Rust slices: the kernel uses safe owned snapshots. It calls
+the original RNG twice per gene in the original order and never batches, caches or
+rewrites user decoder/objective calls. Native/callback runtime failures propagate;
+only known extension-import/compatibility failures select Python fallback.
+
+The source-identified [720-pair kernel confirmation](https://github.com/MarcosPTProenca/RKO/actions/runs/40044712053)
+used 30 fresh seeds per group with unchanged scalar, permutation, object-payload
+and NumPy callbacks. For 500 genes, the research candidate reduced complete serial
+fixed-work invocation medians by 12.5–20.3% across SA/GA/BRKGA. Protected 20-gene and
+single-process peak-RSS bounds passed. Those results identify the kernel and scope;
+they are not a claim that arbitrary callbacks, timed adaptive quality, portfolios
+or all platforms achieve the same gains.
+
+The [installed-wheel confirmation](https://github.com/MarcosPTProenca/RKO/actions/runs/40063949702)
+then compared runtime opt-in disabled/enabled in the same installed mixed wheel,
+using 720 new paired invocations and 30 fresh seeds per group. It preserved every
+result/pool/count/RNG fingerprint and observed 13.35–20.95% median complete-invocation
+gains in the 500-gene groups. Predeclared paired bootstrap intervals excluded no
+improvement; conservative family-adjusted upper bounds stayed below 3.32% slowdown
+for protected 20-gene inputs and 2.42% peak-RSS growth (limits 5% and 10%). This remains
+a serial fixed-evaluation scope, not timed/adaptive-quality or C++ parity evidence.
+
+[Packaging CI](https://github.com/MarcosPTProenca/RKO/actions/runs/40063461860)
+validated normal-GIL CPython 3.14 source builds and installed wheels/sdists on
+Ubuntu, Windows and macOS. It checks real native execution, exact component and
+managed-search candidate prefixes, unavailable-extension fallback, pure builds
+without usable compilers, and pure builds after native builds. Existing installed
+smokes also cover bounded serial/thread/process solves and fixed/adaptive settings;
+those are functional checks, not comparative quality or portfolio speed studies.
+
+### Extended qualification and result provenance
+
+When native blending is admitted, `dict(result.versions)` includes
+`rko-native-blending: rko-blending-rng-buffer-v1`. Default Python and unavailable
+binary fallback preserve the original three version entries. This describes the
+selected component, not proof that every algorithm or input invoked it.
+
+The separate [native qualification workflow](https://github.com/MarcosPTProenca/RKO/blob/main/.github/workflows/native-qualification.yml)
+builds normal CPython 3.14 wheels through pinned cibuildwheel, with manylinux 2.28
+x86-64, native Windows AMD64 and macOS ARM64 targets. Its default auditwheel,
+delvewheel and delocate repair stages inspect platform dependencies before
+installed replay and timed-portfolio functional checks. Inspection rejects
+unreviewed extra bundled native libraries and altered/missing notices. Only digest
+and inspection reports are uploaded: compiled wheels are not published or retained
+as downloadable release artifacts. Owner licensing/release approval remains open.
+An actual free-threaded Python 3.14 job tests Python-only source/installation and
+observable fallback; the normal-ABI extension is deliberately unsupported there.
+
+`tools/smoke_portfolio.py --matrix --functional` exercises SA/GA/BRKGA portfolios
+with fixed/adaptive parameters, opaque objects/permutations, serial/thread/process
+execution, bounded histories, exact final cost recomputation, seed/accounting
+metadata, pickle and worker cleanup. Functional probes observe real kernel calls
+in participating processes without consuming search streams. These probes must
+never enter acceptance timings.
+
+The maintained [timed screening protocol](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/native_portfolio.py) instead
+runs **without profiling or functional kernel probes**, in fresh isolated workers
+using the same installed wheel. It alternates both variants over three preregistered
+seeds per group, a configured two-second search limit, 20/500 dimensions, two
+callbacks and all six backend/adaptation combinations. Existing budget semantics
+are preserved: serial runs give each algorithm its search limit (approximately
+six seconds for three algorithms), threads run concurrently, and process workers
+divide their common deadline among assigned searches. Compare native/reference
+**within** a backend, not unlike end-to-end budgets across backends. Raw quality, evaluation counts, complete process
+latency and recursive process-tree sampled PSS are retained. PSS excludes the
+collector, includes manager/tracker helpers, and records incomplete snapshots.
+It is proportional physical memory, not an exact peak. Normalized quality uses
+known fixture objective ranges, not arbitrary epsilon denominators.
+
+This three-seed screen is descriptive only: it does not establish timed quality
+noninferiority, portfolio speed/memory acceptance, universal callback gains or C++
+parity. Timed trajectories may legitimately differ; unlike fixed-work replay, they
+must not be forced to have equal evaluation counts or costs. Do not pool this
+protocol with the earlier 720 fixed-work pairs or reinterpret test durations as
+performance results.
+
+At source `ba46006`, [CI](https://github.com/MarcosPTProenca/RKO/actions/runs/40094960238)
+and [extended qualification](https://github.com/MarcosPTProenca/RKO/actions/runs/40094960432)
+passed all 15 jobs, including actual free-threaded Python-only tests and repaired
+installed wheels for `manylinux_2_28_x86_64`, `win_amd64` and `macosx_11_0_arm64`.
+All 72 timed pairs completed with matched installed-source/binary identities and
+no functional probes in measurement. All 24 groups are retained, including small
+input groups with slightly lower evaluation throughput. In the twelve 500-key
+groups, median paired evaluation-count ratios ranged from 1.26 to 1.43 and
+normalized quality deltas were negative (better). Median sampled tree-PSS ratios
+across groups were 1.008–1.027. These are descriptive pilot medians, not uncertainty
+bounds, acceptance thresholds, shorter fixed-budget latency or universal gains.
+The original pilot remains the reference; routine CI repetitions are not pooled.
+
+### Independent thirty-seed timed confirmation
+
+`benchmarks.native_confirmation` freezes a separate protocol before collection:
+30 NEW seeds 50000–50029 for every group, the same two-second configured search
+limit and callback/dimension/backend/adaptation matrix, Python 3.14.9, NumPy 2.4.3
+and one BLAS thread. Six complete source-identified shards yield 720 pairs. Source,
+helper, workflow and native build hashes are recorded before the first trial and
+verified after collection; pilot seeds, partial shards, duplicate rows, changed
+artifacts and profiled functional probes cannot enter the report.
+
+Acceptance concerns paired population medians, not every stochastic trajectory:
+
+- Quality: the simultaneous upper bound of native-minus-Python normalized regret
+  must be **at most zero**. No positive loss allowance or epsilon is introduced.
+- 500 keys: median completed-evaluation throughput gain at least 10%, with the
+  upper bound of complete-process time per evaluation below the Python reference.
+- Protected 20 keys: the simultaneous upper bound of time per evaluation at most
+  1.05 times the reference. This is throughput under fixed budgets, not shorter
+  fixed-budget solve latency.
+- Sampled process-tree PSS: simultaneous upper ratio at most 1.10 for every group.
+
+The report uses exact binomial order-statistic median intervals, with Bonferroni
+family coverage of at least 95% across 72 quality/time-per-evaluation/PSS intervals,
+assuming independent seed-pair observations. Discrete ranks and ties make coverage
+conservative. With 30 observations the frozen lower/upper ranks are 6 and 25.
+There is no bootstrap fitting, optional stopping, post-data margin selection or
+pooling of routine CI repeats. All groups and failed gates remain visible.
+
+Opt in through the native workflow's `study=confirmation` dispatch, or the explicit
+`native-confirmation` PR label when the workflow is not yet on the default branch.
+Remove the label after starting so later source edits do not request another long
+confirmation. No source changes are permitted during collection. A successful
+**reporting job** means the experiment was complete and validated; only the JSON
+`qualification_status=established` means all predeclared gates passed. A result
+`not_established` is preserved rather than converted to a technical CI failure or
+misrepresented as proof of harm. Neither outcome authorizes publication.
+
+#### Completed independent confirmation
+
+[Run 40109493113](https://github.com/MarcosPTProenca/RKO/actions/runs/40109493113),
+frozen at source `667001be5983df88fd48d32e41091b5faa189d3a`, completed all **720
+independent pairs**. Local reanalysis reproduced the hosted report exactly. The
+[source-identified reference measurement](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/native-timed-confirmation-reference.json)
+retains every group, simultaneous interval and gate, including negative findings.
+
+- Time-per-evaluation gates passed in all 24 groups. For 500 keys, median complete
+  process time per completed evaluation fell **19.12–30.99%**. This is not shorter
+  fixed-budget solver latency.
+- The protected 20-key upper slowdown bound was **3.403%**, below 5%.
+- Sampled process-tree PSS gates passed in all 24 groups; the largest upper growth
+  bound was **3.039%**, below 10%. This is not an exact memory high-water mark.
+- Strict zero-loss quality was established in **18/24 groups**, including 11/12
+  large-input groups. It was **not established** for the 20-key object callback in
+  process/fixed, process/adaptive, serial/adaptive, thread/fixed and thread/adaptive,
+  or the 500-key object callback in serial/adaptive. These intervals crossed zero;
+  none established quality loss. Nonpositive observed medians do not remove this
+  uncertainty.
+
+**Global qualification remains `not_established`.** Criteria and collected sample
+counts were not changed after viewing results, and no additional sampling was
+performed just to obtain a pass. The reporting workflow completed successfully
+because collection/analysis were valid, not because all acceptance gates passed.
+Python remains the default and native use remains an explicit experimental opt-in.
+
+#### Negative-control diagnosis of the six inconclusive groups
+
+The separate `benchmarks.native_quality_diagnosis` protocol does **not** extend or
+replace that confirmation. It selects exactly its six inconclusive object-callback
+groups and collects 30 NEW seeds61000–61029 per group. Each seed has three fresh
+workers: PythonA, identical PythonB, and admitted native. All six possible arm orders
+occur five times, balancing position without sharing a running interpreter or
+changing callbacks. This yields180triads/540timedworkers, not additional acceptance
+pairs. The native contrasts share Python controls and are not independent tests.
+
+A separate functional check compares all512candidate prefixes for SA/GA/BRKGA in
+adaptive mode at20/500keys under an evaluation-indexed logical clock. Virtual time advances
+across learning windows but stays below the functional deadline. This checks
+checked-prefix replay when policy timing is held equal; it is not timed quality
+or universal replay proof. Real timed workers never run this clock or a profiler.
+
+Existing immutable per-search metadata/histories are serialized after solving;
+no new per-evaluation hook is installed. Reports retain PythonB-minus-PythonA and
+native-minus-each-Python quality contrasts, wins/ties/losses and per-search changes.
+They reuse the original conservative median interval ranks rather than relaxing
+confidence or quality margins. Repeat variability in parallel fixed-parameter
+searches cannot by itself isolate pool cooperation from OS scheduling. Any
+mechanistic interpretation must disclose that limitation. All original gates and
+`qualification_status=not_established` remain unchanged regardless of this
+**diagnostic-only** outcome. Opt in with workflow `study=diagnosis`.
+
+Run `uv run --locked python tools/validate_native_package.py` on a machine with the
+native build prerequisites to check pure/native wheels and sdists, default and
+explicit activation, full native tests, managed-search candidate-prefix replay and
+post-native pure-build contamination. It builds into temporary directories and
+publishes no binary. Platform wheels, release licensing/attribution in `NOTICE`,
+and full native-backend adoption remain separate release gates; no automatic
+publishing or change to Python defaults is introduced.
 
 ## The C++ acceptance target
 

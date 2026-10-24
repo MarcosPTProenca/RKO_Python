@@ -1,0 +1,9 @@
+include LICENSE NOTICE rust-toolchain.toml
+include native/Cargo.toml native/Cargo.lock
+recursive-include native/src *.rs
+recursive-include native/licenses *
+include tools/check_native_licenses.py
+prune native/target
+prune build
+prune dist
+global-exclude *.py[cod] *.so *.pyd *.dll

@@ -29,6 +29,8 @@ import numpy as np
 import os
 import platform
 import time
+from .components.blending._native_loader import BLENDING_CONTRACT
+from .components.blending.blending import _native_blend
 from .components.random_streams import RandomStreams
 from .components.solution_pool import SolutionPool
 from .orchestration.adaptation import Adaptation
@@ -78,7 +80,8 @@ class RKOResult:
         control (int | None): Requested portfolio control; reports give effective control.
         pool_size (int | None): Configured elite capacity.
         n_jobs (int | None): Requested process-worker cap.
-        versions (tuple): RKO distribution, Python and NumPy runtime versions.
+        versions (tuple): RKO, Python, NumPy and admitted native blending contract.
+            Native admission does not imply the selected algorithms invoked blending.
         available_cpus (int | None): Usable logical CPUs snapshotted for process execution.
         initialization (PoolInitializationMetadata | None): Separate opt-in startup work.
     """
@@ -355,7 +358,8 @@ class RKO:
                 ("rko", package_version),
                 ("python", platform.python_version()),
                 ("numpy", np.__version__),
-            ),
+            )
+            + ((("rko-native-blending", BLENDING_CONTRACT),) if _native_blend is not None else ()),
         )
         if self.verbose:
             print(

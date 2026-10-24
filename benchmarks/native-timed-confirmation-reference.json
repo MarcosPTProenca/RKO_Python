@@ -1,0 +1,1021 @@
+{
+  "reference": "independent-installed-native-timed-confirmation-v1",
+  "source_commit": "667001be5983df88fd48d32e41091b5faa189d3a",
+  "run_url": "https://github.com/MarcosPTProenca/RKO/actions/runs/40109493113",
+  "collection_validated": true,
+  "pairs": 720,
+  "definition_sha256": "d7680b2edfdb94af5a6099c4bca2fecafdeb0ec5068180ce002f0ffb99af7b47",
+  "spec": {
+    "version": "rko-timed-confirmation-v1",
+    "repeats": 30,
+    "seed_start": 50000,
+    "seconds": 2.0,
+    "dimensions": [
+      20,
+      500
+    ],
+    "workloads": [
+      "object",
+      "permutation"
+    ],
+    "backends": [
+      "serial",
+      "thread",
+      "process"
+    ],
+    "adaptations": [
+      "fixed",
+      "adaptive"
+    ],
+    "python": "3.14.9",
+    "numpy": "2.4.3",
+    "family_error_probability": 0.05,
+    "intervals": 72,
+    "quality_median_difference_upper": 0.0,
+    "large_median_throughput_gain_minimum": 0.1,
+    "protected_time_per_evaluation_upper": 1.05,
+    "sampled_tree_pss_ratio_upper": 1.1,
+    "interval_method": "exact_binomial_order_statistics_bonferroni_paired_median"
+  },
+  "qualification_status": "not_established",
+  "all_scoped_gates_pass": false,
+  "all_groups_passed": 18,
+  "quality_established_groups": 18,
+  "time_per_evaluation_established_groups": 24,
+  "sampled_pss_established_groups": 24,
+  "large_time_per_evaluation_median_reduction_percent": [
+    19.11929621559898,
+    30.986481609011584
+  ],
+  "protected_time_per_evaluation_maximum_upper_slowdown_percent": 3.402755581815775,
+  "sampled_tree_pss_maximum_upper_growth_percent": 3.0389709605493476,
+  "groups": [
+    {
+      "backend": "process",
+      "adaptation": "adaptive",
+      "dimension": 20,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -1.6849615290780512e-07,
+        "simultaneous95": [
+          -7.681756296874353e-07,
+          4.332109510475397e-07
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 1.0007771623632054,
+        "simultaneous95": [
+          0.9692281720987569,
+          1.0231034051400434
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0245178491030034,
+        "simultaneous95": [
+          1.0237293855403498,
+          1.0251475608021619
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": false,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": false
+    },
+    {
+      "backend": "process",
+      "adaptation": "adaptive",
+      "dimension": 20,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": 0.0,
+        "simultaneous95": [
+          0.0,
+          0.0
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.9996364689880646,
+        "simultaneous95": [
+          0.971223813579939,
+          1.0162048241313761
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0257721723499076,
+        "simultaneous95": [
+          1.0243976037275349,
+          1.0303897096054935
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "process",
+      "adaptation": "adaptive",
+      "dimension": 500,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.008711388007562666,
+        "simultaneous95": [
+          -0.013584997858138798,
+          -0.0052120825152430356
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.7636132930363698,
+        "simultaneous95": [
+          0.7568097812371315,
+          0.7718474534283629
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.021756893583714,
+        "simultaneous95": [
+          1.0131852401196932,
+          1.0230058276784237
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "process",
+      "adaptation": "adaptive",
+      "dimension": 500,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.013774519098076393,
+        "simultaneous95": [
+          -0.01874474697898791,
+          -0.007181548726194906
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.6901351839098842,
+        "simultaneous95": [
+          0.6800285387827983,
+          0.70446138967633
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0231426215322696,
+        "simultaneous95": [
+          1.0223220101969026,
+          1.0236916180150124
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "process",
+      "adaptation": "fixed",
+      "dimension": 20,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -1.7822424377693759e-07,
+        "simultaneous95": [
+          -8.643106752921633e-07,
+          3.590300930349598e-07
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.9998946257313426,
+        "simultaneous95": [
+          0.9827915755271927,
+          1.0253519296848044
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0228294019721127,
+        "simultaneous95": [
+          1.0212279203932262,
+          1.023761438152941
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": false,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": false
+    },
+    {
+      "backend": "process",
+      "adaptation": "fixed",
+      "dimension": 20,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": 0.0,
+        "simultaneous95": [
+          0.0,
+          0.0
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 1.0072240595498054,
+        "simultaneous95": [
+          0.9853295406888086,
+          1.0340275558181578
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0228482725712968,
+        "simultaneous95": [
+          1.0142466790670113,
+          1.0242437833258584
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "process",
+      "adaptation": "fixed",
+      "dimension": 500,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.009618724785476353,
+        "simultaneous95": [
+          -0.011423342767382785,
+          -0.0018761656928826392
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.7955503139326945,
+        "simultaneous95": [
+          0.7880436620818188,
+          0.8076300348951755
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0207132764582163,
+        "simultaneous95": [
+          1.0197084787517963,
+          1.021327481631244
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "process",
+      "adaptation": "fixed",
+      "dimension": 500,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.013058092232368923,
+        "simultaneous95": [
+          -0.01955163020652083,
+          -0.008718418873675499
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.7233375238997348,
+        "simultaneous95": [
+          0.7076863509701992,
+          0.7326788787047959
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0218227182217419,
+        "simultaneous95": [
+          1.021423889890218,
+          1.022595439889074
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "serial",
+      "adaptation": "adaptive",
+      "dimension": 20,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -1.0000479152794831e-08,
+        "simultaneous95": [
+          -1.5993987315893658e-07,
+          1.702329872279587e-07
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 1.004072552529828,
+        "simultaneous95": [
+          0.9949016269979026,
+          1.0131699076844671
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0106755044442641,
+        "simultaneous95": [
+          1.0095711789218982,
+          1.0118441949985195
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": false,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": false
+    },
+    {
+      "backend": "serial",
+      "adaptation": "adaptive",
+      "dimension": 20,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": 0.0,
+        "simultaneous95": [
+          0.0,
+          0.0
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 1.0104783641058366,
+        "simultaneous95": [
+          0.9981540154003913,
+          1.0260618173332463
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.01232084356706,
+        "simultaneous95": [
+          1.0110155182117875,
+          1.0133401331329182
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "serial",
+      "adaptation": "adaptive",
+      "dimension": 500,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.005376153735462713,
+        "simultaneous95": [
+          -0.010729737930270489,
+          3.173665117076063e-05
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.8088070378440102,
+        "simultaneous95": [
+          0.7999357791992001,
+          0.8173808328918383
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0103476747556135,
+        "simultaneous95": [
+          1.0093109869646182,
+          1.0115054243610286
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": false,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": false
+    },
+    {
+      "backend": "serial",
+      "adaptation": "adaptive",
+      "dimension": 500,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.00962867051468206,
+        "simultaneous95": [
+          -0.013865383461533848,
+          -0.0010514442057768247
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.7253692937169058,
+        "simultaneous95": [
+          0.715449990873304,
+          0.7360168454281949
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0118993189855323,
+        "simultaneous95": [
+          1.0111079241740764,
+          1.0129748074663882
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "serial",
+      "adaptation": "fixed",
+      "dimension": 20,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": 0.0,
+        "simultaneous95": [
+          0.0,
+          0.0
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.9965740346353802,
+        "simultaneous95": [
+          0.9917943810676729,
+          1.0099013132598331
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0101553980018207,
+        "simultaneous95": [
+          1.0092827459657834,
+          1.0111522155914994
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "serial",
+      "adaptation": "fixed",
+      "dimension": 20,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": 0.0,
+        "simultaneous95": [
+          0.0,
+          0.0
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.9987703159266001,
+        "simultaneous95": [
+          0.9906632460301347,
+          1.0071639707199542
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.012312282715468,
+        "simultaneous95": [
+          1.0110011297003605,
+          1.0129429809218846
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "serial",
+      "adaptation": "fixed",
+      "dimension": 500,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.004244972988249059,
+        "simultaneous95": [
+          -0.0098127783727886,
+          -0.00014551694727923947
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.8017302047016144,
+        "simultaneous95": [
+          0.7968715747450088,
+          0.8128280778521194
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0101920796352235,
+        "simultaneous95": [
+          1.0087489997332622,
+          1.0108544540690836
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "serial",
+      "adaptation": "fixed",
+      "dimension": 500,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.006917859671438681,
+        "simultaneous95": [
+          -0.012076752307009234,
+          -0.0033515174060696207
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.7146757232106746,
+        "simultaneous95": [
+          0.7069147934490929,
+          0.7213877590931247
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0122390900034717,
+        "simultaneous95": [
+          1.0111944267177195,
+          1.0149960116990162
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "thread",
+      "adaptation": "adaptive",
+      "dimension": 20,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -1.217495473810171e-07,
+        "simultaneous95": [
+          -2.9936478787280628e-06,
+          2.1295970804375894e-06
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.9993709905399144,
+        "simultaneous95": [
+          0.9714616735078906,
+          1.0257734675728902
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0095858041450585,
+        "simultaneous95": [
+          0.9951020842760934,
+          1.018811136192626
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": false,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": false
+    },
+    {
+      "backend": "thread",
+      "adaptation": "adaptive",
+      "dimension": 20,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": 0.0,
+        "simultaneous95": [
+          0.0,
+          0.0
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.9895317344619852,
+        "simultaneous95": [
+          0.9698062397782042,
+          1.0119923546654712
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0126866385765918,
+        "simultaneous95": [
+          1.0117288045641502,
+          1.0171364509929532
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "thread",
+      "adaptation": "adaptive",
+      "dimension": 500,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.012041157012263874,
+        "simultaneous95": [
+          -0.016857389362525593,
+          -0.005358135513806761
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.7971005574319889,
+        "simultaneous95": [
+          0.7800482395935703,
+          0.8175424732656784
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0110941495482695,
+        "simultaneous95": [
+          0.9999745183977169,
+          1.0254052808154275
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "thread",
+      "adaptation": "adaptive",
+      "dimension": 500,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.017794487177948716,
+        "simultaneous95": [
+          -0.02394508778035112,
+          -0.01227652910611643
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.7426154274838095,
+        "simultaneous95": [
+          0.715396348566946,
+          0.752376627472386
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0107339834456526,
+        "simultaneous95": [
+          1.0096666750143999,
+          1.019800479858568
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "thread",
+      "adaptation": "fixed",
+      "dimension": 20,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -1.3585556051475996e-07,
+        "simultaneous95": [
+          -5.246638593206675e-07,
+          3.3810677649310426e-07
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 1.0004509492400695,
+        "simultaneous95": [
+          0.9741688987748598,
+          1.017708154632621
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0101733232929755,
+        "simultaneous95": [
+          1.0097361555633253,
+          1.0106586278362448
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": false,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": false
+    },
+    {
+      "backend": "thread",
+      "adaptation": "fixed",
+      "dimension": 20,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": 0.0,
+        "simultaneous95": [
+          0.0,
+          0.0
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.9821689308406321,
+        "simultaneous95": [
+          0.9433579350365876,
+          1.0068993801266586
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.012465151190221,
+        "simultaneous95": [
+          1.0116575103845638,
+          1.0155869459327813
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "thread",
+      "adaptation": "fixed",
+      "dimension": 500,
+      "workload": "object",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.012780102281608599,
+        "simultaneous95": [
+          -0.018380738540578312,
+          -0.004478593403267256
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.8060715794720132,
+        "simultaneous95": [
+          0.7899367177271202,
+          0.8268674576279337
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.010570605569606,
+        "simultaneous95": [
+          1.0097873776577793,
+          1.0110218617588187
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    },
+    {
+      "backend": "thread",
+      "adaptation": "fixed",
+      "dimension": 500,
+      "workload": "permutation",
+      "pairs": 30,
+      "quality_delta": {
+        "median": -0.017557558230232924,
+        "simultaneous95": [
+          -0.027286957147828583,
+          -0.005476869907479628
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "time_per_evaluation_ratio": {
+        "median": 0.7409272537589777,
+        "simultaneous95": [
+          0.7115312043309928,
+          0.7642253241708996
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "sampled_tree_pss_ratio": {
+        "median": 1.0112087262635576,
+        "simultaneous95": [
+          1.0100606216948278,
+          1.0132313417407484
+        ],
+        "lower_rank_one_based": 6,
+        "interval_coverage_lower_bound": 0.9996750857681036
+      },
+      "gates": {
+        "quality_no_loss_established": true,
+        "time_per_evaluation": true,
+        "sampled_tree_pss": true
+      },
+      "all_gates_pass": true
+    }
+  ],
+  "limitations": [
+    "Quality criterion was predeclared with zero median loss allowance; failure to establish it is not proof of harm.",
+    "Configured durations differ by backend; compare paired variants within a backend.",
+    "These are complete-process time per evaluation and sampled tree PSS, not shorter fixed-budget solve latency or exact memory peaks.",
+    "Only these synthetic opaque callbacks, settings and installed Linux artifact are studied; no universal C++ parity or release approval."
+  ],
+  "release_authorized": false
+}

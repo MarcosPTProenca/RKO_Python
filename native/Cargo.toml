@@ -1,0 +1,17 @@
+[package]
+name = "rko-native-kernel"
+version = "0.3.0-dev.0"
+edition = "2024"
+rust-version = "1.85"
+license-file = "../LICENSE"
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+pyo3 = "=0.30.1"

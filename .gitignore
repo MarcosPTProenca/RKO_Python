@@ -10,6 +10,10 @@ env/
 !.env.example
 build/
 dist/
+/native/target/
+*.so
+*.pyd
+*.dll
 .pytest_cache/
 .hypothesis/
 .mutmut-cache/

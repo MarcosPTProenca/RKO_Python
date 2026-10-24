@@ -16,3 +16,12 @@ provenance under src/rko/examples/instances/.
 This provenance notice does not relicense imported work, assign authorship,
 or establish ownership. The owner must confirm the combined implementation's
 licensing and attribution before a release.
+
+The optional native blending component preserves that existing licensing boundary.
+Its locked Rust dependencies retain their upstream terms, including MIT,
+Apache-2.0, Apache-2.0 WITH LLVM-exception and Unicode-3.0 notices. Exact texts,
+file-specific PyO3 buffer attribution and the pinned Rust standard-library
+copyright document are bundled under native/licenses and in distribution license
+metadata. The inventory includes build/procedural-macro dependencies conservatively.
+These notices do not assign ownership, relicense imported work or authorize a
+release. The owner-confirmation requirement above still applies.
