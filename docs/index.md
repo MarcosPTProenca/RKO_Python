@@ -10,6 +10,10 @@ development library, not a claim of release readiness or C++ equivalence.
 2. [Read instance data and bind callbacks](problem-adapters.md): a complete file-to-solution tutorial, representations and constraints.
 3. [Parameter reference](parameters.md): choose fixed or adaptive settings and understand each knob.
 
+[Migrating from the older published API](migration.md) describes the breaking prerelease
+boundary. [Controlled releases](https://github.com/MarcosPTProenca/RKO/blob/main/RELEASING.md)
+are owner-approved, not automatic publication from main.
+
 ## Apply and extend
 
 - [Standalone algorithms](standalone.md): all eleven classes, tuning and result metadata.
