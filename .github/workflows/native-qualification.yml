@@ -12,6 +12,8 @@ on:
       - 'src/rko/**'
       - 'setup.py'
       - 'pyproject.toml'
+      - 'docs/performance.md'
+      - 'benchmarks/README.md'
 
 permissions:
   contents: read
@@ -94,6 +96,8 @@ jobs:
           uv pip install --python "$RUNNER_TEMP/installed/bin/python" "$RUNNER_TEMP"/mixed/*.whl 'numpy==2.4.3'
           mkdir -p "$RUNNER_TEMP/native-host"
           lscpu --json > "$RUNNER_TEMP/native-host/host.json"
+          sha256sum "$RUNNER_TEMP"/mixed/*.whl > "$RUNNER_TEMP/native-host/wheel.sha256"
+          uv run --locked --no-sync rustc --version --verbose > "$RUNNER_TEMP/native-host/rustc.txt"
       - name: Collect unprofiled source-identified timed quality and process-tree PSS
         run: >-
           uv run --locked python -m benchmarks.native_portfolio

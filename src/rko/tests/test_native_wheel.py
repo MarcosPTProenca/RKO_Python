@@ -27,7 +27,9 @@ from pathlib import Path
 from tools.inspect_native_wheel import inspect_wheel
 
 
-@pytest.mark.parametrize("fault", ["none", "abi", "library", "notice", "license"])
+@pytest.mark.parametrize(
+    "fault", ["none", "abi", "library", "notice", "license", "unrepaired", "filename"]
+)
 def test_repaired_wheel_inventory(tmp_path: Path, fault: str) -> None:
     """Require the expected ABI and reject missing notices or extra native libraries.
 
@@ -52,6 +54,10 @@ def test_repaired_wheel_inventory(tmp_path: Path, fault: str) -> None:
             if fault == "abi"
             else "cp314-cp314-manylinux_2_28_x86_64"
         )
+        if fault == "unrepaired":
+            tag = "cp314-cp314-linux_x86_64"
+        elif fault == "filename":
+            tag = "cp314-cp314-win_amd64"
         wheel.writestr(root + "WHEEL", f"Root-Is-Purelib: false\nTag: {tag}\n")
         wheel.writestr("rko/_native.cpython-314-x86_64-linux-gnu.so", b"fixture, not a real binary")
         wheel.writestr(root + "licenses/NOTICE", b"preserved owner gate")

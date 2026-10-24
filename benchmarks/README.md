@@ -20,6 +20,11 @@ uv run --locked python -m benchmarks.native_portfolio \
   --backend process --adaptation adaptive --repeats 3 --seconds 2
 ```
 
+The configured limit is per algorithm in serial, concurrent for threads, and
+shared among assigned searches in process workers; a three-algorithm serial call
+therefore lasts approximately six search seconds for a two-second setting.
+Only pair within the same backend; do not compare unlike end-to-end budgets.
+
 The fixed protocol covers both opaque-object and permutation fixtures, 20/500
 keys, seeds40000–40002, alternating runtime0/1 using byte-identical installed
 sources/binary. No application callback is tuned. Other backend/adaptation shards

@@ -89,7 +89,7 @@ def test_comparison_rejects_mixed_identity(pair: dict[str, dict], field: str) ->
         NativePortfolioStudy.validate_pair(changed)
 
 
-@pytest.mark.parametrize("case", ["fallback", "reference-native", "profiled", "missing"])
+@pytest.mark.parametrize("case", ["fallback", "reference-native", "profiled", "missing", "runtime"])
 def test_screen_rejects_invalid_admission(pair: dict[str, dict], case: str) -> None:
     """Reject fallback, incomplete pairs and functional-profiler timing samples.
 
@@ -107,6 +107,8 @@ def test_screen_rejects_invalid_admission(pair: dict[str, dict], case: str) -> N
     elif case == "profiled":
         for row in pair.values():
             row["functional"] = True
+    elif case == "runtime":
+        pair["native"]["versions"] = dict(pair["native"]["versions"], numpy="different")
     else:
         del pair["native"]
     with pytest.raises(ValueError):

@@ -137,8 +137,12 @@ never enter acceptance timings.
 The maintained [timed screening protocol](../benchmarks/native_portfolio.py) instead
 runs **without profiling or functional kernel probes**, in fresh isolated workers
 using the same installed wheel. It alternates both variants over three preregistered
-seeds per group, two-second budgets, 20/500 dimensions, two callbacks and all six
-backend/adaptation combinations. Raw quality, evaluation counts, complete process
+seeds per group, a configured two-second search limit, 20/500 dimensions, two
+callbacks and all six backend/adaptation combinations. Existing budget semantics
+are preserved: serial runs give each algorithm its search limit (approximately
+six seconds for three algorithms), threads run concurrently, and process workers
+divide their common deadline among assigned searches. Compare native/reference
+**within** a backend, not unlike end-to-end budgets across backends. Raw quality, evaluation counts, complete process
 latency and recursive process-tree sampled PSS are retained. PSS excludes the
 collector, includes manager/tracker helpers, and records incomplete snapshots.
 It is proportional physical memory, not an exact peak. Normalized quality uses
@@ -150,6 +154,19 @@ parity. Timed trajectories may legitimately differ; unlike fixed-work replay, th
 must not be forced to have equal evaluation counts or costs. Do not pool this
 protocol with the earlier 720 fixed-work pairs or reinterpret test durations as
 performance results.
+
+At source `ba46006`, [CI](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40094960238)
+and [extended qualification](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40094960432)
+passed all 15 jobs, including actual free-threaded Python-only tests and repaired
+installed wheels for `manylinux_2_28_x86_64`, `win_amd64` and `macosx_11_0_arm64`.
+All 72 timed pairs completed with matched installed-source/binary identities and
+no functional probes in measurement. All 24 groups are retained, including small
+input groups with slightly lower evaluation throughput. In the twelve 500-key
+groups, median paired evaluation-count ratios ranged from 1.26 to 1.43 and
+normalized quality deltas were negative (better). Median sampled tree-PSS ratios
+across groups were 1.008–1.027. These are descriptive pilot medians, not uncertainty
+bounds, acceptance thresholds, shorter fixed-budget latency or universal gains.
+The original pilot remains the reference; routine CI repetitions are not pooled.
 
 Run `uv run --locked python tools/validate_native_package.py` on a machine with the
 native build prerequisites to check pure/native wheels and sdists, default and
