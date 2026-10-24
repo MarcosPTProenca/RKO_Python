@@ -20,10 +20,15 @@ their global-RNG behavior. Custom callbacks must own their stochastic state.
 ## Outstanding
 
 The [performance target](performance.md) is to match or exceed pinned C++ RKO
-within declared workload/resource regimes. No Rust engine exists, no general C++
-performance parity is established, and native adoption is conditional on profiling,
-contract preservation, packaging and measured end-to-end benefit. The target is
-not a release guarantee.
+within declared workload/resource regimes. An optional [native Rust engine](native.md)
+(`backend="native"`) now exists. In 2-second studies on Knapsack, TSP and Rastrigin it
+was better than C++ for BRKGA, GA, PSO and SA, and the default portfolio was better on
+Knapsack and not worse on TSP/Rastrigin; IPR alone was worse in all three families and
+ILS/GRASP were worse on TSP at equal wall time. See the
+[study and its limits](../benchmarks/README.md#native-engine-versus-c-and-python). No
+general C++ parity is established beyond those problems, budgets and the one tested
+machine, and the Python process backend remains the default. The target is not a
+release guarantee.
 
 - **Callback concurrency:** library RNGs are isolated, but user callbacks and
   operator overrides must manage their own randomness and mutable state. Global

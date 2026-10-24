@@ -72,6 +72,7 @@ class NativeStudy:
         rust_grid (str): Native parameter grid flavor, `toml` or `cpp`.
         rust_threads (int | None): Native worker cap for portfolios.
         rust_prefill (bool): Whether the native engine prefills its pool.
+        match_reference_time (bool): Whether native budgets follow the C++ wall time.
         instance_limit (int | None): Optional number of instances per run.
         benchmark (KnapsackBenchmark): Shared protocol helper.
         repo_root (Path): Repository root.
@@ -90,6 +91,7 @@ class NativeStudy:
         rust_threads: int | None = None,
         instance_limit: int | None = None,
         rust_prefill: bool = False,
+        match_reference_time: bool = False,
     ) -> None:
         """Store study options without building or executing anything.
 
@@ -104,6 +106,8 @@ class NativeStudy:
             rust_threads (int | None): Native worker cap for portfolios.
             instance_limit (int | None): Positive number of instances to use, or all.
             rust_prefill (bool): Fill the native pool with random vectors before searching.
+            match_reference_time (bool): Run C++ first and give the native engine the wall
+                time that trial actually used when it exceeded the budget.
 
         Raises:
             ValueError: If a solver, implementation or grid name is unknown.
@@ -124,6 +128,7 @@ class NativeStudy:
         self.rust_threads = rust_threads
         self.instance_limit = instance_limit
         self.rust_prefill = rust_prefill
+        self.match_reference_time = match_reference_time
         self.benchmark = KnapsackBenchmark(
             output_path,
             cache_dir,
@@ -160,6 +165,7 @@ class NativeStudy:
         case: InstanceCase,
         solver: str,
         seed: int,
+        budget: float,
     ) -> SolverOutput:
         """Run one native algorithm or portfolio on an instance.
 
@@ -168,6 +174,7 @@ class NativeStudy:
             case (InstanceCase): Verified instance and exact optimum.
             solver (str): Display name of the algorithm or portfolio.
             seed (int): Native engine seed.
+            budget (float): Native search seconds.
 
         Returns:
             SolverOutput: Parsed keys, objective, target events and status.
@@ -183,7 +190,7 @@ class NativeStudy:
         command = [
             str(binary),
             str(case.path),
-            str(self.budget_seconds),
+            f"{budget:.3f}",
             "--algo",
             names,
             "--grid",
@@ -293,6 +300,9 @@ class NativeStudy:
                             )
                             shift = replicate % len(self.implementations)
                             order = self.implementations[shift:] + self.implementations[:shift]
+                            if self.match_reference_time and "cpp64" in order:
+                                order = ("cpp64", *(name for name in order if name != "cpp64"))
+                            rust_budget = float(self.budget_seconds)
                             for implementation in order:
                                 trial_id = self.benchmark._trial_id(
                                     implementation, solver, case, replicate
@@ -315,7 +325,11 @@ class NativeStudy:
                                         case, solver, self.budget_seconds, trial_id, program_dir
                                     )
                                 else:
-                                    output = self._run_rust_trial(binary, case, solver, seed)
+                                    output = self._run_rust_trial(
+                                        binary, case, solver, seed, rust_budget
+                                    )
+                                if implementation == "cpp64" and self.match_reference_time:
+                                    rust_budget = max(rust_budget, round(output.elapsed_seconds, 3))
                                 record = self.benchmark._record_trial(
                                     output,
                                     case,
@@ -323,7 +337,9 @@ class NativeStudy:
                                     implementation,
                                     replicate,
                                     seed if implementation != "cpp64" else None,
-                                    self.budget_seconds,
+                                    rust_budget
+                                    if implementation == "rust"
+                                    else self.budget_seconds,
                                     trial_id,
                                     signature,
                                     metadata,
@@ -517,6 +533,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--rust-grid", choices=("toml", "cpp"), default="toml")
     parser.add_argument("--rust-threads", type=int, default=None)
     parser.add_argument("--rust-prefill", action="store_true")
+    parser.add_argument(
+        "--match-reference-time",
+        action="store_true",
+        help="Give the native engine the wall time each C++ trial actually used.",
+    )
     parser.add_argument("--instances", type=int, default=None, help="Use the first N instances.")
     parser.add_argument("--summary-only", action="store_true", help="Summarize an existing CSV.")
     parser.add_argument("--subject", default="rust", help="Implementation under evaluation.")
@@ -532,6 +553,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         rust_threads=args.rust_threads,
         instance_limit=args.instances,
         rust_prefill=args.rust_prefill,
+        match_reference_time=args.match_reference_time,
     )
     if args.summary_only:
         with args.output.open(encoding="utf-8", newline="") as stream:

@@ -178,6 +178,8 @@ class ProblemStudy:
         sizes (tuple[int, ...]): Dimensions, one instance group each.
         per_size (int): Instances generated per size.
         rust_grid (str): Native parameter grid flavor.
+        rust_budget_seconds (int): Native search budget per trial.
+        match_reference_time (bool): Whether native budgets follow the C++ wall time.
         benchmark (KnapsackBenchmark): Shared helper for the pinned C++ checkout and stats.
         repo_root (Path): Repository root.
     """
@@ -194,6 +196,8 @@ class ProblemStudy:
         sizes: Sequence[int],
         per_size: int,
         rust_grid: str,
+        rust_budget_seconds: int | None = None,
+        match_reference_time: bool = False,
     ) -> None:
         """Store study options without building or executing anything.
 
@@ -207,6 +211,10 @@ class ProblemStudy:
             sizes (Sequence[int]): Positive dimensions.
             per_size (int): Positive number of instances per size.
             rust_grid (str): Native grid flavor, `toml` or `cpp`.
+            rust_budget_seconds (int | None): Native budget override, for example to match
+                the wall time a reference actually used; defaults to `budget_seconds`.
+            match_reference_time (bool): Run C++ first and give the native engine the
+                wall time that trial actually used when it exceeded the budget.
 
         Raises:
             ValueError: If a solver, problem or grid name is unknown.
@@ -227,6 +235,8 @@ class ProblemStudy:
         self.sizes = tuple(sizes)
         self.per_size = per_size
         self.rust_grid = rust_grid
+        self.rust_budget_seconds = rust_budget_seconds or budget_seconds
+        self.match_reference_time = match_reference_time
         self.benchmark = KnapsackBenchmark(
             output_path, cache_dir, budget_seconds=budget_seconds, repetitions=repetitions
         )
@@ -392,7 +402,7 @@ class ProblemStudy:
         return keys, objective, elapsed, ""
 
     def _run_rust(
-        self, binary: Path, instance: Path, solver: str, seed: int
+        self, binary: Path, instance: Path, solver: str, seed: int, budget: float
     ) -> tuple[tuple[float, ...] | None, float | None, float, str]:
         """Run one native algorithm or portfolio.
 
@@ -401,6 +411,7 @@ class ProblemStudy:
             instance (Path): Instance file.
             solver (str): Display name.
             seed (int): Engine seed.
+            budget (float): Native search seconds.
 
         Returns:
             tuple: Keys, reported objective, elapsed seconds and an error message.
@@ -415,7 +426,7 @@ class ProblemStudy:
             [
                 str(binary),
                 str(instance),
-                str(self.budget_seconds),
+                f"{budget:.3f}",
                 "--problem",
                 self.problem,
                 "--algo",
@@ -460,6 +471,9 @@ class ProblemStudy:
                     for replicate in range(self.repetitions):
                         seed = SAMPLE_SEED + solver_index * 1_000_000 + case_index * 100 + replicate
                         order = ("cpp64", "rust") if replicate % 2 == 0 else ("rust", "cpp64")
+                        if self.match_reference_time:
+                            order = ("cpp64", "rust")
+                        rust_budget = float(self.rust_budget_seconds)
                         for implementation in order:
                             if implementation == "cpp64":
                                 keys, reported, elapsed, error = self._run_cpp(
@@ -467,8 +481,10 @@ class ProblemStudy:
                                 )
                             else:
                                 keys, reported, elapsed, error = self._run_rust(
-                                    binary, path, solver, seed
+                                    binary, path, solver, seed, rust_budget
                                 )
+                            if implementation == "cpp64" and self.match_reference_time:
+                                rust_budget = max(rust_budget, round(elapsed, 3))
                             length = None
                             if keys is not None and not error:
                                 try:
@@ -489,7 +505,11 @@ class ProblemStudy:
                                     "implementation": implementation,
                                     "replicate": replicate,
                                     "seed": seed,
-                                    "budget_seconds": self.budget_seconds,
+                                    "budget_seconds": (
+                                        self.budget_seconds
+                                        if implementation == "cpp64"
+                                        else rust_budget
+                                    ),
                                     "objective": "" if length is None else length,
                                     "elapsed_seconds": elapsed,
                                     "status": "ok" if length is not None else "error",
@@ -528,17 +548,18 @@ class ProblemStudy:
         return [{key: str(value) for key, value in row.items()} for row in rows]
 
     @staticmethod
-    def summarize(rows: Sequence[dict[str, str]]) -> str:
-        """Pair native and C++ results per instance and render exact sign tests.
+    def summary_rows(rows: Sequence[dict[str, str]]) -> list[dict[str, str | float | int]]:
+        """Pair native and C++ results per instance and test the differences.
 
         Args:
             rows (Sequence[dict[str, str]]): Annotated raw rows.
 
         Returns:
-            str: Fixed-width paired summary.
+            list[dict[str, str | float | int]]: One record per solver with medians,
+                bootstrap interval, better/worse/tied counts and Holm-adjusted p-value.
 
         Raises:
-            ValueError: If a gap value is nonfinite.
+            ValueError: If a quality value is nonfinite.
         """
         solvers = sorted({row["solver"] for row in rows})
         medians: dict[str, tuple[list[float], list[float]]] = {}
@@ -570,11 +591,7 @@ class ProblemStudy:
             if native
         }
         adjusted = KnapsackBenchmark.holm_adjust(raw) if raw else {}
-        lines = [
-            "\n[quality] rust vs cpp64 (lower is better; B/W/T = rust better/worse/tied)",
-            f"{'solver':12} {'rust':>9} {'cpp64':>9} {'diff':>9} {'95% CI':>21} "
-            f"{'B/W/T':>9} {'p_holm':>8} {'fail r/c':>9}",
-        ]
+        records: list[dict[str, str | float | int]] = []
         for solver, (native, reference) in medians.items():
             if not native:
                 continue
@@ -583,12 +600,50 @@ class ProblemStudy:
             low, high = KnapsackBenchmark.bootstrap_median_interval(
                 differences, seed=SAMPLE_SEED + sum(map(ord, solver))
             )
+            records.append(
+                {
+                    "solver": solver,
+                    "rust_median": statistics.median(native),
+                    "cpp64_median": statistics.median(reference),
+                    "median_difference": statistics.median(differences),
+                    "bootstrap_95_low": low,
+                    "bootstrap_95_high": high,
+                    "rust_better": negative,
+                    "rust_worse": positive,
+                    "tied": len(differences) - non_tied,
+                    "p_holm": adjusted[solver],
+                    "rust_failed": failures[solver][0],
+                    "cpp64_failed": failures[solver][1],
+                }
+            )
+        return records
+
+    @staticmethod
+    def summarize(rows: Sequence[dict[str, str]]) -> str:
+        """Render the paired summary as a fixed-width table.
+
+        Args:
+            rows (Sequence[dict[str, str]]): Annotated raw rows.
+
+        Returns:
+            str: Fixed-width paired summary.
+
+        Raises:
+            ValueError: If a quality value is nonfinite.
+        """
+        lines = [
+            "\n[quality] rust vs cpp64 (lower is better; B/W/T = rust better/worse/tied)",
+            f"{'solver':12} {'rust':>9} {'cpp64':>9} {'diff':>9} {'95% CI':>21} "
+            f"{'B/W/T':>9} {'p_holm':>8} {'fail r/c':>9}",
+        ]
+        for record in ProblemStudy.summary_rows(rows):
+            interval = f"[{record['bootstrap_95_low']:.3f},{record['bootstrap_95_high']:.3f}]"
+            counts = f"{record['rust_better']}/{record['rust_worse']}/{record['tied']}"
+            failed = f"{record['rust_failed']}/{record['cpp64_failed']}"
             lines.append(
-                f"{solver:12} {statistics.median(native):9.3f} {statistics.median(reference):9.3f} "
-                f"{statistics.median(differences):9.3f} "
-                f"{f'[{low:.3f},{high:.3f}]':>21} "
-                f"{negative}/{positive}/{len(differences) - non_tied:<5} "
-                f"{adjusted[solver]:8.4f} {failures[solver][0]}/{failures[solver][1]:>6}"
+                f"{record['solver']:12} {record['rust_median']:9.3f} "
+                f"{record['cpp64_median']:9.3f} {record['median_difference']:9.3f} "
+                f"{interval:>21} {counts:>9} {record['p_holm']:8.4f} {failed:>9}"
             )
         return "\n".join(lines)
 
@@ -620,6 +675,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--per-size", type=int, default=5)
     parser.add_argument("--rust-grid", choices=("toml", "cpp"), default="cpp")
+    parser.add_argument(
+        "--rust-budget-seconds",
+        type=int,
+        default=None,
+        help="Native budget when it must match the wall time the reference actually used.",
+    )
+    parser.add_argument(
+        "--match-reference-time",
+        action="store_true",
+        help="Give the native engine the wall time each C++ trial actually used.",
+    )
     parser.add_argument("--summary-only", action="store_true")
     args = parser.parse_args(argv)
     study = ProblemStudy(
@@ -637,6 +703,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         ],
         per_size=args.per_size,
         rust_grid=args.rust_grid,
+        rust_budget_seconds=args.rust_budget_seconds,
+        match_reference_time=args.match_reference_time,
     )
     if args.summary_only:
         with args.output.open(encoding="utf-8", newline="") as stream:

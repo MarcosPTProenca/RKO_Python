@@ -12,8 +12,11 @@ They are not a general speed guarantee.
 ## Two ways to define a problem
 
 **Native problem (fastest).** The decoder and objective run inside Rust, so every worker
-thread runs in parallel with the interpreter lock released. A built-in 0/1 Knapsack is
-provided; native problems may also offer constant-time move evaluation.
+thread runs in parallel with the interpreter lock released. Python exposes a built-in
+0/1 Knapsack as an example; the Rust crate also contains TSP and Rastrigin problems used
+by the benchmarks. A new native problem means implementing the `Problem` trait in
+`crates/rko-core` (optionally the `Incremental` trait for constant-time move evaluation);
+there is no Python-level API for defining one yet.
 
 ```python
 from rko import RKO
@@ -44,10 +47,14 @@ interpreter lock, so worker threads take turns: the engine removes its own overh
   Random streams are the engine's own, so trajectories differ from the Python engine.
 - `prefill_pool=True` fills the pool with `pool_size` random evaluated vectors first and
   reports it as `PoolInitializationMetadata`; the default stays off.
-- Nelder-Mead takes its two pool vertices from the best pool entries for SA, GA, LNS,
-  GRASP and BRKGA-CS (and may return one of them when better than the incumbent), and
-  from two random entries for the others. The Python engine always uses the best entries;
-  the C++ reference uses random entries.
+- Nelder-Mead takes its two pool vertices from the best pool entries for SA, GA, LNS, PSO
+  and VNS (and may return one of them when better than the incumbent), and from two
+  random entries for BRKGA, BRKGA-CS, GRASP and ILS. The choice came from a Knapsack plus
+  TSP screen where the families agreed; the Python engine always uses the best entries
+  and the C++ reference random entries.
+- Local-search sweeps accept an improving move immediately and continue from it
+  (strategy 1, the C++ benchmark setting); the Python engine's RVND uses fixed-base
+  best improvement.
 - `verbose=True` prints lifecycle lines only; live pool progress is not available.
 - Windows, Linux and macOS builds use the same sources; only Linux has measurements.
 
@@ -56,8 +63,11 @@ interpreter lock, so worker threads take turns: the engine removes its own overh
 - A portfolio of expensive Python callbacks usually runs better on `backend="process"`,
   whose workers each have their own interpreter. See the callback-portfolio rows in the
   benchmark study.
-- IPR alone (without peers filling the pool) and GRASP were not better than C++ in the
-  2-second study; the portfolio, which is the default, was.
+- IPR alone (without peers filling the pool) was worse than C++ in all three studied
+  problem families, and ILS and GRASP were worse on TSP at equal wall time; GRASP and VNS
+  were ties elsewhere. The default portfolio was better on Knapsack and not worse on TSP
+  and Rastrigin.
+- Only Knapsack, TSP and Rastrigin were measured, on one Linux (WSL2) machine.
 - Batched or compiled (for example Numba) decoders are not supported yet.
 
 ## Build and test

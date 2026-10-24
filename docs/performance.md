@@ -1,14 +1,32 @@
 # Performance target and native-backend evaluation
 
-**Status: evaluation, not an implemented Rust engine or a parity claim.**
+**Status: an optional native Rust engine exists; C++ parity is established only for the
+[measured regimes](../benchmarks/README.md#native-engine-versus-c-and-python).**
 The target is to **match or exceed the pinned C++ RKO on declared workloads**, in
 solution quality and time under comparable resources. A language change, passing
 CI, higher evaluations/second or a faster isolated kernel does not meet that target
 by itself. Results outside the evaluated workload/resource envelope remain unknown.
 
+## Outcome of the native-backend evaluation
+
+The fixed-work profile (`benchmarks/performance_profile.py`) attributed most of the
+per-evaluation time of cheap objectives to library bookkeeping (blending and RNG draws,
+callback wrappers) spread over every algorithm, not to one kernel. A single optional
+kernel therefore could not remove the cost, and the implemented route is the one this
+page lists as a whole Rust engine: search loops, operators, per-search RNG streams, the
+shared pool, Q-learning and a thread scheduler in `crates/rko-core`, bound to Python
+through PyO3 (`backend="native"`, [guide](native.md)). Python callbacks still run
+through the interpreter and serialize on its lock; problems defined natively do not.
+Whether this meets the C++ target depends on the problem, algorithm and budget:
+[the study](../benchmarks/README.md#native-engine-versus-c-and-python) reports wins,
+ties and the regressions (IPR alone, ILS and GRASP on TSP at equal wall time). The
+sections below keep the original evaluation criteria, which remain the standard for any
+further claim.
+
 ## What the current evidence establishes
 
-The implementation is Python plus NumPy, with no compiler dependency for users.
+The Python implementation is Python plus NumPy, with no compiler dependency for users of a
+prebuilt wheel.
 Several kernels and allocation paths have measured improvements over earlier Python
 versions; [each benchmark identifies its workload and limits](../benchmarks/README.md).
 Those measurements do not establish whole-solver C++ performance parity.
