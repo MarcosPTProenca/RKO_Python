@@ -25,7 +25,7 @@
 
 use super::{Adapter, Context, Spec};
 use crate::local_search::{FAREY, LocalSearch};
-use crate::operators::random_keys;
+use crate::operators::{PoolPolicy, random_keys};
 use crate::qlearning::QLearning;
 use crate::search::Stop;
 
@@ -33,7 +33,7 @@ use crate::search::Stop;
 pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
     let n = context.search.dimension();
     let mut adapter = Adapter::new(spec, context)?;
-    let mut local = LocalSearch::new();
+    let mut local = LocalSearch::with_policy(PoolPolicy::Elite);
     let mut current = vec![0.0; n];
     random_keys(&mut current, context.rng);
     let first = context.search.eval(&current)?;
@@ -77,17 +77,19 @@ pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
                 candidate[positions[index]] = 0.0;
             }
             let mut candidate_cost = context.search.eval(&candidate)?;
+            context.search.sync(&candidate);
             for &position in &positions[..intensity] {
                 let mut best_value = candidate[position];
                 for &value in &FAREY[..FAREY.len() - 1] {
-                    candidate[position] = value;
-                    let cost = context.search.eval(&candidate)?;
+                    let cost = context.search.probe(&mut candidate, &[(position, value)])?;
                     if cost < candidate_cost {
                         candidate_cost = cost;
                         best_value = value;
                     }
-                    candidate[position] = best_value;
                 }
+                context
+                    .search
+                    .commit(&mut candidate, &[(position, best_value)]);
             }
             candidate_cost = local.nelder_mead(
                 &mut candidate,

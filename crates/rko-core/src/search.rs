@@ -25,7 +25,7 @@
 //! - Input: a `Problem`, a duration or deadline and a shared cancel flag.
 //! - Output: costs, a best-so-far incumbent and bounded history samples.
 
-use crate::problem::Problem;
+use crate::problem::{Incremental, Problem};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
@@ -77,6 +77,7 @@ pub struct Search<'a> {
     history_limit: usize,
     history: Vec<HistoryPoint>,
     history_observations: u64,
+    incremental: Option<Box<dyn Incremental + 'a>>,
 }
 
 impl<'a> Search<'a> {
@@ -102,6 +103,7 @@ impl<'a> Search<'a> {
             history_limit,
             history: Vec::new(),
             history_observations: 0,
+            incremental: None,
         }
     }
 
@@ -184,6 +186,88 @@ impl<'a> Search<'a> {
             }
         }
         Ok(value)
+    }
+
+    /// Binds incremental evaluation to `keys` when the problem supports it.
+    ///
+    /// Must be called before a run of `probe`/`commit` on the same vector.
+    pub fn sync(&mut self, keys: &[f64]) {
+        match self.incremental.as_mut() {
+            Some(state) => state.reset(keys),
+            None => self.incremental = self.problem.incremental(keys),
+        }
+    }
+
+    /// Whether `probe` currently uses constant-time incremental evaluation.
+    #[must_use]
+    pub fn is_incremental(&self) -> bool {
+        self.incremental.is_some()
+    }
+
+    /// Scores `keys` with `changes` applied; `keys` is left unchanged on return.
+    ///
+    /// Counts as one evaluation and updates the incumbent, exactly like `eval`.
+    #[inline]
+    pub fn probe(&mut self, keys: &mut [f64], changes: &[(usize, f64)]) -> Result<f64, Stop> {
+        if self.cancel.load(Ordering::Relaxed) {
+            return Err(Stop::Cancelled);
+        }
+        self.tick += 1;
+        if self.tick >= self.stride {
+            self.tick = 0;
+            if self.best_cost.is_finite() && Instant::now() >= self.deadline {
+                return Err(Stop::TimeLimit);
+            }
+        }
+        let value = if let Some(state) = self.incremental.as_ref() {
+            state.probe(keys, changes)
+        } else {
+            let mut previous = [0.0_f64; 4];
+            let spill: Vec<f64>;
+            let saved: &[f64] = if changes.len() <= previous.len() {
+                for (slot, &(index, _)) in previous.iter_mut().zip(changes) {
+                    *slot = keys[index];
+                }
+                &previous[..changes.len()]
+            } else {
+                spill = changes.iter().map(|&(index, _)| keys[index]).collect();
+                &spill
+            };
+            for &(index, value) in changes {
+                keys[index] = value;
+            }
+            let value = self.problem.evaluate(keys);
+            for (&(index, _), &old) in changes.iter().zip(saved) {
+                keys[index] = old;
+            }
+            value
+        };
+        if !value.is_finite() {
+            return Err(Stop::InvalidCost);
+        }
+        self.evaluations += 1;
+        if value < self.best_cost {
+            self.best_cost = value;
+            self.best_keys.clear();
+            self.best_keys.extend_from_slice(keys);
+            for &(index, new) in changes {
+                self.best_keys[index] = new;
+            }
+            if self.history_limit > 0 {
+                self.record_history();
+            }
+        }
+        Ok(value)
+    }
+
+    /// Applies `changes` to `keys` and to the incremental state.
+    pub fn commit(&mut self, keys: &mut [f64], changes: &[(usize, f64)]) {
+        if let Some(state) = self.incremental.as_mut() {
+            state.commit(keys, changes);
+        }
+        for &(index, value) in changes {
+            keys[index] = value;
+        }
     }
 
     fn record_history(&mut self) {
@@ -280,6 +364,49 @@ mod tests {
         let now = Instant::now();
         let mut search = Search::new(&problem, &cancel, now, now + Duration::from_secs(5), 0);
         assert_eq!(search.eval(&[0.9, 0.1, 0.1]), Err(Stop::Cancelled));
+    }
+
+    #[test]
+    fn probe_matches_eval_with_and_without_incremental_state() {
+        struct Plain(Knapsack);
+        impl Problem for Plain {
+            fn dimension(&self) -> usize {
+                self.0.dimension()
+            }
+            fn evaluate(&self, keys: &[f64]) -> f64 {
+                self.0.evaluate(keys)
+            }
+        }
+        let knapsack = Knapsack::new(&[10, 20, 30, 15], &[5, 6, 7, 4], 12);
+        let plain = Plain(knapsack.clone());
+        let cancel = AtomicBool::new(false);
+        let now = Instant::now();
+        for incremental in [true, false] {
+            let problem: &dyn Problem = if incremental { &knapsack } else { &plain };
+            let mut search = Search::new(problem, &cancel, now, now + Duration::from_secs(5), 0);
+            let mut keys = vec![0.9, 0.1, 0.9, 0.1];
+            search.eval(&keys).unwrap();
+            search.sync(&keys);
+            assert_eq!(search.is_incremental(), incremental);
+            let snapshot = keys.clone();
+            let changes = [(1, 0.8), (3, 0.7)];
+            let moved = search.probe(&mut keys, &changes).unwrap();
+            assert_eq!(keys, snapshot, "probe must restore keys");
+            let mut expected = snapshot.clone();
+            expected[1] = 0.8;
+            expected[3] = 0.7;
+            assert_eq!(moved, knapsack.evaluate(&expected));
+            if moved < search.best_cost() + 1.0 {
+                assert_eq!(search.best_keys().len(), 4);
+            }
+            search.commit(&mut keys, &changes);
+            assert_eq!(keys, expected);
+            assert_eq!(
+                search.probe(&mut keys, &[]).unwrap(),
+                knapsack.evaluate(&expected)
+            );
+            assert_eq!(search.evaluations(), 3);
+        }
     }
 
     #[test]

@@ -29,7 +29,7 @@
 
 use super::{Adapter, Context, Spec};
 use crate::local_search::LocalSearch;
-use crate::operators::random_keys;
+use crate::operators::{PoolPolicy, random_keys};
 use crate::qlearning::QLearning;
 use crate::rng::Rng;
 use crate::search::{Search, Stop};
@@ -84,10 +84,7 @@ fn line_search(
             };
             value = (origin + direction * tau as f64 * step).clamp(0.0, ceiling);
         }
-        keys[position] = value;
-        let cost = search.eval(keys);
-        keys[position] = origin;
-        let cost = cost?;
+        let cost = search.probe(keys, &[(position, value)])?;
         if cost < best_cost {
             best_cost = cost;
             best_value = value;
@@ -100,7 +97,7 @@ fn line_search(
 pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
     let n = context.search.dimension();
     let mut adapter = Adapter::new(spec, context)?;
-    let mut local = LocalSearch::new();
+    let mut local = LocalSearch::with_policy(PoolPolicy::Elite);
     let mut current = vec![0.0; n];
     random_keys(&mut current, context.rng);
     let mut current_cost = context.search.eval(&current)?;
@@ -124,6 +121,7 @@ pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
             candidate.copy_from_slice(&current);
             unfixed.clear();
             unfixed.extend(0..n);
+            context.search.sync(&candidate);
             let intensity = (context.rng.uniform(0.3, 0.7) * n as f64).ceil() as usize;
             for _ in 0..intensity.min(n) {
                 let mut subset = (unfixed.len() as f64 * 0.1) as usize;
@@ -146,7 +144,9 @@ pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
                         chosen_value = value;
                     }
                 }
-                candidate[chosen] = chosen_value;
+                context
+                    .search
+                    .commit(&mut candidate, &[(chosen, chosen_value)]);
                 let index = unfixed
                     .iter()
                     .position(|&value| value == chosen)

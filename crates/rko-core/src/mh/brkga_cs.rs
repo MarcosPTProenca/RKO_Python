@@ -30,7 +30,7 @@
 use super::population::Population;
 use super::{Adapter, Context, Spec};
 use crate::local_search::LocalSearch;
-use crate::operators::random_keys;
+use crate::operators::{PoolPolicy, random_keys};
 use crate::qlearning::QLearning;
 use crate::rng::Rng;
 use crate::search::Stop;
@@ -133,7 +133,7 @@ pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
     let n = context.search.dimension();
     let sigma = spec.offline.get(4).copied().unwrap_or(0.6);
     let mut adapter = Adapter::new(spec, context)?;
-    let mut local = LocalSearch::new();
+    let mut local = LocalSearch::with_policy(PoolPolicy::Elite);
     let mut p = adapter.params()[0] as usize;
     let mut current = Population::new(n, p);
     let mut next = Population::new(n, p);

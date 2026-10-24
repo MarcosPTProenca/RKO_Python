@@ -23,6 +23,21 @@
 //! - Input: a key slice whose length equals `dimension()`.
 //! - Output: a finite cost to minimize.
 
+/// Incremental evaluator that scores single moves in time proportional to the move size.
+///
+/// The `keys` slice passed to every method is the vector the state currently
+/// represents, before any proposed change.
+pub trait Incremental {
+    /// Rebuilds the state from scratch for `keys`.
+    fn reset(&mut self, keys: &[f64]);
+
+    /// Cost the vector would have after applying `changes` as `(index, new value)` pairs.
+    fn probe(&self, keys: &[f64], changes: &[(usize, f64)]) -> f64;
+
+    /// Applies `changes` to the internal state; the caller updates `keys` itself.
+    fn commit(&mut self, keys: &[f64], changes: &[(usize, f64)]);
+}
+
 /// Random-key problem evaluated by the engine.
 pub trait Problem: Sync {
     /// Number of random keys expected by `evaluate`.
@@ -34,6 +49,17 @@ pub trait Problem: Sync {
     /// Evaluations between wall-clock checks; use 1 for expensive callbacks.
     fn check_stride(&self) -> u32 {
         8
+    }
+
+    /// Optional incremental evaluator used by single-coordinate local searches.
+    fn incremental<'a>(&'a self, _keys: &[f64]) -> Option<Box<dyn Incremental + 'a>> {
+        None
+    }
+
+    /// Runs `body` inside any per-thread context the problem needs; the engine wraps
+    /// each worker's whole sequence of searches in one call.
+    fn with_thread_context(&self, body: &mut dyn FnMut()) {
+        body();
     }
 }
 
@@ -148,7 +174,57 @@ impl Knapsack {
     }
 }
 
+/// Constant-time move evaluation for `Knapsack`.
+struct KnapsackState<'a> {
+    problem: &'a Knapsack,
+    profit: f64,
+    weight: f64,
+}
+
+impl Incremental for KnapsackState<'_> {
+    fn reset(&mut self, keys: &[f64]) {
+        (self.profit, self.weight) = self.problem.totals(keys);
+    }
+
+    #[inline]
+    fn probe(&self, keys: &[f64], changes: &[(usize, f64)]) -> f64 {
+        let (mut profit, mut weight) = (self.profit, self.weight);
+        for &(index, value) in changes {
+            let before = keys[index] > 0.5;
+            let after = value > 0.5;
+            if before != after {
+                let sign = if after { 1.0 } else { -1.0 };
+                profit += sign * self.problem.profits[index];
+                weight += sign * self.problem.weights[index];
+            }
+        }
+        self.problem.cost_from_totals(profit, weight)
+    }
+
+    fn commit(&mut self, keys: &[f64], changes: &[(usize, f64)]) {
+        for &(index, value) in changes {
+            let before = keys[index] > 0.5;
+            let after = value > 0.5;
+            if before != after {
+                let sign = if after { 1.0 } else { -1.0 };
+                self.profit += sign * self.problem.profits[index];
+                self.weight += sign * self.problem.weights[index];
+            }
+        }
+    }
+}
+
 impl Problem for Knapsack {
+    fn incremental<'a>(&'a self, keys: &[f64]) -> Option<Box<dyn Incremental + 'a>> {
+        let mut state = KnapsackState {
+            problem: self,
+            profit: 0.0,
+            weight: 0.0,
+        };
+        state.reset(keys);
+        Some(Box::new(state))
+    }
+
     fn dimension(&self) -> usize {
         self.profits.len()
     }
@@ -171,6 +247,40 @@ mod tests {
         assert_eq!(problem.evaluate(&[0.9, 0.9, 0.9]), 100_000.0 * 6.0 - 60.0);
         assert_eq!(problem.solution(&[0.9, 0.9, 0.1]), (30, 11, true));
         assert_eq!(problem.solution(&[0.9, 0.9, 0.9]), (60, 18, false));
+    }
+
+    #[test]
+    fn incremental_probe_and_commit_match_full_evaluation() {
+        let profits: Vec<i64> = (0..40).map(|index| 5 + (index * 17) % 23).collect();
+        let weights: Vec<i64> = (0..40).map(|index| 3 + (index * 11) % 19).collect();
+        let problem = Knapsack::new(&profits, &weights, 150);
+        let mut rng = crate::rng::Rng::new(12);
+        let mut keys: Vec<f64> = (0..40).map(|_| rng.f64()).collect();
+        let mut state = problem.incremental(&keys).unwrap();
+        for _ in 0..2_000 {
+            let count = 1 + rng.below(3);
+            let mut changes: Vec<(usize, f64)> = Vec::new();
+            for _ in 0..count {
+                let index = rng.below(40);
+                if changes.iter().all(|change| change.0 != index) {
+                    changes.push((index, rng.f64()));
+                }
+            }
+            let mut moved = keys.clone();
+            for &(index, value) in &changes {
+                moved[index] = value;
+            }
+            let expected = problem.evaluate(&moved);
+            assert_eq!(state.probe(&keys, &changes), expected);
+            if rng.f64() < 0.5 {
+                state.commit(&keys, &changes);
+                keys = moved;
+                let mut fresh = problem.incremental(&keys).unwrap();
+                fresh.reset(&keys);
+                assert_eq!(fresh.probe(&keys, &[]), problem.evaluate(&keys));
+                assert_eq!(state.probe(&keys, &[]), problem.evaluate(&keys));
+            }
+        }
     }
 
     #[test]

@@ -26,7 +26,7 @@
 //! - Input: keys, their cost, a strategy (1 or 2), `Search`, `Pool` and `Rng`.
 //! - Output: improved keys in place and their cost.
 
-use crate::operators::NelderMead;
+use crate::operators::{NelderMead, PoolPolicy};
 use crate::pool::Pool;
 use crate::rng::Rng;
 use crate::search::{Search, Stop};
@@ -56,10 +56,20 @@ pub struct LocalSearch {
 }
 
 impl LocalSearch {
-    /// Creates an engine with empty buffers.
+    /// Creates an engine with empty buffers and random pool vertices.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Creates an engine whose Nelder-Mead uses the given pool vertex policy.
+    #[must_use]
+    pub fn with_policy(policy: PoolPolicy) -> Self {
+        Self {
+            order: Vec::new(),
+            candidate: Vec::new(),
+            nelder_mead: NelderMead::new(policy),
+        }
     }
 
     /// Runs Nelder-Mead from `keys`.
@@ -94,38 +104,26 @@ impl LocalSearch {
             return Ok(cost);
         }
         self.shuffled_order(n, rng);
+        search.sync(keys);
         let mut best = cost;
-        if strategy == 1 {
-            for i in 0..n - 1 {
-                for j in i + 1..n {
-                    let (a, b) = (self.order[i], self.order[j]);
-                    keys.swap(a, b);
-                    let value = search.eval(keys)?;
-                    if value < best {
-                        best = value;
-                    } else {
-                        keys.swap(a, b);
-                    }
-                }
-            }
-            return Ok(best);
-        }
         let mut chosen = None;
         for i in 0..n - 1 {
             for j in i + 1..n {
                 let (a, b) = (self.order[i], self.order[j]);
-                keys.swap(a, b);
-                let value = search.eval(keys);
-                keys.swap(a, b);
-                let value = value?;
+                let changes = [(a, keys[b]), (b, keys[a])];
+                let value = search.probe(keys, &changes)?;
                 if value < best {
                     best = value;
-                    chosen = Some((a, b));
+                    if strategy == 1 {
+                        search.commit(keys, &changes);
+                    } else {
+                        chosen = Some(changes);
+                    }
                 }
             }
         }
-        if let Some((a, b)) = chosen {
-            keys.swap(a, b);
+        if let Some(changes) = chosen {
+            search.commit(keys, &changes);
         }
         Ok(best)
     }
@@ -144,32 +142,24 @@ impl LocalSearch {
             return Ok(cost);
         }
         self.shuffled_order(n, rng);
+        search.sync(keys);
         let mut best = cost;
         let mut chosen = None;
         for position in 0..n {
             let index = self.order[position];
-            let original = keys[index];
-            keys[index] = mirrored(original);
-            let value = search.eval(keys);
-            let flipped = keys[index];
-            if strategy == 1 {
-                let value = value?;
-                if value < best {
-                    best = value;
+            let changes = [(index, mirrored(keys[index]))];
+            let value = search.probe(keys, &changes)?;
+            if value < best {
+                best = value;
+                if strategy == 1 {
+                    search.commit(keys, &changes);
                 } else {
-                    keys[index] = original;
-                }
-            } else {
-                keys[index] = original;
-                let value = value?;
-                if value < best {
-                    best = value;
-                    chosen = Some((index, flipped));
+                    chosen = Some(changes);
                 }
             }
         }
-        if let Some((index, value)) = chosen {
-            keys[index] = value;
+        if let Some(changes) = chosen {
+            search.commit(keys, &changes);
         }
         Ok(best)
     }
@@ -188,36 +178,27 @@ impl LocalSearch {
             return Ok(cost);
         }
         self.shuffled_order(n, rng);
+        search.sync(keys);
         let mut best = cost;
         let mut chosen = None;
         for position in 0..n {
             let index = self.order[position];
-            let mut base = keys[index];
             for interval in 0..FAREY.len() - 1 {
                 let value = rng.uniform(FAREY[interval], FAREY[interval + 1]);
-                keys[index] = value;
-                let result = search.eval(keys);
-                if strategy == 1 {
-                    let result = result?;
-                    if result < best {
-                        best = result;
-                        base = value;
+                let changes = [(index, value)];
+                let result = search.probe(keys, &changes)?;
+                if result < best {
+                    best = result;
+                    if strategy == 1 {
+                        search.commit(keys, &changes);
                     } else {
-                        keys[index] = base;
-                    }
-                } else {
-                    keys[index] = base;
-                    let result = result?;
-                    if result < best {
-                        best = result;
-                        chosen = Some((index, value));
+                        chosen = Some(changes);
                     }
                 }
             }
-            keys[index] = base;
         }
-        if let Some((index, value)) = chosen {
-            keys[index] = value;
+        if let Some(changes) = chosen {
+            search.commit(keys, &changes);
         }
         Ok(best)
     }
@@ -332,6 +313,42 @@ mod tests {
             run_sweep(strategy, |local, keys, cost, strategy, search, rng| {
                 local.farey(keys, cost, strategy, search, rng)
             });
+        }
+    }
+
+    #[test]
+    fn incremental_and_plain_evaluation_follow_identical_trajectories() {
+        struct Plain(Knapsack);
+        impl Problem for Plain {
+            fn dimension(&self) -> usize {
+                self.0.dimension()
+            }
+            fn evaluate(&self, keys: &[f64]) -> f64 {
+                self.0.evaluate(keys)
+            }
+        }
+        let fast = problem();
+        let slow = Plain(fast.clone());
+        let cancel = AtomicBool::new(false);
+        for strategy in [1, 2] {
+            let mut outcomes = Vec::new();
+            for incremental in [true, false] {
+                let target: &dyn Problem = if incremental { &fast } else { &slow };
+                let now = Instant::now();
+                let mut search =
+                    Search::new(target, &cancel, now, now + Duration::from_secs(30), 0);
+                let pool = Pool::new(5);
+                let mut rng = Rng::new(21);
+                let mut local = LocalSearch::new();
+                let mut keys = vec![0.0; 30];
+                random_keys(&mut keys, &mut rng);
+                let start = search.eval(&keys).unwrap();
+                let cost = local
+                    .rvnd(&mut keys, start, strategy, &mut search, &pool, &mut rng)
+                    .unwrap();
+                outcomes.push((keys, cost, search.evaluations()));
+            }
+            assert_eq!(outcomes[0], outcomes[1], "strategy {strategy}");
         }
     }
 

@@ -163,56 +163,58 @@ pub fn run_portfolio(
                 let (pool, cancel, failure) = (&pool, &cancel, &failure);
                 scope.spawn(move || {
                     let mut reports = Vec::with_capacity(assigned.len());
-                    for (position, &index) in assigned.iter().enumerate() {
-                        let remaining_searches = (assigned.len() - position) as u32;
-                        let now = Instant::now();
-                        let remaining = deadline.saturating_duration_since(now);
-                        let share = remaining / remaining_searches;
-                        let search_started = now;
-                        let search_deadline = now + share;
-                        let seed = derive_seed(config.seed, index as u64);
-                        let mut rng = Rng::new(seed);
-                        let mut search = Search::new(
-                            problem,
-                            cancel,
-                            search_started,
-                            search_deadline,
-                            config.history_limit,
-                        );
-                        let spec = &specs[index];
-                        let mut context = Context {
-                            search: &mut search,
-                            pool,
-                            rng: &mut rng,
-                            source: index,
-                            strategy: config.ls_strategy,
-                        };
-                        let stop = match spec.run(&mut context) {
-                            Err(stop) => stop,
-                            Ok(()) => Stop::TimeLimit,
-                        };
-                        if stop == Stop::InvalidCost {
-                            failure
-                                .lock()
-                                .expect("failure lock poisoned")
-                                .get_or_insert(spec.algorithm.name());
-                            cancel.store(true, Ordering::Relaxed);
+                    problem.with_thread_context(&mut || {
+                        for (position, &index) in assigned.iter().enumerate() {
+                            let remaining_searches = (assigned.len() - position) as u32;
+                            let now = Instant::now();
+                            let remaining = deadline.saturating_duration_since(now);
+                            let share = remaining / remaining_searches;
+                            let search_started = now;
+                            let search_deadline = now + share;
+                            let seed = derive_seed(config.seed, index as u64);
+                            let mut rng = Rng::new(seed);
+                            let mut search = Search::new(
+                                problem,
+                                cancel,
+                                search_started,
+                                search_deadline,
+                                config.history_limit,
+                            );
+                            let spec = &specs[index];
+                            let mut context = Context {
+                                search: &mut search,
+                                pool,
+                                rng: &mut rng,
+                                source: index,
+                                strategy: config.ls_strategy,
+                            };
+                            let stop = match spec.run(&mut context) {
+                                Err(stop) => stop,
+                                Ok(()) => Stop::TimeLimit,
+                            };
+                            if stop == Stop::InvalidCost {
+                                failure
+                                    .lock()
+                                    .expect("failure lock poisoned")
+                                    .get_or_insert(spec.algorithm.name());
+                                cancel.store(true, Ordering::Relaxed);
+                            }
+                            search.finish_history();
+                            reports.push(SearchReport {
+                                index,
+                                algorithm: spec.algorithm.name(),
+                                seed,
+                                evaluations: search.evaluations(),
+                                elapsed: search.elapsed(),
+                                budget: search.budget(),
+                                stop,
+                                best_cost: search.best_cost(),
+                                best_keys: search.best_keys().to_vec(),
+                                history: search.history().to_vec(),
+                                history_observations: search.history_observations(),
+                            });
                         }
-                        search.finish_history();
-                        reports.push(SearchReport {
-                            index,
-                            algorithm: spec.algorithm.name(),
-                            seed,
-                            evaluations: search.evaluations(),
-                            elapsed: search.elapsed(),
-                            budget: search.budget(),
-                            stop,
-                            best_cost: search.best_cost(),
-                            best_keys: search.best_keys().to_vec(),
-                            history: search.history().to_vec(),
-                            history_observations: search.history_observations(),
-                        });
-                    }
+                    });
                     reports
                 })
             })

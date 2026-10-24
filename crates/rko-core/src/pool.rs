@@ -140,6 +140,21 @@ impl Pool {
         Some((entries[a].cost, entries[b].cost))
     }
 
+    /// Copies the two best entries into the supplied buffers.
+    ///
+    /// Returns their costs, or `None` when fewer than two entries exist.
+    pub fn best_pair(&self, first: &mut Vec<f64>, second: &mut Vec<f64>) -> Option<(f64, f64)> {
+        let entries = self.entries.read().expect("pool lock poisoned");
+        if entries.len() < 2 {
+            return None;
+        }
+        first.clear();
+        first.extend_from_slice(&entries[0].keys);
+        second.clear();
+        second.extend_from_slice(&entries[1].keys);
+        Some((entries[0].cost, entries[1].cost))
+    }
+
     /// Returns clones of the top `limit` entries.
     #[must_use]
     pub fn top(&self, limit: usize) -> Vec<Entry> {

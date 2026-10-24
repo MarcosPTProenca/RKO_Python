@@ -121,24 +121,36 @@ const XE: usize = 5;
 const XC: usize = 6;
 const BEST: usize = 7;
 
+/// How Nelder-Mead picks its two pool vertices.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PoolPolicy {
+    /// Two distinct random entries; only points derived from the incumbent can win.
+    #[default]
+    Random,
+    /// The two best entries, which may themselves be returned when they beat the incumbent.
+    Elite,
+}
+
 /// Reusable Nelder-Mead local search over random keys.
 #[derive(Clone, Debug)]
 pub struct NelderMead {
     points: [Point; 8],
+    policy: PoolPolicy,
 }
 
 impl Default for NelderMead {
     fn default() -> Self {
-        Self::new()
+        Self::new(PoolPolicy::Random)
     }
 }
 
 impl NelderMead {
     /// Creates a searcher with an empty arena that grows on first use.
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(policy: PoolPolicy) -> Self {
         Self {
             points: Default::default(),
+            policy,
         }
     }
 
@@ -211,7 +223,12 @@ impl NelderMead {
         self.points[BEST].copy_from(keys, cost);
         let (head, tail) = self.points.split_at_mut(X3);
         let (second, third) = (&mut head[X2], &mut tail[0]);
-        match pool.sample_pair(rng, &mut second.keys, &mut third.keys) {
+        let sampled = if self.policy == PoolPolicy::Elite {
+            pool.best_pair(&mut second.keys, &mut third.keys)
+        } else {
+            pool.sample_pair(rng, &mut second.keys, &mut third.keys)
+        };
+        match sampled {
             Some((second_cost, third_cost)) => {
                 second.cost = second_cost;
                 third.cost = third_cost;
@@ -224,10 +241,18 @@ impl NelderMead {
                 }
             }
         }
+        if self.policy == PoolPolicy::Elite {
+            for slot in [X2, X3] {
+                if self.points[slot].cost < self.points[BEST].cost {
+                    let (arena, best) = self.points.split_at_mut(BEST);
+                    best[0].copy_from(&arena[slot].keys, arena[slot].cost);
+                }
+            }
+        }
         self.sort_simplex();
 
         let mut improved = false;
-        let mut improved_origin = false;
+        let mut improved_origin = self.points[BEST].cost < origin_cost;
         self.make(X1, X2, X0, false, rng);
         self.evaluate(X0, search, &mut improved, &mut improved_origin)?;
 
@@ -357,7 +382,7 @@ mod tests {
         let mut keys = vec![0.0; 60];
         random_keys(&mut keys, &mut rng);
         let start = search.eval(&keys).unwrap();
-        let mut searcher = NelderMead::new();
+        let mut searcher = NelderMead::default();
         for _ in 0..20 {
             let before = problem.evaluate(&keys);
             let after = searcher

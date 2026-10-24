@@ -24,7 +24,7 @@
 //! - Output: `Result<(), Stop>`; the incumbent and pool carry the result.
 
 use super::{Context, Spec};
-use crate::operators::{NelderMead, random_keys, shake};
+use crate::operators::{NelderMead, PoolPolicy, random_keys, shake};
 use crate::qlearning::QLearning;
 use crate::search::Stop;
 
@@ -75,7 +75,7 @@ pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
     let mut best_cost = current_cost;
     context.pool.insert(best_cost, &keys, context.source);
 
-    let mut searcher = NelderMead::new();
+    let mut searcher = NelderMead::new(PoolPolicy::Elite);
     let mut reannealing = false;
     loop {
         let mut temperature = if reannealing {

@@ -93,7 +93,7 @@ pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
         .pool
         .insert(best_cost, current.ranked(0), context.source);
 
-    let mut searcher = NelderMead::new();
+    let mut searcher = NelderMead::default();
     let mut action = 0;
     let mut schedule = None;
     loop {

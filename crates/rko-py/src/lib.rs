@@ -57,14 +57,18 @@ impl KnapsackProblem {
 
     fn evaluate(&self, keys: Vec<f64>) -> PyResult<f64> {
         if keys.len() != self.inner.dimension() {
-            return Err(PyValueError::new_err("keys length must match the item count"));
+            return Err(PyValueError::new_err(
+                "keys length must match the item count",
+            ));
         }
         Ok(self.inner.evaluate(&keys))
     }
 
     fn solution(&self, keys: Vec<f64>) -> PyResult<(i64, i64, bool)> {
         if keys.len() != self.inner.dimension() {
-            return Err(PyValueError::new_err("keys length must match the item count"));
+            return Err(PyValueError::new_err(
+                "keys length must match the item count",
+            ));
         }
         Ok(self.inner.solution(&keys))
     }
@@ -134,9 +138,15 @@ impl Problem for CallbackAdapter<'_> {
     fn check_stride(&self) -> u32 {
         1
     }
+
+    fn with_thread_context(&self, body: &mut dyn FnMut()) {
+        Python::attach(|_| body());
+    }
 }
 
-fn parse_specs(specs: Vec<(String, Vec<f64>, Vec<Vec<f64>>, bool)>) -> PyResult<Vec<Spec>> {
+type SpecTuple = (String, Vec<f64>, Vec<Vec<f64>>, bool);
+
+fn parse_specs(specs: Vec<SpecTuple>) -> PyResult<Vec<Spec>> {
     specs
         .into_iter()
         .map(|(name, offline, states, adaptive)| {
@@ -196,7 +206,7 @@ fn engine_error(error: &EngineError) -> PyErr {
 fn run<'py>(
     py: Python<'py>,
     problem: &Bound<'py, PyAny>,
-    specs: Vec<(String, Vec<f64>, Vec<Vec<f64>>, bool)>,
+    specs: Vec<SpecTuple>,
     time_limit: f64,
     seed: u64,
     pool_size: usize,
