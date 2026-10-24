@@ -70,6 +70,15 @@ established qualification. A technically successful analysis with
 `qualification_status=not_established` must not be called an acceptance pass.
 No experiment result authorizes a release or changes Python defaults.
 
+`native-timed-confirmation-reference.json` is the explicitly identified completed
+measurement from run40109493113/source667001b, not an agent plan or rolling CI
+summary. It retains all24groups and frozen criteria:720independentpairs, time per
+evaluation and sampledPSS gates passed24/24, strictzero-loss quality established
+18/24. Overall qualification is **not_established**. Do not remove the six
+inconclusive groups, overwrite this reference with a more favorable CI repeat or
+pool repeated seeds. Full raw evidence and source identity remain in that run's
+artifacts; public results describe this scope only.
+
 ## Source-identified fixed-work baseline
 
 ```bash

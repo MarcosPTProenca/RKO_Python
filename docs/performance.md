@@ -205,6 +205,33 @@ confirmation. No source changes are permitted during collection. A successful
 `not_established` is preserved rather than converted to a technical CI failure or
 misrepresented as proof of harm. Neither outcome authorizes publication.
 
+#### Completed independent confirmation
+
+[Run 40109493113](https://github.com/MarcosPTProenca/RKO/actions/runs/40109493113),
+frozen at source `667001be5983df88fd48d32e41091b5faa189d3a`, completed all **720
+independent pairs**. Local reanalysis reproduced the hosted report exactly. The
+[source-identified reference measurement](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/native-timed-confirmation-reference.json)
+retains every group, simultaneous interval and gate, including negative findings.
+
+- Time-per-evaluation gates passed in all 24 groups. For 500 keys, median complete
+  process time per completed evaluation fell **19.12–30.99%**. This is not shorter
+  fixed-budget solver latency.
+- The protected 20-key upper slowdown bound was **3.403%**, below 5%.
+- Sampled process-tree PSS gates passed in all 24 groups; the largest upper growth
+  bound was **3.039%**, below 10%. This is not an exact memory high-water mark.
+- Strict zero-loss quality was established in **18/24 groups**, including 11/12
+  large-input groups. It was **not established** for the 20-key object callback in
+  process/fixed, process/adaptive, serial/adaptive, thread/fixed and thread/adaptive,
+  or the 500-key object callback in serial/adaptive. These intervals crossed zero;
+  none established quality loss. Nonpositive observed medians do not remove this
+  uncertainty.
+
+**Global qualification remains `not_established`.** Criteria and collected sample
+counts were not changed after viewing results, and no additional sampling was
+performed just to obtain a pass. The reporting workflow completed successfully
+because collection/analysis were valid, not because all acceptance gates passed.
+Python remains the default and native use remains an explicit experimental opt-in.
+
 Run `uv run --locked python tools/validate_native_package.py` on a machine with the
 native build prerequisites to check pure/native wheels and sdists, default and
 explicit activation, full native tests, managed-search candidate-prefix replay and
