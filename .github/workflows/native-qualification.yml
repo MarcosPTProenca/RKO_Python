@@ -2,12 +2,20 @@ name: Native qualification
 
 on:
   workflow_dispatch:
+    inputs:
+      study:
+        description: Frozen screening or independent thirty-seed confirmation
+        type: choice
+        options: [screen, confirmation]
+        default: screen
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - '.github/workflows/native-qualification.yml'
       - 'tools/*native*'
       - 'tools/smoke_portfolio.py'
       - 'benchmarks/native_portfolio.py'
+      - 'benchmarks/native_confirmation.py'
       - 'native/**'
       - 'src/rko/**'
       - 'setup.py'
@@ -70,15 +78,16 @@ jobs:
 
   timed-screen:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: ${{ (inputs.study == 'confirmation' || contains(github.event.pull_request.labels.*.name, 'native-confirmation')) && 6 || 2 }}
       matrix:
         backend: [serial, thread, process]
         adaptation: [fixed, adaptive]
     env:
-      UV_PYTHON: '3.14'
+      UV_PYTHON: '3.14.9'
+      STUDY: ${{ (inputs.study == 'confirmation' || contains(github.event.pull_request.labels.*.name, 'native-confirmation')) && 'confirmation' || 'screen' }}
       RKO_BUILD_NATIVE: '0'
       RKO_USE_NATIVE: '0'
       OPENBLAS_NUM_THREADS: '1'
@@ -92,26 +101,80 @@ jobs:
         shell: bash
         run: |
           RKO_BUILD_NATIVE=1 uv build --wheel --out-dir "$RUNNER_TEMP/mixed"
-          uv venv --python 3.14 "$RUNNER_TEMP/installed"
+          uv venv --python 3.14.9 "$RUNNER_TEMP/installed"
           uv pip install --python "$RUNNER_TEMP/installed/bin/python" "$RUNNER_TEMP"/mixed/*.whl 'numpy==2.4.3'
           mkdir -p "$RUNNER_TEMP/native-host"
           lscpu --json > "$RUNNER_TEMP/native-host/host.json"
           sha256sum "$RUNNER_TEMP"/mixed/*.whl > "$RUNNER_TEMP/native-host/wheel.sha256"
           uv run --locked --no-sync rustc --version --verbose > "$RUNNER_TEMP/native-host/rustc.txt"
       - name: Collect unprofiled source-identified timed quality and process-tree PSS
-        run: >-
-          uv run --locked python -m benchmarks.native_portfolio
-          --python ${{ runner.temp }}/installed/bin/python
-          --output ${{ runner.temp }}/native-screen
-          --backend ${{ matrix.backend }} --adaptation ${{ matrix.adaptation }}
-          --repeats 3 --seconds 2
+        env:
+          BACKEND: ${{ matrix.backend }}
+          ADAPTATION: ${{ matrix.adaptation }}
+        run: |
+          if [ "$STUDY" = confirmation ]; then
+            uv run --locked python -m benchmarks.native_confirmation collect \
+              --python "$RUNNER_TEMP/installed/bin/python" \
+              --output "$RUNNER_TEMP/native-screen" \
+              --backend "$BACKEND" --adaptation "$ADAPTATION"
+          else
+            uv run --locked python -m benchmarks.native_portfolio \
+              --python "$RUNNER_TEMP/installed/bin/python" \
+              --output "$RUNNER_TEMP/native-screen" \
+              --backend "$BACKEND" --adaptation "$ADAPTATION" --repeats 3 --seconds 2
+          fi
       - name: Preserve raw observations including failures
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: native-timed-${{ matrix.backend }}-${{ matrix.adaptation }}
+          name: native-${{ env.STUDY == 'confirmation' && 'confirmation' || 'timed' }}-${{ matrix.backend }}-${{ matrix.adaptation }}
           path: |
             ${{ runner.temp }}/native-screen
             ${{ runner.temp }}/native-host
+          if-no-files-found: error
+          retention-days: 90
+
+  confirmation-report:
+    name: Report confirmation evidence (not release approval)
+    if: inputs.study == 'confirmation' || contains(github.event.pull_request.labels.*.name, 'native-confirmation')
+    needs: timed-screen
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      UV_PYTHON: '3.14.9'
+      RKO_BUILD_NATIVE: '0'
+      RKO_USE_NATIVE: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      - run: uv sync --locked --group dev
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: native-confirmation-*
+          path: ${{ runner.temp }}/confirmation
+      - name: Validate all720 pairs and report every frozen gate
+        run: |
+          uv run --locked python -m benchmarks.native_confirmation analyze "$RUNNER_TEMP/confirmation"
+          uv run --locked python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'confirmation/summary.json').read_text())
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('# Independent timed confirmation\n\n')
+              summary.write(f"Collection validated: {report['collection_validated']}; pairs: {report['pairs']}.\n\n")
+              summary.write(f"**Qualification: {report['qualification_status']}**. No release authorization.\n\n")
+              summary.write('|Backend|Adaptation|Keys|Callback|Quality|Time/evaluation|PSS|\n|---|---|---|---|---|---|---|\n')
+              for group in report['groups']:
+                  gates = group['gates']
+                  values = [group['backend'], group['adaptation'], group['dimension'], group['workload'], *gates.values()]
+                  summary.write('|' + '|'.join(map(str, values)) + '|\n')
+          PY
+      - name: Retain explicit qualification outcome and raw validation identity
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-confirmation-report
+          path: ${{ runner.temp }}/confirmation/summary.json
           if-no-files-found: error
           retention-days: 90

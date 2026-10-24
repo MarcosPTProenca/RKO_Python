@@ -42,6 +42,34 @@ quality, speedup, memory noninferiority or universal C++-parity certification.
 Do not require equal timed trajectories, pool with fixed-work evidence, publish
 only favorable groups or run beside the protected historical experiment.
 
+## Independent thirty-seed timed confirmation
+
+The separate frozen confirmation uses seeds50000–50029, never the three pilot
+seeds or pooled CI repeats. Each backend/adaptation shard runs:
+
+```bash
+uv run --locked python -m benchmarks.native_confirmation collect \
+  --python /path/to/installed/bin/python --output /tmp/new-confirmation-shard \
+  --backend process --adaptation adaptive
+```
+
+Download all six completed shards, check out the exact frozen source revision,
+then validate coverage and compute every predeclared gate:
+
+```bash
+uv run --locked python -m benchmarks.native_confirmation analyze /tmp/all-six-shards
+```
+
+Source/helper/native/workflow hashes, completion markers and thirty distinct seeds
+per group are mandatory. The report includes720pairs/24groups with simultaneous
+paired-median intervals for quality, complete-process time per evaluation and
+sampled process-tree PSS. Exact binomial order statistics and Bonferroni correction
+replace post-hoc margin choice. Quality allows no positive median loss; the
+[full frozen gates](../docs/performance.md) distinguish validated collection from
+established qualification. A technically successful analysis with
+`qualification_status=not_established` must not be called an acceptance pass.
+No experiment result authorizes a release or changes Python defaults.
+
 ## Source-identified fixed-work baseline
 
 ```bash

@@ -208,7 +208,7 @@ class NativePortfolioStudy:
             "dimensions": [20, 500],
             "workloads": ["object", "permutation"],
             "pss_sample_seconds": 0.02,
-            "scope": "descriptive_timed_screen_not_acceptance",
+            "scope": getattr(args, "scope", "descriptive_timed_screen_not_acceptance"),
             "threads": {
                 key: os.environ.get(key)
                 for key in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")

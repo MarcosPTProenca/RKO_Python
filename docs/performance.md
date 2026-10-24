@@ -168,6 +168,43 @@ across groups were 1.008–1.027. These are descriptive pilot medians, not uncer
 bounds, acceptance thresholds, shorter fixed-budget latency or universal gains.
 The original pilot remains the reference; routine CI repetitions are not pooled.
 
+### Independent thirty-seed timed confirmation
+
+`benchmarks.native_confirmation` freezes a separate protocol before collection:
+30 NEW seeds 50000–50029 for every group, the same two-second configured search
+limit and callback/dimension/backend/adaptation matrix, Python 3.14.9, NumPy 2.4.3
+and one BLAS thread. Six complete source-identified shards yield 720 pairs. Source,
+helper, workflow and native build hashes are recorded before the first trial and
+verified after collection; pilot seeds, partial shards, duplicate rows, changed
+artifacts and profiled functional probes cannot enter the report.
+
+Acceptance concerns paired population medians, not every stochastic trajectory:
+
+- Quality: the simultaneous upper bound of native-minus-Python normalized regret
+  must be **at most zero**. No positive loss allowance or epsilon is introduced.
+- 500 keys: median completed-evaluation throughput gain at least 10%, with the
+  upper bound of complete-process time per evaluation below the Python reference.
+- Protected 20 keys: the simultaneous upper bound of time per evaluation at most
+  1.05 times the reference. This is throughput under fixed budgets, not shorter
+  fixed-budget solve latency.
+- Sampled process-tree PSS: simultaneous upper ratio at most 1.10 for every group.
+
+The report uses exact binomial order-statistic median intervals, with Bonferroni
+family coverage of at least 95% across 72 quality/time-per-evaluation/PSS intervals,
+assuming independent seed-pair observations. Discrete ranks and ties make coverage
+conservative. With 30 observations the frozen lower/upper ranks are 6 and 25.
+There is no bootstrap fitting, optional stopping, post-data margin selection or
+pooling of routine CI repeats. All groups and failed gates remain visible.
+
+Opt in through the native workflow's `study=confirmation` dispatch, or the explicit
+`native-confirmation` PR label when the workflow is not yet on the default branch.
+Remove the label after starting so later source edits do not request another long
+confirmation. No source changes are permitted during collection. A successful
+**reporting job** means the experiment was complete and validated; only the JSON
+`qualification_status=established` means all predeclared gates passed. A result
+`not_established` is preserved rather than converted to a technical CI failure or
+misrepresented as proof of harm. Neither outcome authorizes publication.
+
 Run `uv run --locked python tools/validate_native_package.py` on a machine with the
 native build prerequisites to check pure/native wheels and sdists, default and
 explicit activation, full native tests, managed-search candidate-prefix replay and
