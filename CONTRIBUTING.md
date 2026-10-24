@@ -45,6 +45,27 @@ when implementing an algorithm or replacing operators. Update the
 [parameter reference](docs/parameters.md) alongside defaults or validation changes.
 Link new user-facing pages from an existing guide.
 
+## Documentation website
+
+Preview the same maintained Markdown with the built-in MkDocs theme:
+
+```bash
+uv run --locked --only-group docs mkdocs serve
+```
+
+Use the reported `/RKO_Python/` URL. Docs tools are a separate locked group, not
+runtime dependencies. Before a docs change, run:
+
+```bash
+uv run --locked --group docs pytest src/rko/tests/test_documentation_site.py -q
+uv run --locked --only-group docs mkdocs build --strict
+```
+
+Navigation is the publication allowlist; do not add ignored/internal material.
+See [site maintenance and owner setup](docs/documentation-site.md) for file
+boundaries, main-only Pages deployment and recovery. Do not advertise a live URL
+until deployment succeeds, or confuse development docs with a stable release.
+
 ## Bugs and pull requests
 
 For a bug report, include a minimal reader/decoder/objective, failing input or a
