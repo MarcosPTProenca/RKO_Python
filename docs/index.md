@@ -16,6 +16,7 @@ development library, not a claim of release readiness or C++ equivalence.
 - [Optional solution validation](solution-validation.md): final domain checks and report diagnostics.
 - [Interactive reports](reporting.md): offline HTML charts, bounded histories and JSON export.
 - [Static decoder diagrams](decoder-diagrams.md): optional declared logic or supported Python structure, not execution traces.
+- [Private FastAPI/Docker service](service.md): optional authenticated, bounded Linux reference and no-overwrite scaffold.
 - [Documentation website](documentation-site.md): local preview, publication boundaries and Pages setup.
 - [Extension guide](extending.md): replace local search/shaking or implement a new algorithm.
 - [Portfolio and execution API](usage.md): sharing elites, processes, budgets and reproducibility.

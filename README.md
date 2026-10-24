@@ -380,6 +380,7 @@ parameter reference and contributor guidance.
 | Generate offline interactive HTML charts and data-only exports | [Analysis reports](docs/reporting.md) |
 | Optionally check the final domain solution | [Post-solve validation](docs/solution-validation.md) |
 | Optionally illustrate decoder logic without executing it | [Static decoder diagrams](docs/decoder-diagrams.md) |
+| Connect trusted callbacks to a bounded private HTTP container | [Optional FastAPI/Docker service](docs/service.md) |
 | Preview/build the development documentation website | [Documentation website](docs/documentation-site.md) |
 | Configure the solver, callbacks, hyperparameters and results | [Usage and API guide](docs/usage.md) |
 | Choose workers and understand startup/time accounting | [Execution modes](docs/usage.md#execution-modes), [workers](docs/process-workers.md), [startup](docs/driver-initialization.md) |

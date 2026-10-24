@@ -17,6 +17,14 @@ coverage. Library random draws now use privately owned per-search Python/NumPy
 streams in all backends, including seeded threads; standalone operators retain
 their global-RNG behavior. Custom callbacks must own their stochastic state.
 
+The optional [FastAPI/Docker service](service.md) binds trusted installed application
+callbacks to one authenticated single-tenant job at a time. It includes bounded
+Linux process-group supervision, ephemeral TTL/count-limited output, independent
+checks/reports and a no-overwrite reference scaffold. Compose runtime limits are
+required: an image alone does not cap CPU/RAM/PIDs/disk. This is not an untrusted-code
+sandbox, durable distributed queue or hardened public SaaS; native Windows service
+supervision and arbitrary-adapter capacity guarantees are not provided.
+
 ## Outstanding
 
 The [performance target](performance.md) is to match or exceed pinned C++ RKO

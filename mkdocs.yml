@@ -51,6 +51,7 @@ nav:
       - Application data pipeline: problem-adapters.md
       - Optional solution checks: solution-validation.md
       - Static decoder diagrams: decoder-diagrams.md
+      - Private FastAPI/Docker service: service.md
   - Analyze:
       - Interactive reports: reporting.md
       - Performance boundaries: performance.md
