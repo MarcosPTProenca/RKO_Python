@@ -92,6 +92,33 @@ diagnostics, not the decoded solution or source keys. User metrics are not promo
 to validation results. It is a data-only artifact, not a replay script. This version does not provide
 JSON import, automatic experiment aggregation or programmatic PDF conversion.
 
+## Optional static decoder logic
+
+Explicitly request a diagram after solving and attach it separately:
+
+```python
+from rko.explain import DecoderDiagram
+
+diagram = DecoderDiagram.from_callable(decode)
+report = OptimizationReport(result, decoder_diagram=diagram)
+report.write_html("decoder.html")
+```
+
+An author-declared `DecoderDiagram(nodes=..., edges=...)` is an alternative when
+source is missing or domain meaning is more useful than syntax. Both render with
+the already embedded Plotly library and complete plain step/transition tables.
+The report labels origin and disclosure flags, never inspects code automatically,
+and never invokes callbacks to draw the graph. JSON schema 1 gains nullable
+`decoder_diagram`, containing graph metadata rather than complete raw source or
+callback data. No extra renderer dependency or remote service is introduced.
+
+Static graphs are **not execution traces**, proofs of decoder completeness, or
+explanations of the original winning evaluation. The AST subset excludes unsupported
+control and keeps expressions/calls opaque. Default labels omit literals, but code
+identifiers and user labels may still be sensitive. Expression disclosure is
+explicitly opt-in. Read [supported syntax, limits, provenance and privacy](decoder-diagrams.md)
+before inspecting or sharing a decoder. No original-evaluation recorder is included.
+
 ## Bounded, opt-in history
 
 `history_limit=0` (default) disables capture. A positive integer from **2 to 10000**

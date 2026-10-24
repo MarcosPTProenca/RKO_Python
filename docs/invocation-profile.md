@@ -1,6 +1,6 @@
 # Invocation, startup and callback resource probes
 
-The [hosted invocation study](../.github/workflows/invocation-study.yml) reuses
+The [hosted invocation study](https://github.com/MarcosPTProenca/RKO_Python/blob/main/.github/workflows/invocation-study.yml) reuses
 existing probes instead of implementing another solver or profiler. It measures
 public `RKO` calls, preparation and resource observations, complementing the
 [fixed-work diagnostics](performance-baseline.md). It does not establish a runtime
@@ -81,7 +81,7 @@ C++ parity or default-policy superiority follows from a shorter invocation.
 
 [Run 39843491836](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/39843491836)
 passed all registered cases and existing seed/objective/accounting/native-team
-checks. The selected [compact reference](../benchmarks/invocation-profile-reference.json)
+checks. The selected [compact reference](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/invocation-profile-reference.json)
 retains manifests, host summaries, input hashes and aggregation definitions. These
 are descriptive three-observation medians, not acceptance intervals.
 

@@ -92,7 +92,7 @@ wall profiles are not memory measurements.
 
 ## Hosted fixed-work screening
 
-The [baseline study workflow](../.github/workflows/performance-study.yml) runs on
+The [baseline study workflow](https://github.com/MarcosPTProenca/RKO_Python/blob/main/.github/workflows/performance-study.yml) runs on
 isolated hosted Ubuntu runners and retains raw records/host observations for 90
 days. It runs on relevant pull requests and can be dispatched manually after merge.
 Its registered screening matrix is six diagnostic algorithms, three objective
@@ -123,7 +123,7 @@ VMs, so their latency difference is not a controlled hardware-scaling experiment
 
 [Run 39809649686](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/39809649686)
 validated all 216 trials / 108 exact replay pairs / 36 groups. The selected compact
-[reference record](../benchmarks/performance-baseline-reference.json) retains input
+[reference record](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/performance-baseline-reference.json) retains input
 and analysis SHA256 digests, producer revision, run URL and explicit limits. Both
 raw shards had clean Git state and the same source/runtime identity: Python 3.14.9,
 NumPy 2.4.3. The dimension-20 VM reported Intel Xeon Platinum 8573C; dimension 500
@@ -187,6 +187,6 @@ it; the comparison runner itself is independently tested measurement capability.
 This first diagnostic does not yet cover whole public-API invocations, process
 portfolios, realistic expensive callbacks, stage counters, peak process-tree memory,
 real-clock adaptive quality or C++ equal-resource comparisons. Follow the
-[existing startup probes](../benchmarks/README.md#spawn-startup-and-installation-layout)
+[existing startup probes](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md#spawn-startup-and-installation-layout)
 for separate import/spawn evidence. Do not extrapolate a tiny CI smoke to speed,
 quality, a native-backend choice or release readiness.

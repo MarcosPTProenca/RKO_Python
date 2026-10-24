@@ -1,6 +1,6 @@
 # Extend the library
 
-[Documentation index](index.md) · [Contributing](../CONTRIBUTING.md)
+[Documentation index](index.md) · [Contributing](https://github.com/MarcosPTProenca/RKO_Python/blob/main/CONTRIBUTING.md)
 
 ## First choose the smallest extension
 
