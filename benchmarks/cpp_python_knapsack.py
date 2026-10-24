@@ -1209,7 +1209,7 @@ class KnapsackBenchmark:
                 process.returncode,
                 f"Child exited {process.returncode}: {process.stderr[-1200:]}",
             )
-        if command[0] == sys.executable:
+        if command[0] == sys.executable or "RKO_BENCH_RESULT " in process.stdout:
             try:
                 result_line = next(
                     line.removeprefix("RKO_BENCH_RESULT ")
