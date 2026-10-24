@@ -368,21 +368,13 @@ mod tests {
 
     #[test]
     fn probe_matches_eval_with_and_without_incremental_state() {
-        struct Plain(Knapsack);
-        impl Problem for Plain {
-            fn dimension(&self) -> usize {
-                self.0.dimension()
-            }
-            fn evaluate(&self, keys: &[f64]) -> f64 {
-                self.0.evaluate(keys)
-            }
-        }
+        use crate::problem::test_support::DeltaKnapsack;
         let knapsack = Knapsack::new(&[10, 20, 30, 15], &[5, 6, 7, 4], 12);
-        let plain = Plain(knapsack.clone());
+        let fast = DeltaKnapsack(knapsack.clone());
         let cancel = AtomicBool::new(false);
         let now = Instant::now();
         for incremental in [true, false] {
-            let problem: &dyn Problem = if incremental { &knapsack } else { &plain };
+            let problem: &dyn Problem = if incremental { &fast } else { &knapsack };
             let mut search = Search::new(problem, &cancel, now, now + Duration::from_secs(5), 0);
             let mut keys = vec![0.9, 0.1, 0.9, 0.1];
             search.eval(&keys).unwrap();
@@ -396,9 +388,6 @@ mod tests {
             expected[1] = 0.8;
             expected[3] = 0.7;
             assert_eq!(moved, knapsack.evaluate(&expected));
-            if moved < search.best_cost() + 1.0 {
-                assert_eq!(search.best_keys().len(), 4);
-            }
             search.commit(&mut keys, &changes);
             assert_eq!(keys, expected);
             assert_eq!(

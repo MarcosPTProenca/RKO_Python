@@ -67,8 +67,8 @@ The first three arguments are required. The others are keyword-only:
 | `pool_size=None` | Configured elite capacity; not a prebuilt population |
 | `prefill_pool=None` | Configured startup policy; packaged default is off |
 | `params_dir=None` | Custom TOML directory, otherwise installed resources |
-| `backend="process"` | `"process"`, `"thread"` or `"serial"`; not a native-language engine |
-| `n_jobs=None` | Process-only worker cap; default uses discovered CPU capacity |
+| `backend="process"` | `"process"`, `"thread"`, `"serial"` or `"native"` (compiled Rust engine, see [native](native.md)) |
+| `n_jobs=None` | Process or native worker cap; process default uses discovered CPU capacity, native default one thread per algorithm |
 | `random_state=None` | Nonnegative library seed, or fresh assigned seeds |
 | `verbose=False` | Opt-in lifecycle/shared-pool progress to stdout |
 | `history_limit=0` | Opt-in per-search scalar history cap, 2–10000; see [interactive reports](reporting.md) |
@@ -133,6 +133,8 @@ and also accepts `verbose=True`.
   use the [native-thread launch guide](native-threads.md) for numerical callbacks.
 - **`backend="thread"`:** legacy shared-memory execution; arbitrary local
   callbacks work, but CPU-bound Python code is subject to the standard GIL.
+- **`backend="native"`:** the compiled engine; Python callbacks serialize on the
+  interpreter lock, built-in native problems do not. See [native engine](native.md).
 - **`backend="serial"`:** debugging/reference execution with shared elites.
   Each algorithm gets its own time budget, so total search time can approach
   algorithm count times `limit_time`. This is not an equal-wall-time benchmark

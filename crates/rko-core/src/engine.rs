@@ -156,6 +156,9 @@ pub fn run_portfolio(
             "time_limit must be positive and finite".to_owned(),
         ));
     }
+    for spec in specs {
+        spec.validate().map_err(EngineError::Invalid)?;
+    }
     if !(1..=2).contains(&config.ls_strategy) {
         return Err(EngineError::Invalid(
             "ls_strategy must be 1 or 2".to_owned(),
@@ -506,6 +509,30 @@ mod tests {
         let elapsed: f64 = result.reports.iter().map(|report| report.elapsed).sum();
         assert!(elapsed < 0.6, "elapsed {elapsed}");
         assert!(result.reports.iter().all(|report| report.evaluations > 50));
+    }
+
+    #[test]
+    fn rejects_invalid_parameter_vectors_before_running() {
+        let problem = instance();
+        let mut spec = small_spec(Algorithm::Brkga, false);
+        spec.offline = vec![1.0, 0.15, 0.10, 0.7];
+        assert!(matches!(
+            run_portfolio(&problem, &[spec.clone()], &config(None)),
+            Err(EngineError::Invalid(message)) if message.contains("BRKGA")
+        ));
+        spec.offline = vec![20.0, 0.5, 0.5, 0.7];
+        assert!(run_portfolio(&problem, &[spec.clone()], &config(None)).is_err());
+        spec.offline = vec![20.0, 0.1];
+        assert!(run_portfolio(&problem, &[spec], &config(None)).is_err());
+        let mut sa = small_spec(Algorithm::Sa, true);
+        sa.states = vec![vec![10.0, 1e5, 0.9, 0.5, 0.1]];
+        assert!(run_portfolio(&problem, &[sa.clone()], &config(None)).is_err());
+        sa.states.clear();
+        assert!(run_portfolio(&problem, &[sa], &config(None)).is_err());
+        for algorithm in Algorithm::all() {
+            assert!(small_spec(algorithm, false).validate().is_ok());
+            assert!(small_spec(algorithm, true).validate().is_ok());
+        }
     }
 
     #[test]

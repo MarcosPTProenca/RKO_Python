@@ -45,12 +45,17 @@ not prerequisites. See the [complete data-loading example](docs/problem-adapters
   PSO, SA and VNS; the packaged default selects ten algorithms.
 - Serial, thread and process execution with shared elites, owned library RNG
   streams, validated parameters and immutable result metadata.
+- An optional compiled Rust engine (`backend="native"`) that runs the same eleven
+  algorithms and TOML configuration; problems defined natively (such as the built-in
+  Knapsack) run without the interpreter. See [native engine](docs/native.md).
 - Python callbacks for arbitrary problems; **NumPy is the only runtime dependency**.
-  No C++ installation, Rust compiler or agent framework is required.
+  Installing a prebuilt wheel needs no compiler; building from source needs a Rust
+  toolchain. No C++ installation or agent framework is required.
 
 ## Install from source
 
-Requires **Python 3.14+** and [uv](https://docs.astral.sh/uv/).
+Requires **Python 3.14+**, [uv](https://docs.astral.sh/uv/) and a
+[Rust toolchain](https://rustup.rs/) (the native extension is built from source).
 CI currently tests Python 3.14 on Ubuntu and Windows; other combinations are not
 certified by that matrix.
 
@@ -381,15 +386,18 @@ parameter reference and contributor guidance.
 | Configure the solver, callbacks, hyperparameters and results | [Usage and API guide](docs/usage.md) |
 | Choose workers and understand startup/time accounting | [Execution modes](docs/usage.md#execution-modes), [workers](docs/process-workers.md), [startup](docs/driver-initialization.md) |
 | Run from the terminal or avoid WSL setup overhead | [Running guide](docs/running.md) |
-| Understand the C++ target and Rust feasibility | [Performance and native-backend evaluation](docs/performance.md) |
+| Use the compiled engine and native problems | [Native engine](docs/native.md) |
+| Understand the C++ target and native-engine evidence | [Performance and native-backend evaluation](docs/performance.md) |
 | Inspect measurements rather than speed claims | [Benchmarks](benchmarks/README.md), [expanded quality study](docs/prefill-expanded-work.md) |
 | Check algorithm differences and remaining risks | [C++ compatibility](docs/cpp-compatibility.md), [current limitations](docs/status.md) |
 | Develop, test or report an issue | [Contributing](CONTRIBUTING.md) |
 
-`backend` currently selects **process/thread/serial execution**, not a programming
-language. **No Rust engine is implemented.** Prefill remains opt-in: broader IPR
-benefits include regressions, and large-GRASP short-budget wins can be startup-only.
-Neither passing CI nor an isolated kernel speedup establishes C++ parity.
+`backend` selects process, thread or serial **Python** execution, or the compiled
+`"native"` engine. Native results versus pinned C++ and Python are reported with
+their limits in [benchmarks](benchmarks/README.md#native-engine-versus-c-and-python);
+they do not extend to untested problem families, budgets or hardware. Prefill remains
+opt-in: broader IPR benefits include regressions, and large-GRASP short-budget wins
+can be startup-only.
 
 ## Project status and attribution
 

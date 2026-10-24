@@ -154,7 +154,126 @@ pub struct Context<'a, 'b> {
     pub strategy: u8,
 }
 
+impl Algorithm {
+    /// Number of values in an online state vector for this algorithm.
+    #[must_use]
+    pub fn state_len(self) -> usize {
+        match self {
+            Self::Sa => 5,
+            Self::Ils | Self::Vns => 2,
+            Self::Lns | Self::Brkga | Self::BrkgaCs | Self::Pso => 4,
+            Self::Ga | Self::Grasp => 3,
+            Self::Ipr | Self::MultiStart => 0,
+        }
+    }
+
+    fn offline_lens(self) -> &'static [usize] {
+        match self {
+            Self::Sa => &[5],
+            Self::Ils | Self::Vns | Self::Grasp => &[2],
+            Self::Lns | Self::Brkga | Self::Pso => &[4],
+            Self::BrkgaCs => &[4, 5],
+            Self::Ga => &[3],
+            Self::Ipr | Self::MultiStart => &[0],
+        }
+    }
+
+    /// Checks one parameter vector (`online` selects the GRASP axis layout).
+    pub fn validate_values(self, values: &[f64], online: bool) -> Result<(), String> {
+        let label = self.name();
+        let expected = if online {
+            &[self.state_len()][..]
+        } else {
+            self.offline_lens()
+        };
+        if !expected.contains(&values.len()) {
+            return Err(format!(
+                "{label}: expected {expected:?} parameter values, got {}",
+                values.len()
+            ));
+        }
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(format!("{label}: parameters must be finite"));
+        }
+        let unit = |value: f64| (0.0..=1.0).contains(&value);
+        let ok = match self {
+            Self::Sa => {
+                values[0] >= 1.0
+                    && values[1] > 0.0
+                    && values[2] > 0.0
+                    && values[2] < 1.0
+                    && unit(values[3])
+                    && unit(values[4])
+                    && values[3] <= values[4]
+            }
+            Self::Ils => unit(values[0]) && unit(values[1]) && values[0] <= values[1],
+            Self::Vns => values[0] >= 1.0 && values[1] >= 0.0,
+            Self::Lns => {
+                unit(values[0])
+                    && unit(values[1])
+                    && values[0] <= values[1]
+                    && values[2] > 0.0
+                    && values[3] > 0.0
+                    && values[3] < 1.0
+            }
+            Self::Brkga | Self::BrkgaCs => {
+                let population = values[0];
+                let elite = (population * values[1]).floor().max(1.0);
+                let mutants = if self == Self::Brkga {
+                    (population * values[2]).floor()
+                } else {
+                    0.0
+                };
+                population >= 2.0
+                    && unit(values[1])
+                    && unit(values[2])
+                    && unit(values[3])
+                    && elite + mutants < population
+                    && values.get(4).is_none_or(|sigma| unit(*sigma))
+            }
+            Self::Pso => {
+                values[0] >= 1.0 && values[1] >= 0.0 && values[2] >= 0.0 && values[3] >= 0.0
+            }
+            Self::Ga => values[0] >= 3.0 && unit(values[1]) && unit(values[2]),
+            Self::Grasp => {
+                let (start, end) = if online {
+                    (values[1], values[2])
+                } else {
+                    (values[0], values[1])
+                };
+                start > 0.0 && end > 0.0 && end <= start && (!online || unit(values[0]))
+            }
+            Self::Ipr | Self::MultiStart => true,
+        };
+        if ok {
+            Ok(())
+        } else {
+            Err(format!(
+                "{label}: parameter values {values:?} violate the algorithm's constraints"
+            ))
+        }
+    }
+}
+
 impl Spec {
+    /// Validates the offline vector or every online state before a run.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.adaptive && self.algorithm.state_len() > 0 {
+            if self.states.is_empty() {
+                return Err(format!(
+                    "{}: online parameters contain no feasible states",
+                    self.algorithm.name()
+                ));
+            }
+            for state in &self.states {
+                self.algorithm.validate_values(state, true)?;
+            }
+            Ok(())
+        } else {
+            self.algorithm.validate_values(&self.offline, false)
+        }
+    }
+
     /// Runs the configured algorithm until the search budget is exhausted.
     pub fn run(&self, context: &mut Context<'_, '_>) -> Result<(), Stop> {
         match self.algorithm {

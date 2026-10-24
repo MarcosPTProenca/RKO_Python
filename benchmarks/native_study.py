@@ -7,7 +7,7 @@ Objective:
 Technical approach:
 - Reuse the hash-pinned KPLIB instances, exact optima, patched 64-bit C++ build,
   Python worker and independent solution re-scoring from `cpp_python_knapsack`.
-- Add a `rust` implementation that runs the `rko_kp` binary built in release mode,
+- Add a `rust` implementation that runs the `rko_bench` binary built in release mode,
   with the same target telemetry and full-precision returned keys.
 - Summarize per-solver instance-level medians with exact sign tests, Holm correction
   and bootstrap intervals for rust-versus-C++ and rust-versus-Python differences.
@@ -143,7 +143,7 @@ class NativeStudy:
             RuntimeError: If compilation fails.
         """
         build = subprocess.run(
-            ["cargo", "build", "--release", "--locked", "--bin", "rko_kp"],
+            ["cargo", "build", "--release", "--locked", "--bin", "rko_bench"],
             cwd=self.repo_root,
             check=False,
             capture_output=True,
@@ -151,7 +151,7 @@ class NativeStudy:
         )
         if build.returncode != 0:
             raise RuntimeError(f"Native build failed: {build.stderr[-3000:]}")
-        binary = self.repo_root / "target" / "release" / "rko_kp"
+        binary = self.repo_root / "target" / "release" / "rko_bench"
         return binary, hashlib.sha256(binary.read_bytes()).hexdigest()
 
     def _run_rust_trial(

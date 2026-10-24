@@ -1,7 +1,7 @@
-//! Command-line Knapsack runner used for native engine benchmarking.
+//! Command-line benchmark runner for the native engine on built-in problems.
 //!
 //! Objective:
-//! - Run the native portfolio on a Knapsack instance file and print one JSON record,
+//! - Run the native portfolio on a Knapsack or TSP instance file and print one JSON record,
 //!   so the engine can be compared with the C++ reference without a Python host.
 //!
 //! Technical approach:
@@ -18,14 +18,14 @@
 //! - Feasibility and profit are recomputed independently from the returned keys.
 //!
 //! Inputs/Outputs:
-//! - Input: `<instance> <seconds> [--algo A,B] [--grid toml|cpp] [--seed N] [--threads N]
-//!   [--fixed] [--strategy 1|2] [--targets gap:profit,...]`.
+//! - Input: `<instance> <seconds> [--problem kp|tsp|rastrigin] [--algo A,B] [--grid toml|cpp] [--seed N]
+//!   [--threads N] [--fixed] [--prefill] [--strategy 1|2] [--targets gap:profit,...]`.
 //! - Output: an `RKO_BENCH_RESULT` line with full-precision keys, then one summary JSON object;
 //!   first feasible target hits are reported on standard error.
 
 use rko_core::engine::{Config, run_portfolio};
 use rko_core::mh::{Algorithm, Spec};
-use rko_core::problem::{Knapsack, Problem};
+use rko_core::problem::{Knapsack, Problem, Rastrigin, Tsp};
 use rko_core::qlearning::QLearning;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
@@ -215,13 +215,13 @@ fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
     if arguments.len() < 2 {
         eprintln!(
-            "usage: rko_kp <instance> <seconds> [--algo A,B] [--grid toml|cpp] [--seed N] [--threads N] [--fixed]"
+            "usage: rko_bench <instance> <seconds> [--problem kp|tsp|rastrigin] [--algo A,B] [--grid toml|cpp] [--seed N] [--threads N] [--fixed] [--prefill]"
         );
         std::process::exit(2);
     }
     let text = std::fs::read_to_string(&arguments[0]).expect("instance unreadable");
-    let problem = Knapsack::parse(&text).expect("instance malformed");
     let seconds: f64 = arguments[1].parse().expect("seconds must be a number");
+    let mut kind = "kp".to_owned();
     let mut algos = "BRKGA".to_owned();
     let mut flavor = "toml".to_owned();
     let mut seed = 42_u64;
@@ -233,6 +233,10 @@ fn main() {
     let mut index = 2;
     while index < arguments.len() {
         match arguments[index].as_str() {
+            "--problem" => {
+                kind.clone_from(&arguments[index + 1]);
+                index += 1;
+            }
             "--algo" => {
                 algos.clone_from(&arguments[index + 1]);
                 index += 1;
@@ -296,19 +300,34 @@ fn main() {
         ls_strategy: strategy,
         prefill,
     };
-    let floor = targets
-        .iter()
-        .map(|(_, profit)| *profit)
-        .fold(f64::INFINITY, f64::min);
-    let tracked = Tracked {
-        inner: &problem,
-        reported: targets.iter().map(|_| AtomicBool::new(false)).collect(),
-        targets,
-        floor,
-        origin: Instant::now(),
+    let (result, extra) = if kind == "rastrigin" {
+        let function = Rastrigin::parse(&text).expect("instance malformed");
+        let result = run_portfolio(&function, &specs, &config).expect("run failed");
+        (result, String::new())
+    } else if kind == "tsp" {
+        let tsp = Tsp::parse(&text).expect("instance malformed");
+        let result = run_portfolio(&tsp, &specs, &config).expect("run failed");
+        (result, String::new())
+    } else {
+        let problem = Knapsack::parse(&text).expect("instance malformed");
+        let floor = targets
+            .iter()
+            .map(|(_, profit)| *profit)
+            .fold(f64::INFINITY, f64::min);
+        let tracked = Tracked {
+            inner: &problem,
+            reported: targets.iter().map(|_| AtomicBool::new(false)).collect(),
+            targets,
+            floor,
+            origin: Instant::now(),
+        };
+        let result = run_portfolio(&tracked, &specs, &config).expect("run failed");
+        let (profit, weight, ok) = problem.solution(&result.best_keys);
+        (
+            result,
+            format!("\"profit\":{profit},\"weight\":{weight},\"feasible\":{ok},"),
+        )
     };
-    let result = run_portfolio(&tracked, &specs, &config).expect("run failed");
-    let (profit, weight, ok) = problem.solution(&result.best_keys);
     let evaluations: u64 = result.reports.iter().map(|report| report.evaluations).sum();
     let keys: Vec<String> = result
         .best_keys
@@ -321,7 +340,7 @@ fn main() {
         result.best_cost
     );
     println!(
-        "{{\"algorithms\":\"{algos}\",\"seed\":{seed},\"profit\":{profit},\"weight\":{weight},\"feasible\":{ok},\"cost\":{},\"evaluations\":{evaluations},\"elapsed\":{:.6},\"workers\":{}}}",
+        "{{\"algorithms\":\"{algos}\",\"seed\":{seed},{extra}\"cost\":{},\"evaluations\":{evaluations},\"elapsed\":{:.6},\"workers\":{}}}",
         result.best_cost, result.elapsed, result.workers
     );
 }

@@ -25,7 +25,7 @@
 
 use super::{Adapter, Context, Spec};
 use crate::local_search::LocalSearch;
-use crate::operators::random_keys;
+use crate::operators::{PoolPolicy, random_keys};
 use crate::qlearning::QLearning;
 use crate::search::Stop;
 
@@ -33,7 +33,7 @@ use crate::search::Stop;
 pub fn run(spec: &Spec, context: &mut Context<'_, '_>) -> Result<(), Stop> {
     let n = context.search.dimension();
     let mut adapter = Adapter::new(spec, context)?;
-    let mut local = LocalSearch::new();
+    let mut local = LocalSearch::with_policy(PoolPolicy::Elite);
     let size = adapter.params()[0] as usize;
     let mut positions = vec![0.0; n * size];
     let mut velocities = vec![0.0; n * size];

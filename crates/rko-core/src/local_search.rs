@@ -318,17 +318,9 @@ mod tests {
 
     #[test]
     fn incremental_and_plain_evaluation_follow_identical_trajectories() {
-        struct Plain(Knapsack);
-        impl Problem for Plain {
-            fn dimension(&self) -> usize {
-                self.0.dimension()
-            }
-            fn evaluate(&self, keys: &[f64]) -> f64 {
-                self.0.evaluate(keys)
-            }
-        }
-        let fast = problem();
-        let slow = Plain(fast.clone());
+        use crate::problem::test_support::DeltaKnapsack;
+        let slow = problem();
+        let fast = DeltaKnapsack(slow.clone());
         let cancel = AtomicBool::new(false);
         for strategy in [1, 2] {
             let mut outcomes = Vec::new();
@@ -346,6 +338,7 @@ mod tests {
                 let cost = local
                     .rvnd(&mut keys, start, strategy, &mut search, &pool, &mut rng)
                     .unwrap();
+                assert_eq!(search.is_incremental(), incremental);
                 outcomes.push((keys, cost, search.evaluations()));
             }
             assert_eq!(outcomes[0], outcomes[1], "strategy {strategy}");

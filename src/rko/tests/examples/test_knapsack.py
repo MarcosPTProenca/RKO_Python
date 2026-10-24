@@ -28,6 +28,7 @@ from rko.examples.run_kp_cpp_instances import default_output_csv
 from rko.examples.run_kp_cpp_instances import evaluate_solution
 from rko.examples.run_kp_cpp_instances import make_cost
 from rko.examples.run_kp_cpp_instances import read_kp_instance
+from rko.examples.run_kp_cpp_instances import run_single_instance
 
 
 def test_default_instances_ship_inside_the_python_package() -> None:
@@ -109,3 +110,13 @@ def test_objective_rejects_invalid_decisions(tmp_path: Path, solution: list[int]
     path.write_text("3 5 6 1 10 2 12 3", encoding="utf-8")
     with pytest.raises(ValueError):
         make_cost(read_kp_instance(path))(solution)
+
+
+def test_native_backend_reaches_the_known_optimum_with_independent_scoring() -> None:
+    """Solve a bundled instance in the compiled engine and re-score it in Python."""
+    pytest.importorskip("rko._native")
+    result = run_single_instance(
+        default_instances_dir() / "kp10.txt", 0.2, None, backend="native", random_state=3
+    )
+    assert result.feasible and result.profit == 31
+    assert result.cost == -31.0
