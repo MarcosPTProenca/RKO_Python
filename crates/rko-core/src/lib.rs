@@ -23,6 +23,7 @@
 //! - Output: best random keys, their cost and per-search telemetry.
 
 pub mod engine;
+pub mod local_search;
 pub mod mh;
 pub mod operators;
 pub mod pool;

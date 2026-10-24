@@ -19,7 +19,7 @@
 //!
 //! Inputs/Outputs:
 //! - Input: `<instance> <seconds> [--algo A,B] [--grid toml|cpp] [--seed N] [--threads N]
-//!   [--fixed] [--targets gap:profit,...]`.
+//!   [--fixed] [--strategy 1|2] [--targets gap:profit,...]`.
 //! - Output: an `RKO_BENCH_RESULT` line with full-precision keys, then one summary JSON object;
 //!   first feasible target hits are reported on standard error.
 
@@ -61,45 +61,134 @@ impl Problem for Tracked<'_> {
 }
 
 fn grid(algorithm: Algorithm, flavor: &str) -> (Vec<f64>, Vec<Vec<f64>>) {
-    match (algorithm, flavor) {
-        (Algorithm::Brkga, "cpp") => (
+    let cpp = flavor == "cpp";
+    let axes =
+        |values: &[&[f64]]| -> Vec<Vec<f64>> { values.iter().map(|axis| axis.to_vec()).collect() };
+    match algorithm {
+        Algorithm::Brkga if cpp => (
             vec![987.0, 0.20, 0.15, 0.65],
-            vec![
-                vec![300.0, 400.0, 500.0],
-                vec![0.10, 0.15, 0.20],
-                vec![0.10, 0.15, 0.20],
-                vec![0.60, 0.65, 0.70],
-            ],
+            axes(&[
+                &[300.0, 400.0, 500.0],
+                &[0.10, 0.15, 0.20],
+                &[0.10, 0.15, 0.20],
+                &[0.60, 0.65, 0.70],
+            ]),
         ),
-        (Algorithm::Brkga, _) => (
+        Algorithm::Brkga => (
             vec![50.0, 0.15, 0.10, 0.70],
-            vec![
-                vec![30.0, 50.0, 100.0],
-                vec![0.10, 0.15, 0.20],
-                vec![0.05, 0.10, 0.15],
-                vec![0.60, 0.70, 0.80],
-            ],
+            axes(&[
+                &[30.0, 50.0, 100.0],
+                &[0.10, 0.15, 0.20],
+                &[0.05, 0.10, 0.15],
+                &[0.60, 0.70, 0.80],
+            ]),
         ),
-        (Algorithm::Sa, "cpp") => (
+        Algorithm::BrkgaCs if cpp => (
+            vec![987.0, 0.25, 0.03, 0.65, 0.6],
+            axes(&[
+                &[377.0, 610.0, 987.0],
+                &[0.15, 0.20, 0.25],
+                &[0.01, 0.02, 0.03],
+                &[0.60, 0.65, 0.70],
+            ]),
+        ),
+        Algorithm::BrkgaCs => (
+            vec![50.0, 0.15, 0.10, 0.70, 0.6],
+            axes(&[
+                &[30.0, 50.0, 100.0],
+                &[0.10, 0.15, 0.20],
+                &[0.05, 0.10, 0.15],
+                &[0.60, 0.70, 0.80],
+            ]),
+        ),
+        Algorithm::Sa if cpp => (
             vec![1000.0, 1_000_000.0, 0.99, 0.01, 0.05],
-            vec![
-                vec![250.0, 500.0, 750.0],
-                vec![100_000.0],
-                vec![0.97, 0.99, 0.99],
-                vec![0.03, 0.04, 0.05],
-                vec![0.08, 0.09, 0.10],
-            ],
+            axes(&[
+                &[250.0, 500.0, 750.0],
+                &[100_000.0],
+                &[0.97, 0.99, 0.99],
+                &[0.03, 0.04, 0.05],
+                &[0.08, 0.09, 0.10],
+            ]),
         ),
-        (Algorithm::Sa, _) => (
+        Algorithm::Sa => (
             vec![1000.0, 1_000_000.0, 0.99, 0.01, 0.05],
-            vec![
-                vec![250.0, 500.0, 750.0, 1000.0],
-                vec![100_000.0, 500_000.0, 1_000_000.0],
-                vec![0.97, 0.98, 0.99],
-                vec![0.01, 0.03, 0.05],
-                vec![0.05, 0.08, 0.10],
-            ],
+            axes(&[
+                &[250.0, 500.0, 750.0, 1000.0],
+                &[100_000.0, 500_000.0, 1_000_000.0],
+                &[0.97, 0.98, 0.99],
+                &[0.01, 0.03, 0.05],
+                &[0.05, 0.08, 0.10],
+            ]),
         ),
+        Algorithm::Ils if cpp => (
+            vec![0.10, 0.20],
+            axes(&[&[0.05, 0.10, 0.15], &[0.15, 0.20, 0.25]]),
+        ),
+        Algorithm::Ils => (
+            vec![0.10, 0.20],
+            axes(&[&[0.05, 0.10, 0.20, 0.30], &[0.10, 0.20, 0.30, 0.40]]),
+        ),
+        Algorithm::Vns if cpp => (
+            vec![5.0, 0.05],
+            axes(&[&[5.0, 8.0, 10.0], &[0.02, 0.04, 0.05]]),
+        ),
+        Algorithm::Vns => (
+            vec![5.0, 0.05],
+            axes(&[&[3.0, 5.0, 7.0], &[0.05, 0.10, 0.20]]),
+        ),
+        Algorithm::Lns => (
+            vec![0.10, 0.30, 10_000.0, 0.95],
+            axes(&[
+                &[0.05, 0.10, 0.15],
+                &[0.15, 0.20, 0.25],
+                &[1000.0, 10_000.0],
+                &[0.95, 0.96],
+            ]),
+        ),
+        Algorithm::Pso if cpp => (
+            vec![200.0, 2.05, 2.05, 0.73],
+            axes(&[
+                &[100.0, 200.0, 300.0],
+                &[1.95, 2.0, 2.05],
+                &[1.95, 2.0, 2.05],
+                &[0.73, 0.74, 0.75],
+            ]),
+        ),
+        Algorithm::Pso => (
+            vec![30.0, 2.0, 2.0, 0.70],
+            axes(&[
+                &[20.0, 30.0, 50.0],
+                &[1.5, 2.0, 2.5],
+                &[1.5, 2.0, 2.5],
+                &[0.4, 0.7, 0.9],
+            ]),
+        ),
+        Algorithm::Ga if cpp => (
+            vec![400.0, 0.98, 0.005],
+            axes(&[
+                &[200.0, 400.0, 600.0],
+                &[0.90, 0.95, 0.98],
+                &[0.02, 0.03, 0.05],
+            ]),
+        ),
+        Algorithm::Ga => (
+            vec![50.0, 0.80, 0.02],
+            axes(&[
+                &[30.0, 50.0, 100.0],
+                &[0.60, 0.80, 0.90],
+                &[0.01, 0.02, 0.05],
+            ]),
+        ),
+        Algorithm::Grasp => (
+            vec![0.125, 0.00098],
+            axes(&[
+                &[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+                &[0.125, 0.0625],
+                &[0.00098, 0.00049],
+            ]),
+        ),
+        Algorithm::Ipr | Algorithm::MultiStart => (Vec::new(), Vec::new()),
     }
 }
 
@@ -111,7 +200,14 @@ fn feasible(algorithm: Algorithm, state: &[f64]) -> bool {
             let mutants = (population as f64 * state[2]) as usize;
             elite + mutants < population
         }
+        Algorithm::BrkgaCs => {
+            let population = state[0] as usize;
+            ((population as f64 * state[1]) as usize).max(1) < population
+        }
         Algorithm::Sa => state[3] <= state[4],
+        Algorithm::Ils | Algorithm::Lns => state[0] <= state[1],
+        Algorithm::Grasp => state[2] <= state[1],
+        _ => true,
     }
 }
 
@@ -131,6 +227,7 @@ fn main() {
     let mut seed = 42_u64;
     let mut threads = None;
     let mut adaptive = true;
+    let mut strategy = 1_u8;
     let mut targets: Vec<(u32, f64)> = Vec::new();
     let mut index = 2;
     while index < arguments.len() {
@@ -152,6 +249,10 @@ fn main() {
                 index += 1;
             }
             "--fixed" => adaptive = false,
+            "--strategy" => {
+                strategy = arguments[index + 1].parse().expect("strategy");
+                index += 1;
+            }
             "--targets" => {
                 targets = arguments[index + 1]
                     .split(',')
@@ -166,6 +267,11 @@ fn main() {
         }
         index += 1;
     }
+    let algos = if algos == "all" {
+        "SA,ILS,VNS,BRKGA,BRKGA_CS,PSO,GA,LNS,GRASP,IPR".to_owned()
+    } else {
+        algos
+    };
     let specs: Vec<Spec> = algos
         .split(',')
         .map(|name| {
@@ -185,6 +291,7 @@ fn main() {
         pool_size: 10,
         threads,
         history_limit: 0,
+        ls_strategy: strategy,
     };
     let floor = targets
         .iter()

@@ -46,6 +46,8 @@ pub struct Config {
     pub threads: Option<usize>,
     /// Per-search incumbent history cap; zero disables it.
     pub history_limit: usize,
+    /// Local-search sweep strategy: 1 sequential acceptance, 2 fixed-base best.
+    pub ls_strategy: u8,
 }
 
 /// Outcome of one search.
@@ -137,6 +139,11 @@ pub fn run_portfolio(
             "time_limit must be positive and finite".to_owned(),
         ));
     }
+    if !(1..=2).contains(&config.ls_strategy) {
+        return Err(EngineError::Invalid(
+            "ls_strategy must be 1 or 2".to_owned(),
+        ));
+    }
     if config.pool_size == 0 {
         return Err(EngineError::Invalid(
             "pool_size must be positive".to_owned(),
@@ -178,6 +185,7 @@ pub fn run_portfolio(
                             pool,
                             rng: &mut rng,
                             source: index,
+                            strategy: config.ls_strategy,
                         };
                         let stop = match spec.run(&mut context) {
                             Err(stop) => stop,
@@ -304,6 +312,7 @@ mod tests {
             pool_size: 10,
             threads,
             history_limit: 16,
+            ls_strategy: 1,
         }
     }
 
@@ -322,6 +331,115 @@ mod tests {
                 assert!(report.elapsed < 1.0);
                 assert!(!report.history.is_empty());
                 assert_eq!(problem.evaluate(&report.best_keys), report.best_cost);
+            }
+        }
+    }
+
+    fn small_spec(algorithm: Algorithm, adaptive: bool) -> Spec {
+        let (offline, axes): (Vec<f64>, Vec<Vec<f64>>) = match algorithm {
+            Algorithm::Sa => (
+                vec![100.0, 1e5, 0.98, 0.01, 0.05],
+                vec![
+                    vec![50.0, 100.0],
+                    vec![1e5],
+                    vec![0.97, 0.99],
+                    vec![0.01],
+                    vec![0.05],
+                ],
+            ),
+            Algorithm::Ils => (vec![0.1, 0.2], vec![vec![0.05, 0.1], vec![0.1, 0.2]]),
+            Algorithm::Vns => (vec![3.0, 0.05], vec![vec![2.0, 3.0], vec![0.05, 0.1]]),
+            Algorithm::Lns => (
+                vec![0.1, 0.3, 1000.0, 0.95],
+                vec![
+                    vec![0.05, 0.1],
+                    vec![0.15, 0.2],
+                    vec![1000.0],
+                    vec![0.95, 0.96],
+                ],
+            ),
+            Algorithm::Brkga => (
+                vec![30.0, 0.15, 0.10, 0.7],
+                vec![
+                    vec![20.0, 30.0],
+                    vec![0.1, 0.2],
+                    vec![0.05, 0.1],
+                    vec![0.6, 0.7],
+                ],
+            ),
+            Algorithm::BrkgaCs => (
+                vec![30.0, 0.2, 0.05, 0.7, 0.6],
+                vec![
+                    vec![20.0, 30.0],
+                    vec![0.1, 0.2],
+                    vec![0.05, 0.1],
+                    vec![0.6, 0.7],
+                ],
+            ),
+            Algorithm::Pso => (
+                vec![15.0, 2.0, 2.0, 0.7],
+                vec![
+                    vec![10.0, 15.0],
+                    vec![1.5, 2.0],
+                    vec![1.5, 2.0],
+                    vec![0.4, 0.7],
+                ],
+            ),
+            Algorithm::Ga => (
+                vec![20.0, 0.8, 0.02],
+                vec![vec![10.0, 20.0], vec![0.6, 0.8], vec![0.01, 0.02]],
+            ),
+            Algorithm::Grasp => (
+                vec![0.125, 0.01],
+                vec![vec![0.1, 0.5], vec![0.125, 0.0625], vec![0.01, 0.005]],
+            ),
+            Algorithm::Ipr | Algorithm::MultiStart => (Vec::new(), Vec::new()),
+        };
+        Spec {
+            algorithm,
+            offline,
+            states: QLearning::grid_states(&axes, |_| true),
+            adaptive: adaptive && !axes.is_empty(),
+        }
+    }
+
+    #[test]
+    fn every_algorithm_runs_fixed_and_adaptive_with_consistent_results() {
+        let problem = instance();
+        for adaptive in [false, true] {
+            for strategy in [1, 2] {
+                let specs: Vec<Spec> = Algorithm::all()
+                    .into_iter()
+                    .map(|algorithm| small_spec(algorithm, adaptive))
+                    .collect();
+                let mut settings = config(None);
+                settings.time_limit = 0.5;
+                settings.ls_strategy = strategy;
+                let result = run_portfolio(&problem, &specs, &settings).unwrap();
+                assert_eq!(result.reports.len(), 11);
+                assert_eq!(problem.evaluate(&result.best_keys), result.best_cost);
+                for report in &result.reports {
+                    assert!(
+                        report.evaluations > 20,
+                        "{} evaluated too little",
+                        report.algorithm
+                    );
+                    assert_eq!(report.stop, Stop::TimeLimit, "{}", report.algorithm);
+                    assert!(
+                        report.elapsed < 1.5,
+                        "{} overran: {}",
+                        report.algorithm,
+                        report.elapsed
+                    );
+                    assert_eq!(problem.evaluate(&report.best_keys), report.best_cost);
+                    assert!(report.best_keys.iter().all(|key| (0.0..1.0).contains(key)));
+                }
+                let best_known = result
+                    .reports
+                    .iter()
+                    .map(|report| report.best_cost)
+                    .fold(f64::INFINITY, f64::min);
+                assert!(best_known < -400.0, "portfolio cost {best_known}");
             }
         }
     }

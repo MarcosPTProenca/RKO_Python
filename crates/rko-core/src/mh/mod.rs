@@ -9,6 +9,8 @@
 //!   the shared `Pool`, a private `Rng`, and the algorithm's `Spec`.
 //! - Algorithms never check the clock themselves: every candidate goes through
 //!   `Search::eval`, whose `Stop` error unwinds the loop through `?`.
+//! - `Adapter` wraps the optional Q-learning controller so every algorithm adopts
+//!   online parameters with the same begin/finish protocol.
 //!
 //! Flow (pseudocode):
 //! 1. The scheduler builds a `Context` per search.
@@ -24,39 +26,104 @@
 //! - Output: `Result<(), Stop>`; results live in the `Search` incumbent and the pool.
 
 pub mod brkga;
+pub mod brkga_cs;
+pub mod ga;
+pub mod grasp;
+pub mod ils;
+pub mod ipr;
+pub mod lns;
+pub mod multi_start;
+mod population;
+pub mod pso;
 pub mod sa;
+pub mod vns;
 
 use crate::pool::Pool;
+use crate::qlearning::{QLearning, Schedule};
 use crate::rng::Rng;
 use crate::search::{Search, Stop};
 
 /// Algorithms implemented natively.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Algorithm {
-    /// Biased random-key genetic algorithm.
-    Brkga,
     /// Simulated annealing.
     Sa,
+    /// Iterated local search.
+    Ils,
+    /// Variable neighborhood search.
+    Vns,
+    /// Large neighborhood search.
+    Lns,
+    /// Biased random-key genetic algorithm.
+    Brkga,
+    /// BRKGA with community-based elite refinement.
+    BrkgaCs,
+    /// Particle swarm optimization.
+    Pso,
+    /// Genetic algorithm.
+    Ga,
+    /// Greedy randomized adaptive search.
+    Grasp,
+    /// Implicit path relinking.
+    Ipr,
+    /// Random multi-start.
+    MultiStart,
 }
 
 impl Algorithm {
-    /// Canonical display name.
+    /// Canonical display name, matching the Python registry.
     #[must_use]
     pub fn name(self) -> &'static str {
         match self {
-            Self::Brkga => "BRKGA",
             Self::Sa => "SA",
+            Self::Ils => "ILS",
+            Self::Vns => "VNS",
+            Self::Lns => "LNS",
+            Self::Brkga => "BRKGA",
+            Self::BrkgaCs => "BRKGA_CS",
+            Self::Pso => "PSO",
+            Self::Ga => "GA",
+            Self::Grasp => "GRASP",
+            Self::Ipr => "IPR",
+            Self::MultiStart => "MultiStart",
         }
     }
 
-    /// Parses a canonical or underscore-separated algorithm name.
+    /// Parses a name case-insensitively, accepting `-` or `_` separators.
     #[must_use]
     pub fn parse(name: &str) -> Option<Self> {
-        match name.to_ascii_uppercase().as_str() {
-            "BRKGA" => Some(Self::Brkga),
+        match name.to_ascii_uppercase().replace('-', "_").as_str() {
             "SA" => Some(Self::Sa),
+            "ILS" => Some(Self::Ils),
+            "VNS" => Some(Self::Vns),
+            "LNS" => Some(Self::Lns),
+            "BRKGA" => Some(Self::Brkga),
+            "BRKGA_CS" => Some(Self::BrkgaCs),
+            "PSO" => Some(Self::Pso),
+            "GA" => Some(Self::Ga),
+            "GRASP" => Some(Self::Grasp),
+            "IPR" => Some(Self::Ipr),
+            "MULTISTART" | "MULTI_START" => Some(Self::MultiStart),
             _ => None,
         }
+    }
+
+    /// Every implemented algorithm in canonical order.
+    #[must_use]
+    pub fn all() -> [Self; 11] {
+        [
+            Self::Sa,
+            Self::Ils,
+            Self::Vns,
+            Self::Lns,
+            Self::Brkga,
+            Self::BrkgaCs,
+            Self::Pso,
+            Self::Ga,
+            Self::Grasp,
+            Self::Ipr,
+            Self::MultiStart,
+        ]
     }
 }
 
@@ -83,14 +150,91 @@ pub struct Context<'a, 'b> {
     pub rng: &'a mut Rng,
     /// Index recorded as the producer of pool entries.
     pub source: usize,
+    /// Local-search sweep strategy: 1 sequential acceptance, 2 fixed-base best.
+    pub strategy: u8,
 }
 
 impl Spec {
     /// Runs the configured algorithm until the search budget is exhausted.
     pub fn run(&self, context: &mut Context<'_, '_>) -> Result<(), Stop> {
         match self.algorithm {
-            Algorithm::Brkga => brkga::run(self, context),
             Algorithm::Sa => sa::run(self, context),
+            Algorithm::Ils => ils::run(self, context),
+            Algorithm::Vns => vns::run(self, context),
+            Algorithm::Lns => lns::run(self, context),
+            Algorithm::Brkga => brkga::run(self, context),
+            Algorithm::BrkgaCs => brkga_cs::run(self, context),
+            Algorithm::Pso => pso::run(self, context),
+            Algorithm::Ga => ga::run(self, context),
+            Algorithm::Grasp => grasp::run(self, context),
+            Algorithm::Ipr => ipr::run(self, context),
+            Algorithm::MultiStart => multi_start::run(self, context),
+        }
+    }
+}
+
+/// Online parameter selection shared by all adaptive algorithms.
+pub(crate) struct Adapter {
+    controller: Option<QLearning>,
+    state: usize,
+    action: usize,
+    schedule: Option<Schedule>,
+    current: Vec<f64>,
+}
+
+impl Adapter {
+    /// Builds the adapter, choosing a random initial state when adaptive.
+    pub(crate) fn new(spec: &Spec, context: &mut Context<'_, '_>) -> Result<Self, Stop> {
+        if !spec.adaptive {
+            return Ok(Self {
+                controller: None,
+                state: 0,
+                action: 0,
+                schedule: None,
+                current: spec.offline.clone(),
+            });
+        }
+        let controller = QLearning::new(spec.states.clone(), context.search.budget(), context.rng)
+            .map_err(|_| Stop::InvalidCost)?;
+        let state = context.rng.below(controller.len());
+        let current = controller.state(state).parameters.clone();
+        Ok(Self {
+            controller: Some(controller),
+            state,
+            action: 0,
+            schedule: None,
+            current,
+        })
+    }
+
+    /// Current parameter vector.
+    pub(crate) fn params(&self) -> &[f64] {
+        &self.current
+    }
+
+    /// Whether Q-learning is active.
+    pub(crate) fn adaptive(&self) -> bool {
+        self.controller.is_some()
+    }
+
+    /// Chooses the next action and adopts its parameters; no-op when offline.
+    pub(crate) fn begin(&mut self, context: &mut Context<'_, '_>) {
+        if let Some(controller) = self.controller.as_mut() {
+            let timing = controller.schedule(context.search.elapsed());
+            self.action = controller.choose_action(self.state, timing.epsilon, context.rng);
+            let target = controller.state(self.state).actions[self.action];
+            self.current
+                .clone_from(&controller.state(target).parameters);
+            self.schedule = Some(timing);
+        }
+    }
+
+    /// Rewards the last action and moves to its target state; no-op when offline.
+    pub(crate) fn finish(&mut self, reward: f64) {
+        if let (Some(controller), Some(timing)) = (self.controller.as_mut(), self.schedule) {
+            let next = controller.state(self.state).actions[self.action];
+            controller.update(self.state, self.action, reward, timing);
+            self.state = next;
         }
     }
 }

@@ -25,70 +25,12 @@
 //! - Input: `Spec` with axes `[p, pe, pm, rhoe]` and a search `Context`.
 //! - Output: `Result<(), Stop>`; the incumbent and pool carry the result.
 
+use super::population::Population;
 use super::{Context, Spec};
 use crate::operators::{NelderMead, random_keys};
 use crate::qlearning::QLearning;
 use crate::rng::Rng;
 use crate::search::Stop;
-
-struct Population {
-    n: usize,
-    keys: Vec<f64>,
-    costs: Vec<f64>,
-    order: Vec<usize>,
-}
-
-impl Population {
-    fn new(n: usize, size: usize) -> Self {
-        Self {
-            n,
-            keys: vec![0.0; n * size],
-            costs: vec![0.0; size],
-            order: (0..size).collect(),
-        }
-    }
-
-    fn resize(&mut self, size: usize) {
-        self.keys.resize(self.n * size, 0.0);
-        self.costs.resize(size, 0.0);
-    }
-
-    #[inline]
-    fn slot(&self, slot: usize) -> &[f64] {
-        &self.keys[slot * self.n..(slot + 1) * self.n]
-    }
-
-    #[inline]
-    fn slot_mut(&mut self, slot: usize) -> &mut [f64] {
-        &mut self.keys[slot * self.n..(slot + 1) * self.n]
-    }
-
-    #[inline]
-    fn ranked(&self, rank: usize) -> &[f64] {
-        self.slot(self.order[rank])
-    }
-
-    fn rank(&mut self, size: usize) {
-        self.order.clear();
-        self.order.extend(0..size);
-        let costs = &self.costs;
-        self.order
-            .sort_by(|&left, &right| costs[left].total_cmp(&costs[right]));
-    }
-
-    fn compact(&mut self, size: usize, scratch: &mut Vec<f64>) {
-        scratch.clear();
-        scratch.reserve(self.n * size);
-        let mut costs = Vec::with_capacity(size);
-        for rank in 0..size.min(self.order.len()) {
-            scratch.extend_from_slice(self.ranked(rank));
-            costs.push(self.costs[self.order[rank]]);
-        }
-        std::mem::swap(&mut self.keys, scratch);
-        self.costs = costs;
-        self.order = (0..self.costs.len()).collect();
-    }
-}
 
 #[derive(Clone, Copy)]
 struct Parameters {
