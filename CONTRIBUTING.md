@@ -96,10 +96,14 @@ analysis stay ignored under the repository's existing conventions.
 
 ## Before a release
 
-This development line is **not release-ready**. Before tagging/publishing:
+A version in source is **not evidence of publication or stable readiness**.
+The initial controlled candidate is a Python-default prerelease; follow
+[RELEASING](RELEASING.md) and the [migration guide](docs/migration.md).
+Before tagging/publishing each version:
 
-- Resolve imported-code ownership and attribution in [NOTICE](NOTICE); do not
-  replace licenses or claim that a compiler port settles provenance.
+- Preserve the owner's recorded rights/attribution confirmation in [NOTICE](NOTICE)
+  and review new third-party additions. Do not replace licenses, relicense historical
+  artifacts or claim that a compiler port settles provenance.
 - Define supported Python/platform versions and the public API/deprecation policy.
 - Review API/error documentation, stopping limits and current compatibility gaps.
 - Run source, wheel/sdist and clean-install checks for every supported target.

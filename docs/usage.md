@@ -36,7 +36,7 @@ standard hooks directory. If `core.hooksPath` is centrally managed, integrate
 pre-commit with those existing hooks instead; no global Git settings are changed
 by this migration.
 
-The distribution retains the name `rko`; version `0.3.0.dev0` identifies this
+The distribution retains the name `rko`; version `0.3.0a1` identifies this
 unreleased class-based development line, not a PyPI publication. It replaces
 the previous implementation on `main`, whose complete code/history is retained
 at `archive/pre-standalone-migration-2026-10-18`. The new API and Python 3.14

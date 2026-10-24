@@ -112,8 +112,14 @@ not a release guarantee.
   Keep prefill opt-in. Stage-completion instrumentation, sufficient per-algorithm
   budgets, adaptive/real-clock policies, instance families and callback profiling
   are still needed before default/native decisions.
-- **Licensing:** confirm imported-code ownership/terms before release; see
-  [NOTICE](https://github.com/MarcosPTProenca/RKO/blob/main/NOTICE). An existing license file does not settle that review.
+- **Releases/licensing:** the owner confirmed control of PyPI rko and current
+  combined-code distribution rights/attribution; this is recorded in
+  [NOTICE](https://github.com/MarcosPTProenca/RKO/blob/main/NOTICE), not independent legal certification.
+  The initial pipeline is prerelease-only and Python-default; protected publishers,
+  approvals and exact index verification remain necessary before any upload claim.
+  Review new third-party/native additions separately. See
+  [release procedure](https://github.com/MarcosPTProenca/RKO/blob/main/RELEASING.md)
+  and [breaking API migration](migration.md).
 
 The hot blending kernel now batches offspring selection after consuming the same
 Python random draws in the same order. A reproducible 1,000-key serial SA synthetic

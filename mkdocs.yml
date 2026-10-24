@@ -36,6 +36,7 @@ nav:
   - Start:
       - Overview: index.md
       - First solve and installation: getting-started.md
+      - Prerelease migration: migration.md
   - Use:
       - Portfolio usage: usage.md
       - Individual solvers: standalone.md

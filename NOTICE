@@ -14,5 +14,10 @@ Bundled reference fixtures retain their separate upstream MIT license and
 provenance under src/rko/examples/instances/.
 
 This provenance notice does not relicense imported work, assign authorship,
-or establish ownership. The owner must confirm the combined implementation's
-licensing and attribution before a release.
+or establish ownership. On 2026-10-24, the repository owner confirmed publishing
+control of the existing PyPI rko project and approved the current combined Python
+implementation's distribution rights, retained licenses and attribution. This is
+an owner attestation, not an independent legal certification or a relicensing of
+historical releases. Source code retains Apache-2.0; the bundled reference fixtures
+retain MIT. New third-party additions and native binary distributions require
+review before publication. Every release still requires explicit owner approval.
