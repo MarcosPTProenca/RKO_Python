@@ -1,0 +1,117 @@
+name: Native qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/native-qualification.yml'
+      - 'tools/*native*'
+      - 'tools/smoke_portfolio.py'
+      - 'benchmarks/native_portfolio.py'
+      - 'native/**'
+      - 'src/rko/**'
+      - 'setup.py'
+      - 'pyproject.toml'
+      - 'docs/performance.md'
+      - 'benchmarks/README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  portable-wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      UV_PYTHON: '3.14'
+      CIBW_BUILD: 'cp314-manylinux_x86_64 cp314-win_amd64 cp314-macosx_arm64'
+      CIBW_BUILD_FRONTEND: uv
+      CIBW_ENVIRONMENT: 'RKO_BUILD_NATIVE=1 RKO_USE_NATIVE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1'
+      CIBW_ENVIRONMENT_LINUX: 'PATH=$HOME/.cargo/bin:$PATH RKO_BUILD_NATIVE=1 RKO_USE_NATIVE=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1'
+      CIBW_BEFORE_ALL_LINUX: 'curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0 --profile minimal'
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+      CIBW_TEST_COMMAND: 'python -I {project}/tools/smoke_native.py --binary present && python -I {project}/tools/smoke_portfolio.py --matrix --functional'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      - run: uv sync --locked --group dev
+      - name: Build, repair external dependencies and test installed portable wheels
+        run: uv run --locked --with cibuildwheel==4.3.4 python -m cibuildwheel --output-dir wheelhouse
+      - name: Inspect wheel tags, notices and native dependencies
+        run: uv run --locked python tools/inspect_native_wheel.py wheelhouse
+      - name: Retain inspection report only, not unapproved release binaries
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-wheel-inspection-${{ matrix.os }}
+          path: wheelhouse/inspection.json
+          if-no-files-found: error
+          retention-days: 90
+
+  free-threaded-fallback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      UV_PYTHON: '3.14t'
+      RKO_BUILD_NATIVE: '0'
+      RKO_USE_NATIVE: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      - run: uv sync --locked --group dev
+      - name: Pure source tests on actual unsupported native ABI
+        run: uv run --locked pytest src/rko/tests -q
+      - run: uv build --wheel
+      - name: Explicit native request must remain observable Python fallback
+        run: uv run --isolated --no-project --with ./dist/rko-0.3.0.dev0-py3-none-any.whl python -I tools/smoke_native.py --binary absent
+
+  timed-screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        backend: [serial, thread, process]
+        adaptation: [fixed, adaptive]
+    env:
+      UV_PYTHON: '3.14'
+      RKO_BUILD_NATIVE: '0'
+      RKO_USE_NATIVE: '0'
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      - run: uv sync --locked --group dev
+      - name: Build and install one mixed artifact for both runtime variants
+        shell: bash
+        run: |
+          RKO_BUILD_NATIVE=1 uv build --wheel --out-dir "$RUNNER_TEMP/mixed"
+          uv venv --python 3.14 "$RUNNER_TEMP/installed"
+          uv pip install --python "$RUNNER_TEMP/installed/bin/python" "$RUNNER_TEMP"/mixed/*.whl 'numpy==2.4.3'
+          mkdir -p "$RUNNER_TEMP/native-host"
+          lscpu --json > "$RUNNER_TEMP/native-host/host.json"
+          sha256sum "$RUNNER_TEMP"/mixed/*.whl > "$RUNNER_TEMP/native-host/wheel.sha256"
+          uv run --locked --no-sync rustc --version --verbose > "$RUNNER_TEMP/native-host/rustc.txt"
+      - name: Collect unprofiled source-identified timed quality and process-tree PSS
+        run: >-
+          uv run --locked python -m benchmarks.native_portfolio
+          --python ${{ runner.temp }}/installed/bin/python
+          --output ${{ runner.temp }}/native-screen
+          --backend ${{ matrix.backend }} --adaptation ${{ matrix.adaptation }}
+          --repeats 3 --seconds 2
+      - name: Preserve raw observations including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-timed-${{ matrix.backend }}-${{ matrix.adaptation }}
+          path: |
+            ${{ runner.temp }}/native-screen
+            ${{ runner.temp }}/native-host
+          if-no-files-found: error
+          retention-days: 90

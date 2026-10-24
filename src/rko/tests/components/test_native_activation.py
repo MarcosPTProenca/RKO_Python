@@ -24,6 +24,7 @@ import os
 import pytest
 import subprocess
 import sys
+import sysconfig
 
 
 @pytest.mark.parametrize("enabled", [False, True])
@@ -93,7 +94,13 @@ with warnings.catch_warnings(record=True) as observed:
     notices = [w for w in observed if 'RKO_USE_NATIVE' in str(w.message)]
     assert len(notices) == (0 if COMPATIBLE else 1)
 """.replace("__CONTRACT_VALUE__", repr("rko-blending-rng-buffer-v1" if compatible else "wrong"))
-    code = code.replace("COMPATIBLE", str(compatible))
+    admitted = (
+        compatible
+        and sys.implementation.name == "cpython"
+        and sys.version_info[:2] == (3, 14)
+        and not sysconfig.get_config_var("Py_GIL_DISABLED")
+    )
+    code = code.replace("COMPATIBLE", str(admitted))
     env = os.environ.copy()
     env["RKO_USE_NATIVE"] = "1"
     subprocess.run([sys.executable, "-c", code], env=env, check=True, timeout=30)
