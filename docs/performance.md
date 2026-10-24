@@ -84,7 +84,7 @@ the original RNG twice per gene in the original order and never batches, caches 
 rewrites user decoder/objective calls. Native/callback runtime failures propagate;
 only known extension-import/compatibility failures select Python fallback.
 
-The source-identified [720-pair kernel confirmation](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40044712053)
+The source-identified [720-pair kernel confirmation](https://github.com/MarcosPTProenca/RKO/actions/runs/40044712053)
 used 30 fresh seeds per group with unchanged scalar, permutation, object-payload
 and NumPy callbacks. For 500 genes, the research candidate reduced complete serial
 fixed-work invocation medians by 12.5–20.3% across SA/GA/BRKGA. Protected 20-gene and
@@ -92,7 +92,7 @@ single-process peak-RSS bounds passed. Those results identify the kernel and sco
 they are not a claim that arbitrary callbacks, timed adaptive quality, portfolios
 or all platforms achieve the same gains.
 
-The [installed-wheel confirmation](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40063949702)
+The [installed-wheel confirmation](https://github.com/MarcosPTProenca/RKO/actions/runs/40063949702)
 then compared runtime opt-in disabled/enabled in the same installed mixed wheel,
 using 720 new paired invocations and 30 fresh seeds per group. It preserved every
 result/pool/count/RNG fingerprint and observed 13.35–20.95% median complete-invocation
@@ -101,7 +101,7 @@ improvement; conservative family-adjusted upper bounds stayed below 3.32% slowdo
 for protected 20-gene inputs and 2.42% peak-RSS growth (limits 5% and 10%). This remains
 a serial fixed-evaluation scope, not timed/adaptive-quality or C++ parity evidence.
 
-[Packaging CI](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40063461860)
+[Packaging CI](https://github.com/MarcosPTProenca/RKO/actions/runs/40063461860)
 validated normal-GIL CPython 3.14 source builds and installed wheels/sdists on
 Ubuntu, Windows and macOS. It checks real native execution, exact component and
 managed-search candidate prefixes, unavailable-extension fallback, pure builds
@@ -155,8 +155,8 @@ must not be forced to have equal evaluation counts or costs. Do not pool this
 protocol with the earlier 720 fixed-work pairs or reinterpret test durations as
 performance results.
 
-At source `ba46006`, [CI](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40094960238)
-and [extended qualification](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40094960432)
+At source `ba46006`, [CI](https://github.com/MarcosPTProenca/RKO/actions/runs/40094960238)
+and [extended qualification](https://github.com/MarcosPTProenca/RKO/actions/runs/40094960432)
 passed all 15 jobs, including actual free-threaded Python-only tests and repaired
 installed wheels for `manylinux_2_28_x86_64`, `win_amd64` and `macosx_11_0_arm64`.
 All 72 timed pairs completed with matched installed-source/binary identities and
