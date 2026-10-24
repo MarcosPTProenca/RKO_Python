@@ -8,6 +8,7 @@ Technical approach:
 - Snapshot immutable result metadata into a versioned JSON-compatible document.
 - Import optional Plotly only for HTML rendering and embed its JavaScript once.
 - Render independent search histories on explicitly local clocks, never a synthetic portfolio curve.
+- Reuse Plotly for explicitly attached bounded static diagrams and accessible text alternatives.
 - Atomically replace output only after successful serialization/rendering.
 
 Flow (pseudocode):
@@ -17,13 +18,14 @@ Flow (pseudocode):
 4. Write HTML or data-only JSON through an adjacent temporary file and rename.
 
 Important criteria:
-- Reporting never reevaluates objectives, starts browsers or downloads remote assets.
+- Reporting never reevaluates objectives, inspects source, starts browsers or downloads assets.
+- Declared/source-derived diagrams remain static descriptions, never original evaluation traces.
 - Missing histories remain unavailable; compacted histories are explicitly approximate.
 - Portfolio members cooperate and must not be presented as independent competitors.
 - File generation is outside the measured search lifecycle and can raise independently.
 
 Inputs/Outputs:
-- Input: RKOResult, optional title and precomputed domain metric labels/values.
+- Input: RKOResult, optional labels, precomputed diagnostics and a validated static diagram.
 - Output: self-contained HTML or versioned JSON, excluding candidate coordinates.
 """
 
@@ -35,14 +37,22 @@ import math
 import os
 from .assessment import SolutionAssessment
 from .assessment import ValidationReport
+from .explain import DecoderDiagram
 from .solver import RKOResult
+from collections import deque
 from collections.abc import Mapping
 from collections.abc import Sequence
 from dataclasses import asdict
 from html import escape
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from textwrap import wrap
+from types import ModuleType
+from typing import TYPE_CHECKING
 from typing import Any
+
+if TYPE_CHECKING:
+    from plotly.graph_objects import Figure
 
 
 class OptimizationReport:
@@ -63,6 +73,7 @@ class OptimizationReport:
         title: str = "RKO optimization report",
         metrics: Mapping[str, str | int | float | bool] | None = None,
         assessment: SolutionAssessment[object] | None = None,
+        decoder_diagram: DecoderDiagram | None = None,
     ) -> None:
         """Snapshot finite result metadata and optional already-computed domain metrics.
 
@@ -73,6 +84,8 @@ class OptimizationReport:
                 domain values such as feasibility or profit; never verified automatically.
             assessment (SolutionAssessment[object] | None): Optional completed post-run
                 assessment for this result; only diagnostics, not its payload, are exported.
+            decoder_diagram (DecoderDiagram | None): Explicit static graph; reporting never
+                inspects source or executes a callback automatically.
 
         Raises:
             ValueError: If labels/metric types are invalid, numbers are nonfinite,
@@ -89,6 +102,8 @@ class OptimizationReport:
         if assessment is not None:
             if not isinstance(assessment, SolutionAssessment) or assessment.result != result:
                 raise ValueError("Assessment belongs to a different result or has an invalid type.")
+        if decoder_diagram is not None and not isinstance(decoder_diagram, DecoderDiagram):
+            raise ValueError("decoder_diagram must be a validated DecoderDiagram or None.")
         self.title = title
         data = {
             "schema_version": 1,
@@ -113,6 +128,7 @@ class OptimizationReport:
             "initialization": asdict(result.initialization) if result.initialization else None,
             "searches": [asdict(search) for search in result.searches],
             "domain_metrics": domain,
+            "decoder_diagram": decoder_diagram.to_dict() if decoder_diagram is not None else None,
             "assessment": assessment.to_dict()
             if assessment is not None
             else {
@@ -152,11 +168,189 @@ class OptimizationReport:
             f"<tbody>{body}</tbody></table></div>"
         )
 
-    def _charts(self) -> str:
+    @staticmethod
+    def _decoder_figure(go: ModuleType, diagram: dict[str, Any]) -> Figure:
+        """Place a bounded directed graph in simple depth bands using existing Plotly.
+
+        Args:
+            go (ModuleType): Lazily loaded optional Plotly graph objects module.
+            diagram (dict[str, Any]): Previously validated graph snapshot.
+
+        Returns:
+            Figure: Plotly figure with directed transitions and escaped plain labels.
+        """
+        nodes, edges = diagram["nodes"], diagram["edges"]
+        adjacency = {node["id"]: [] for node in nodes}
+        for edge in edges:
+            adjacency[edge["source"]].append(edge["target"])
+        start = next(node["id"] for node in nodes if node["kind"] == "start")
+        depths = {start: 0}
+        pending = deque([start])
+        while pending:
+            current = pending.popleft()
+            for target in adjacency[current]:
+                if target not in depths:
+                    depths[target] = depths[current] + 1
+                    pending.append(target)
+        final_depth = max(depths.values()) + 1
+        for node in nodes:
+            if node["kind"] == "end":
+                depths[node["id"]] = final_depth
+        bands: dict[int, list[str]] = {}
+        for node in nodes:
+            bands.setdefault(depths[node["id"]], []).append(node["id"])
+        positions = {
+            identifier: ((index - (len(band) - 1) / 2) * 2.7, -depth * 1.8)
+            for depth, band in bands.items()
+            for index, identifier in enumerate(band)
+        }
+        figure = go.Figure()
+        for edge in edges:
+            sx, sy = positions[edge["source"]]
+            tx, ty = positions[edge["target"]]
+            if edge["source"] == edge["target"]:
+                route = [(sx, sy), (sx + 0.8, sy + 0.45), (sx + 0.8, sy - 0.45), (tx, ty)]
+            elif ty >= sy:
+                lane = max(sx, tx) + 0.8
+                route = [(sx, sy), (lane, sy), (lane, ty), (tx, ty)]
+            else:
+                route = [(sx, sy), (tx, ty)]
+            figure.add_trace(
+                go.Scatter(
+                    x=[point[0] for point in route],
+                    y=[point[1] for point in route],
+                    mode="lines",
+                    line={"color": "#68778d", "width": 1.5},
+                    hoverinfo="skip",
+                )
+            )
+            figure.add_annotation(
+                x=tx,
+                y=ty,
+                ax=route[-2][0],
+                ay=route[-2][1],
+                xref="x",
+                yref="y",
+                axref="x",
+                ayref="y",
+                text="",
+                showarrow=True,
+                arrowhead=3,
+                arrowcolor="#68778d",
+                arrowwidth=1.5,
+                standoff=18,
+            )
+            if edge["label"]:
+                figure.add_annotation(
+                    x=(route[0][0] + route[1][0]) / 2,
+                    y=(route[0][1] + route[1][1]) / 2 + 0.22,
+                    text=escape(edge["label"]),
+                    showarrow=False,
+                    bgcolor="white",
+                )
+        symbols = {
+            "start": "circle",
+            "end": "circle",
+            "error": "x",
+            "decision": "diamond",
+            "operation": "square",
+            "return": "square",
+        }
+        figure.add_trace(
+            go.Scatter(
+                x=[positions[node["id"]][0] for node in nodes],
+                y=[positions[node["id"]][1] for node in nodes],
+                mode="markers+text",
+                text=[
+                    "<br>".join(escape(part) for part in wrap(node["label"], 28)) for node in nodes
+                ],
+                textposition="bottom center",
+                hovertext=[
+                    escape(f"{node['id']}: {node['label']} ({node['kind']})") for node in nodes
+                ],
+                hoverinfo="text",
+                marker={
+                    "size": 30,
+                    "symbol": [symbols[node["kind"]] for node in nodes],
+                    "color": "#dceafa",
+                    "line": {"color": "#285b8c", "width": 2},
+                },
+            )
+        )
+        figure.update_layout(
+            title=escape(diagram["title"]),
+            showlegend=False,
+            hovermode="closest",
+            height=max(500, min(1800, (max(depths.values()) + 1) * 110)),
+            xaxis={"visible": False},
+            yaxis={"visible": False},
+            margin={"l": 60, "r": 100, "t": 70, "b": 100},
+        )
+        return figure
+
+    def _decoder_section(self, chart: str) -> str:
+        """Render explicit graph provenance with complete accessible text alternatives.
+
+        Args:
+            chart (str): Already-rendered optional diagram figure, not user markup.
+
+        Returns:
+            str: Escaped optional-decoder HTML section, including absence disclosure.
+        """
+        diagram = self._data["decoder_diagram"]
+        if diagram is None:
+            return (
+                '<section id="decoder"><h2>Optional decoder logic</h2>'
+                "<p>No diagram attached. "
+                "Reporting never inspects source automatically.</p></section>"
+            )
+        origin = (
+            "author-declared logic"
+            if diagram["origin"] == "author_declared"
+            else "source-derived structure"
+        )
+        metadata = self._table(
+            ("Diagram field", "Value"),
+            [
+                ("Origin", origin),
+                ("Function", diagram["function_name"]),
+                ("Source SHA-256", diagram["source_sha256"]),
+                ("Expression/literal disclosure opted in", diagram["includes_expressions"]),
+            ],
+        )
+        steps = self._table(
+            ("ID", "Kind", "Plain step", "Source snippet line"),
+            [
+                (node["id"], node["kind"], node["label"], node["source_line"])
+                for node in diagram["nodes"]
+            ],
+        )
+        transitions = self._table(
+            ("From", "To", "Branch"),
+            [(edge["source"], edge["target"], edge["label"]) for edge in diagram["edges"]],
+        )
+        return (
+            '<section id="decoder"><h2>Optional decoder logic</h2>'
+            f'<h3>{escape(diagram["title"])}</h3><p id="decoder-description">'
+            f"{escape(diagram['description'])}</p>{metadata}"
+            '<p class="notice">This is not an execution trace. Declared logic is not checked '
+            "against code. Source structure does not model implicit exceptions, subexpression "
+            "control or called-library internals. Neither explains the original winning evaluation "
+            "or certifies completeness, feasibility or optimality. "
+            "Diagram helpers/rendering do not invoke the decoder/objective. "
+            "Source inspection and rendering are outside solve time; review identifiers/labels "
+            "before sharing. Expression opt-in can disclose literals or business secrets.</p>"
+            f'<div role="img" aria-label="{escape(diagram["title"], quote=True)}" '
+            f'aria-describedby="decoder-description">{chart}</div>'
+            f"<h3>Diagram steps (text alternative)</h3>{steps}"
+            f"<h3>Diagram transitions</h3>{transitions}</section>"
+        )
+
+    def _charts(self) -> tuple[str, str]:
         """Render interactive figures with one inline Plotly bundle and no external assets.
 
         Returns:
-            str: HTML fragments for scalar histories, evaluation counts and time budgets.
+            tuple[str, str]: Analysis fragments and a separate optional decoder chart.
 
         Raises:
             ImportError: If the optional reports dependency is not installed.
@@ -227,6 +421,9 @@ class OptimizationReport:
                 barmode="group",
             )
             figures.append(timing)
+        diagram = self._data["decoder_diagram"]
+        if diagram is not None:
+            figures.append(self._decoder_figure(go, diagram))
         fragments = []
         for index, figure in enumerate(figures):
             figure.update_layout(template="plotly_white", font={"family": "Arial, sans-serif"})
@@ -240,7 +437,9 @@ class OptimizationReport:
                     config={"responsive": True, "displaylogo": False},
                 )
             )
-        return "\n".join(fragments)
+        if diagram is not None:
+            return "\n".join(fragments[:-1]), fragments[-1]
+        return "\n".join(fragments), ""
 
     @staticmethod
     def _write(path: Path, content: str, suffix: str) -> Path:
@@ -384,7 +583,8 @@ class OptimizationReport:
             .replace(">", "\\u003e")
             .replace("&", "\\u0026")
         )
-        charts = self._charts()
+        charts, decoder_chart = self._charts()
+        decoder_section = self._decoder_section(decoder_chart)
         heading = escape(self.title)
         document = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
@@ -397,7 +597,8 @@ th{{background:#f4f5f7}}nav a{{margin-right:16px}}section{{margin-top:32px}}
 @media print{{body{{max-width:none}}nav{{display:none}}.table{{overflow:visible}}}}
 </style></head><body><header><h1>{heading}</h1><p>Single-run observations · minimized objective</p>
 <nav><a href="#summary">Summary</a><a href="#analysis">Charts</a>
-<a href="#validation">Validation</a><a href="#configuration">Configuration</a>
+<a href="#validation">Validation</a><a href="#decoder">Decoder</a>
+<a href="#configuration">Configuration</a>
 <a href="#provenance">Provenance</a></nav></header>
 <p class="notice">No feasibility or optimality certificate is inferred from finite costs.
 Portfolio members cooperate: these are not independent benchmark comparisons.
@@ -423,6 +624,7 @@ Terminal observations retain actual timestamps, including cooperative deadline o
 No exact time-to-target is inferred from compacted curves.</p>{charts}
 <h3>Search accounting</h3>{searches}<p>Session durations can overlap; their sum is not wall time.
 Evaluation counts are not CPU utilization or equivalent work across objectives.</p></section>
+{decoder_section}
 <section id="configuration"><h2>Effective initial search settings</h2>{configuration}
 <h3>Separate shared initialization</h3>{initialization}
 <p>Shared initialization is outside search histories; its result can be better than a search's
