@@ -324,6 +324,15 @@ mod tests {
     use crate::mh::Algorithm;
     use crate::problem::Knapsack;
     use crate::qlearning::QLearning;
+    use std::sync::{Mutex, MutexGuard};
+
+    static SERIAL: Mutex<()> = Mutex::new(());
+
+    fn serial() -> MutexGuard<'static, ()> {
+        SERIAL
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
 
     fn instance() -> Knapsack {
         let profits: Vec<i64> = (0..80).map(|index| 10 + (index * 37) % 91).collect();
@@ -375,6 +384,7 @@ mod tests {
 
     #[test]
     fn portfolio_improves_over_random_and_reports_everything() {
+        let _guard = serial();
         let problem = instance();
         for adaptive in [false, true] {
             let result = run_portfolio(&problem, &specs(adaptive), &config(None)).unwrap();
@@ -462,6 +472,7 @@ mod tests {
 
     #[test]
     fn every_algorithm_runs_fixed_and_adaptive_with_consistent_results() {
+        let _guard = serial();
         let problem = instance();
         for adaptive in [false, true] {
             for strategy in [1, 2] {
@@ -503,6 +514,7 @@ mod tests {
 
     #[test]
     fn single_worker_shares_time_between_searches() {
+        let _guard = serial();
         let problem = instance();
         let result = run_portfolio(&problem, &specs(true), &config(Some(1))).unwrap();
         assert_eq!(result.workers, 1);
@@ -513,6 +525,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_parameter_vectors_before_running() {
+        let _guard = serial();
         let problem = instance();
         let mut spec = small_spec(Algorithm::Brkga, false);
         spec.offline = vec![1.0, 0.15, 0.10, 0.7];
@@ -537,6 +550,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_configuration() {
+        let _guard = serial();
         let problem = instance();
         assert!(run_portfolio(&problem, &[], &config(None)).is_err());
         let mut bad = config(None);
@@ -546,6 +560,7 @@ mod tests {
 
     #[test]
     fn nonfinite_cost_cancels_and_errors() {
+        let _guard = serial();
         struct Broken;
         impl Problem for Broken {
             fn dimension(&self) -> usize {
