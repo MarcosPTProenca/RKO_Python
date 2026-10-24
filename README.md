@@ -345,6 +345,11 @@ by default; compacted curves are labelled approximate. See [interpretation and
 privacy boundaries](docs/reporting.md); automatic PDF export is not included.
 Core optimization still requires only NumPy.
 
+Reports can optionally include an [author-declared or source-derived decoder
+diagram](docs/decoder-diagrams.md), explicitly attached through `decoder_diagram`.
+Source inspection never runs automatically and static structure is not an execution
+trace, a complete explanation or a feasibility/optimality certificate.
+
 ## Run the supplied Knapsack adapter
 
 ```bash
@@ -372,6 +377,7 @@ parameter reference and contributor guidance.
 | Replace operators or implement an algorithm | [Extension guide](docs/extending.md) |
 | Generate offline interactive HTML charts and data-only exports | [Analysis reports](docs/reporting.md) |
 | Optionally check the final domain solution | [Post-solve validation](docs/solution-validation.md) |
+| Optionally illustrate decoder logic without executing it | [Static decoder diagrams](docs/decoder-diagrams.md) |
 | Configure the solver, callbacks, hyperparameters and results | [Usage and API guide](docs/usage.md) |
 | Choose workers and understand startup/time accounting | [Execution modes](docs/usage.md#execution-modes), [workers](docs/process-workers.md), [startup](docs/driver-initialization.md) |
 | Run from the terminal or avoid WSL setup overhead | [Running guide](docs/running.md) |

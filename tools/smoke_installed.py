@@ -40,8 +40,10 @@ from rko.components.adaptive_control.q_learning import QLearningController
 from rko.examples import instance_pipeline
 from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import read_kp_instance
+from rko.explain import DecoderDiagram
 from rko.metaheuristics import SA
 from rko.parameters.loader import default_params_dir
+from rko.reporting import OptimizationReport
 
 
 def decode(keys: np.ndarray) -> np.ndarray:
@@ -244,6 +246,14 @@ def main() -> None:
     assert dict(standalone.searches[0].parameters)["sa_max"] == 100
     assert standalone.algorithms == ("SA",)
     assert standalone.cost == problem.cost(problem.decode(np.asarray(standalone.keys)))
+    diagram = DecoderDiagram.from_callable(problem.decode)
+    assert diagram.origin == "source_derived"
+    assert diagram.function_name == "decode"
+    assert any(node.kind == "decision" for node in diagram.nodes)
+    assert any(node.kind == "error" for node in diagram.nodes)
+    graph_report = OptimizationReport(standalone, decoder_diagram=diagram).to_dict()
+    assert graph_report["decoder_diagram"] == diagram.to_dict()
+    assert "plotly" not in sys.modules
     executable = shutil.which("rko")
     assert executable is not None
     with tempfile.TemporaryDirectory(prefix="rko-installed-cli-") as temporary:

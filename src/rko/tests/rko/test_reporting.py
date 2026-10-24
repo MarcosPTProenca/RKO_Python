@@ -36,6 +36,9 @@ from rko import ValidationCheck
 from rko import ValidationReport
 from rko import assess_result
 from rko.components import SolutionPool
+from rko.explain import DecoderDiagram
+from rko.explain import DiagramEdge
+from rko.explain import DiagramNode
 from rko.metaheuristics import MultiStart
 from rko.metaheuristics.multi_start import MultiStart as MultiStartKernel
 from rko.orchestration.search import SearchSession
@@ -45,6 +48,71 @@ from rko.solver import RKOResult
 from unittest.mock import Mock
 
 HAS_PLOTLY = importlib.util.find_spec("plotly") is not None
+
+
+def test_optional_diagram_is_snapshotted_without_callback_replay() -> None:
+    """Export optional static structure without changing a completed numerical result."""
+    result = RKOResult((0.1,), 1.0, 0.0, "serial", ("SA",), None)
+    diagram = DecoderDiagram.from_source("def decode(keys):\n    return keys\n")
+    report = OptimizationReport(result, decoder_diagram=diagram)
+    assert report.to_dict()["decoder_diagram"] == diagram.to_dict()
+    data = report.to_dict()
+    data["decoder_diagram"]["nodes"][0]["label"] = "changed"
+    assert report.to_dict()["decoder_diagram"]["nodes"][0]["label"] == "Entry"
+    assert result.cost == 1.0
+    assert OptimizationReport(result).to_dict()["decoder_diagram"] is None
+    with pytest.raises(ValueError, match="diagram"):
+        OptimizationReport(result, decoder_diagram={"nodes": []})
+
+
+@pytest.mark.skipif(not HAS_PLOTLY, reason="Install the optional reports extra")
+@pytest.mark.parametrize("source_derived", [False, True])
+def test_diagram_html_is_offline_accessible_and_explicitly_static(
+    source_derived: bool,
+    tmp_path: Path,
+) -> None:
+    """Escape diagram content and retain provenance plus complete text alternatives.
+
+    Args:
+        source_derived (bool): Whether to derive a graph from explicitly supplied source.
+        tmp_path (Path): Isolated HTML output directory.
+    """
+    attack = '</script><img src=x onerror="alert(1)">'
+    if source_derived:
+        diagram = DecoderDiagram.from_source(
+            f"def decode(keys):\n    value = {attack!r}\n    return value\n",
+            title=attack,
+            include_expressions=True,
+        )
+    else:
+        diagram = DecoderDiagram(
+            [
+                DiagramNode("start", attack, "start"),
+                DiagramNode("step", "Capacity check"),
+                DiagramNode("end", "Solution", "end"),
+            ],
+            [
+                DiagramEdge("start", "step", attack),
+                DiagramEdge("step", "step", "repeat"),
+                DiagramEdge("step", "end", "done"),
+            ],
+            title=attack,
+            description=attack,
+        )
+    result = RKOResult((0.1,), 1.0, 0.0, "serial", ("SA",), None)
+    report = OptimizationReport(result, decoder_diagram=diagram)
+    text = report.write_html(tmp_path / "diagram.html").read_text(encoding="utf-8")
+    parser = ReportParser()
+    parser.feed(text)
+    assert not parser.external_scripts
+    assert attack not in text
+    assert text.count("plotly.js v") == 1
+    assert text.count('id="rko-chart-') == 1
+    assert "not an execution trace" in text
+    assert "Diagram steps (text alternative)" in text
+    assert "Diagram transitions" in text
+    assert "source-derived" in text if source_derived else "author-declared" in text
+    assert json.loads(parser.scripts[-1]) == report.to_dict()
 
 
 def decode(keys: np.ndarray) -> np.ndarray:

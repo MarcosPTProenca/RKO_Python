@@ -77,6 +77,12 @@ not a release guarantee.
   callbacks and result/time accounting. Exhaustive operator/API/error documentation
   and a supported-version/deprecation policy still need release review; the
   [contributor checklist](../CONTRIBUTING.md#before-a-release) is not a completed release.
+- **Optional explanations:** [decoder diagrams](decoder-diagrams.md) are bounded
+  author declarations or best-effort static Python structures, never observed
+  decisions. Unsupported control flow fails explicitly. Opaque expressions/calls,
+  implicit exceptions, source availability and simple graph layout limit coverage.
+  Source association, domain completeness, winning-evaluation explanations and
+  comparative interpretability are not verified. No original witness is captured.
 - **Stopping:** active callbacks cannot be interrupted cooperatively, blocked
   threads cannot be safely killed, and standalone operators receive no RKO
   deadline. A first valid evaluation may exceed the requested duration.

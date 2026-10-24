@@ -15,6 +15,7 @@ development library, not a claim of release readiness or C++ equivalence.
 - [Standalone algorithms](standalone.md): all eleven classes, tuning and result metadata.
 - [Optional solution validation](solution-validation.md): final domain checks and report diagnostics.
 - [Interactive reports](reporting.md): offline HTML charts, bounded histories and JSON export.
+- [Static decoder diagrams](decoder-diagrams.md): optional declared logic or supported Python structure, not execution traces.
 - [Extension guide](extending.md): replace local search/shaking or implement a new algorithm.
 - [Portfolio and execution API](usage.md): sharing elites, processes, budgets and reproducibility.
 - [Terminal usage](running.md): the supplied Knapsack adapter and custom TOML files.
