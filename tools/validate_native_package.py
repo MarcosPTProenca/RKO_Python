@@ -170,6 +170,22 @@ class NativePackageValidation:
                 ],
                 native_runtime=True,
             )
+            self.run(
+                [
+                    "uv",
+                    "run",
+                    "--isolated",
+                    "--no-project",
+                    "--with",
+                    str(wheels[0]),
+                    "python",
+                    "-I",
+                    "tools/smoke_portfolio.py",
+                    "--matrix",
+                    "--functional",
+                ],
+                native_runtime=True,
+            )
 
     def validate(self) -> None:
         """Execute pure, native and post-native-pure validation in order.

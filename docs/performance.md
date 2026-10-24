@@ -109,6 +109,48 @@ without usable compilers, and pure builds after native builds. Existing installe
 smokes also cover bounded serial/thread/process solves and fixed/adaptive settings;
 those are functional checks, not comparative quality or portfolio speed studies.
 
+### Extended qualification and result provenance
+
+When native blending is admitted, `dict(result.versions)` includes
+`rko-native-blending: rko-blending-rng-buffer-v1`. Default Python and unavailable
+binary fallback preserve the original three version entries. This describes the
+selected component, not proof that every algorithm or input invoked it.
+
+The separate [native qualification workflow](../.github/workflows/native-qualification.yml)
+builds normal CPython 3.14 wheels through pinned cibuildwheel, with manylinux 2.28
+x86-64, native Windows AMD64 and macOS ARM64 targets. Its default auditwheel,
+delvewheel and delocate repair stages inspect platform dependencies before
+installed replay and timed-portfolio functional checks. Inspection rejects
+unreviewed extra bundled native libraries and altered/missing notices. Only digest
+and inspection reports are uploaded: compiled wheels are not published or retained
+as downloadable release artifacts. Owner licensing/release approval remains open.
+An actual free-threaded Python 3.14 job tests Python-only source/installation and
+observable fallback; the normal-ABI extension is deliberately unsupported there.
+
+`tools/smoke_portfolio.py --matrix --functional` exercises SA/GA/BRKGA portfolios
+with fixed/adaptive parameters, opaque objects/permutations, serial/thread/process
+execution, bounded histories, exact final cost recomputation, seed/accounting
+metadata, pickle and worker cleanup. Functional probes observe real kernel calls
+in participating processes without consuming search streams. These probes must
+never enter acceptance timings.
+
+The maintained [timed screening protocol](../benchmarks/native_portfolio.py) instead
+runs **without profiling or functional kernel probes**, in fresh isolated workers
+using the same installed wheel. It alternates both variants over three preregistered
+seeds per group, two-second budgets, 20/500 dimensions, two callbacks and all six
+backend/adaptation combinations. Raw quality, evaluation counts, complete process
+latency and recursive process-tree sampled PSS are retained. PSS excludes the
+collector, includes manager/tracker helpers, and records incomplete snapshots.
+It is proportional physical memory, not an exact peak. Normalized quality uses
+known fixture objective ranges, not arbitrary epsilon denominators.
+
+This three-seed screen is descriptive only: it does not establish timed quality
+noninferiority, portfolio speed/memory acceptance, universal callback gains or C++
+parity. Timed trajectories may legitimately differ; unlike fixed-work replay, they
+must not be forced to have equal evaluation counts or costs. Do not pool this
+protocol with the earlier 720 fixed-work pairs or reinterpret test durations as
+performance results.
+
 Run `uv run --locked python tools/validate_native_package.py` on a machine with the
 native build prerequisites to check pure/native wheels and sdists, default and
 explicit activation, full native tests, managed-search candidate-prefix replay and

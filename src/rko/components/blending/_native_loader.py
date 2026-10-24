@@ -27,6 +27,8 @@ import sysconfig
 import warnings
 from collections.abc import Callable
 
+BLENDING_CONTRACT = "rko-blending-rng-buffer-v1"
+
 
 def load_blending_kernel() -> Callable[..., None] | None:
     """Load explicit native acceleration or explain a safe Python fallback.
@@ -58,7 +60,7 @@ def load_blending_kernel() -> Callable[..., None] | None:
         else:
             kernel = getattr(module, "blend_buffers_rng", None)
             if (
-                getattr(module, "BLENDING_CONTRACT", None) != "rko-blending-rng-buffer-v1"
+                getattr(module, "BLENDING_CONTRACT", None) != BLENDING_CONTRACT
                 or getattr(module, "BUILD_MODE", None) != "release"
                 or not callable(kernel)
             ):
