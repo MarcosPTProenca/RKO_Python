@@ -40,11 +40,13 @@ from .orchestration.execution import select_best_result
 from .orchestration.factory import build_metaheuristic
 from .orchestration.factory import normalize_hyperparameters
 from .orchestration.initialization import initialize_pool
+from .orchestration.native import NativeRunner
 from .orchestration.processes import run_processes
 from .orchestration.search import SearchSession
 from .orchestration.types import CostFn
 from .orchestration.types import DecoderFn
 from .orchestration.types import Hyperparameters
+from .orchestration.types import NativeProblem
 from .orchestration.types import PoolInitializationMetadata
 from .orchestration.types import RunConfig
 from .orchestration.types import SearchMetadata
@@ -167,8 +169,8 @@ class RKO:
         pool_size (int | None): Shared elite capacity; None uses TOML defaults.
         prefill_pool (bool | None): Opt-in reference-style startup; None uses TOML.
         params_dir (Path | None): Optional parameter directory.
-        backend (str): Process, thread or serial execution.
-        n_jobs (int | None): Positive process-worker limit, excluding the pool manager.
+        backend (str): Process, thread, serial or native (compiled engine) execution.
+        n_jobs (int | None): Positive process or native worker limit, excluding the manager.
         random_state (int | None): Nonnegative per-search seed in every backend.
         verbose (bool): Print lifecycle and attributed shared-pool updates; default False.
         hyperparameters (Hyperparameters | None): Partial named offline scalar overrides.
@@ -188,7 +190,7 @@ class RKO:
         pool_size: int | None = None,
         prefill_pool: bool | None = None,
         params_dir: Path | None = None,
-        backend: Literal["process", "thread", "serial"] = "process",
+        backend: Literal["process", "thread", "serial", "native"] = "process",
         n_jobs: int | None = None,
         random_state: int | None = None,
         verbose: bool = False,
@@ -211,8 +213,11 @@ class RKO:
             prefill_pool (bool | None): Reference startup override; adds a separately
                 accounted cooperative allowance equal to time_limit before fresh searches.
             params_dir (Path | None): Optional parameter TOML directory.
-            backend (Literal): Process, legacy thread or serial execution.
-            n_jobs (int | None): Positive worker limit; None uses available logical CPUs.
+            backend (Literal): Process, legacy thread, serial or native execution. Native
+                runs the compiled Rust engine; Python callbacks serialize on the
+                interpreter lock, built-in native problems run in parallel.
+            n_jobs (int | None): Positive worker limit; None uses available logical CPUs
+                (process) or one native thread per algorithm.
                 Missing CPU discovery falls back to one worker. Smaller limits share
                 workers and split the common search budget; explicit limits override CPUs.
             random_state (int | None): Nonnegative seed for owned library RNG streams.
@@ -238,6 +243,60 @@ class RKO:
         self.hyperparameters = hyperparameters
         self.history_limit = history_limit
         self.result_: RKOResult | None = None
+        self._native_problem: NativeProblem | None = None
+
+    @classmethod
+    def native(
+        cls,
+        problem: NativeProblem,
+        *,
+        algorithms: Sequence[str] | None = None,
+        adaptation: Adaptation | None = None,
+        control: int | None = None,
+        pool_size: int | None = None,
+        params_dir: Path | None = None,
+        n_jobs: int | None = None,
+        random_state: int | None = None,
+        verbose: bool = False,
+        hyperparameters: Hyperparameters | None = None,
+        history_limit: int = 0,
+    ) -> RKO:
+        """Build a solver around a built-in native problem evaluated without Python.
+
+        Args:
+            problem (NativeProblem): Native problem exposing a positive `dimension`.
+            algorithms (Sequence[str] | None): Portfolio overriding configuration.
+            adaptation (Adaptation | None): "fixed" or "adaptive" parameter control.
+            control (int | None): Legacy 0 (fixed) or 1 (adaptive) override.
+            pool_size (int | None): Elite capacity, or configured default.
+            params_dir (Path | None): Optional parameter TOML directory.
+            n_jobs (int | None): Native worker threads, or one per algorithm.
+            random_state (int | None): Nonnegative engine seed.
+            verbose (bool): Print lifecycle lines.
+            hyperparameters (Hyperparameters | None): Offline scalar overrides.
+            history_limit (int): Per-search scalar history cap; zero disables it.
+
+        Returns:
+            RKO: Solver that runs the compiled engine on `problem`.
+        """
+        solver = cls(
+            lambda keys: keys,
+            lambda value: 0.0,
+            problem.dimension,
+            algorithms=algorithms,
+            adaptation=adaptation,
+            control=control,
+            pool_size=pool_size,
+            params_dir=params_dir,
+            backend="native",
+            n_jobs=n_jobs,
+            random_state=random_state,
+            verbose=verbose,
+            hyperparameters=hyperparameters,
+            history_limit=history_limit,
+        )
+        solver._native_problem = problem
+        return solver
 
     def solve(self, time_limit: float) -> RKOResult:
         """Execute a fresh portfolio and retain its measured result.
@@ -273,16 +332,16 @@ class RKO:
             raise ValueError("'history_limit' must be 0 (disabled) or an integer from 2 to 10000.")
         if type(self.verbose) is not bool:
             raise ValueError("'verbose' must be a boolean.")
-        if self.backend not in ("process", "thread", "serial"):
-            raise ValueError("'backend' must be 'process', 'thread', or 'serial'.")
+        if self.backend not in ("process", "thread", "serial", "native"):
+            raise ValueError("'backend' must be 'process', 'thread', 'serial', or 'native'.")
         if not callable(self.decoder) or not callable(self.cost):
             raise ValueError("'decoder' and 'cost' must be callable.")
         if self.random_state is not None and (
             type(self.random_state) is not int or self.random_state < 0
         ):
             raise ValueError("'random_state' must be a nonnegative integer or None.")
-        if self.backend != "process" and self.n_jobs is not None:
-            raise ValueError("'n_jobs' is only supported by the process backend.")
+        if self.backend not in ("process", "native") and self.n_jobs is not None:
+            raise ValueError("'n_jobs' is only supported by the process and native backends.")
         raw = load_config(self.params_dir)
         if not isinstance(raw.get("run"), dict):
             raise ValueError("Configuration section 'run' must be a table.")
@@ -395,6 +454,17 @@ class RKO:
             RuntimeError: If a worker fails.
             TimeoutError: If process execution exceeds its watchdog.
         """
+        if self.backend == "native":
+            return NativeRunner(config, self.n_variables, self.params_dir, hyperparameters).run(
+                self._native_problem
+                if self._native_problem is not None
+                else (self.decoder, self.cost),
+                time_limit,
+                self.random_state,
+                self.n_jobs,
+                self.history_limit,
+                search_metadata,
+            )
         pool = SolutionPool(capacity=config.pool_size, verbose=self.verbose, started_at=started_at)
         seeds = np.random.SeedSequence(self.random_state).spawn(len(config.active_metaheuristics))
         streams = [RandomStreams(int(sequence.generate_state(1)[0])) for sequence in seeds]

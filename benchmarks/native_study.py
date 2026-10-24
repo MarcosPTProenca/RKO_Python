@@ -36,6 +36,7 @@ import csv
 import dataclasses
 import hashlib
 import json
+import os
 import statistics
 import subprocess
 import sys
@@ -50,7 +51,7 @@ from benchmarks.cpp_python_knapsack import TrialRecord
 from collections.abc import Sequence
 from pathlib import Path
 
-IMPLEMENTATIONS = ("python", "cpp64", "rust")
+IMPLEMENTATIONS = ("python", "cpp64", "rust", "rust-callback")
 RUST_PORTFOLIO_THREADS = 10
 
 
@@ -193,6 +194,44 @@ class NativeStudy:
         started_ns = time.perf_counter_ns()
         return self.benchmark._execute_process(command, self.repo_root, {}, started_ns)
 
+    def _run_rust_callback_trial(
+        self,
+        case: InstanceCase,
+        solver: str,
+        python_algorithm: str | None,
+        seed: int,
+    ) -> SolverOutput:
+        """Run the native engine with the same Python callbacks as the Python engine.
+
+        Args:
+            case (InstanceCase): Verified instance and exact optimum.
+            solver (str): Display name of the algorithm or portfolio.
+            python_algorithm (str | None): Factory name, or None for the default portfolio.
+            seed (int): Engine seed.
+
+        Returns:
+            SolverOutput: Parsed keys, objective, target events and status.
+        """
+        payload = {
+            "instance_path": str(case.path),
+            "algorithm": python_algorithm,
+            "budget_seconds": self.budget_seconds,
+            "seed": seed,
+            "target_profits": self.benchmark._target_profits(case.optimum),
+            "backend": "native",
+        }
+        command = [
+            sys.executable,
+            "-m",
+            "benchmarks.cpp_python_knapsack",
+            "--worker",
+            json.dumps(payload, separators=(",", ":")),
+        ]
+        started_ns = time.perf_counter_ns()
+        return self.benchmark._execute_process(
+            command, self.repo_root, os.environ.copy(), started_ns
+        )
+
     def run(self) -> list[dict[str, str]]:
         """Execute every trial, persist raw rows and return them.
 
@@ -254,6 +293,10 @@ class NativeStudy:
                                         seed,
                                         trial_id,
                                     )
+                                elif implementation == "rust-callback":
+                                    output = self._run_rust_callback_trial(
+                                        case, solver, algorithm[solver], seed
+                                    )
                                 elif implementation == "cpp64":
                                     output = self.benchmark._run_cpp_trial(
                                         case, solver, self.budget_seconds, trial_id, program_dir
@@ -272,7 +315,7 @@ class NativeStudy:
                                     signature,
                                     metadata,
                                 )
-                                if implementation == "rust":
+                                if implementation in ("rust", "rust-callback"):
                                     threads = (
                                         self.rust_threads or RUST_PORTFOLIO_THREADS
                                         if solver == "RKO-default"
@@ -280,7 +323,7 @@ class NativeStudy:
                                     )
                                     record = dataclasses.replace(
                                         record,
-                                        execution_mode=f"rust-threads-{threads}-{self.rust_grid}",
+                                        execution_mode=f"{implementation}-threads-{threads}",
                                     )
                                 writer.writerow(dataclasses.asdict(record))
                                 stream.flush()
@@ -294,11 +337,14 @@ class NativeStudy:
             return list(csv.DictReader(stream))
 
     @staticmethod
-    def summarize(rows: Sequence[dict[str, str]]) -> list[dict[str, str | float | int]]:
-        """Pair implementations per instance and test native-versus-reference differences.
+    def summarize(
+        rows: Sequence[dict[str, str]], subject: str = "rust"
+    ) -> list[dict[str, str | float | int]]:
+        """Pair implementations per instance and test subject-versus-reference differences.
 
         Args:
             rows (Sequence[dict[str, str]]): Raw trial rows.
+            subject (str): Implementation under evaluation.
 
         Returns:
             list[dict[str, str | float | int]]: One row per solver, reference and metric.
@@ -308,20 +354,21 @@ class NativeStudy:
         """
         results: list[dict[str, str | float | int]] = []
         solvers = sorted({row["solver"] for row in rows})
+        references = sorted({row["implementation"] for row in rows} - {subject})
         metrics = (
             ("gap", "normalized_objective_difference"),
             ("elapsed_seconds", "elapsed_seconds"),
         )
         for metric, column in metrics:
-            for reference in ("cpp64", "python"):
+            for reference in references:
                 comparisons: dict[str, list[float]] = {}
                 cells: dict[str, tuple[float, float, int, int, int]] = {}
                 for solver in solvers:
                     per_instance: dict[str, dict[str, list[float]]] = {}
-                    failures = {"rust": 0, reference: 0}
+                    failures = {subject: 0, reference: 0}
                     for row in rows:
                         if row["solver"] != solver or row["implementation"] not in (
-                            "rust",
+                            subject,
                             reference,
                         ):
                             continue
@@ -335,21 +382,21 @@ class NativeStudy:
                             row["implementation"], []
                         ).append(float(row[column]))
                     differences: list[float] = []
-                    rust_values: list[float] = []
+                    subject_values: list[float] = []
                     reference_values: list[float] = []
                     for sides in per_instance.values():
-                        if "rust" in sides and reference in sides:
-                            native = statistics.median(sides["rust"])
+                        if subject in sides and reference in sides:
+                            native = statistics.median(sides[subject])
                             other = statistics.median(sides[reference])
                             differences.append(native - other)
-                            rust_values.append(native)
+                            subject_values.append(native)
                             reference_values.append(other)
                     if differences:
                         comparisons[solver] = differences
                         cells[solver] = (
-                            statistics.median(rust_values),
+                            statistics.median(subject_values),
                             statistics.median(reference_values),
-                            failures["rust"],
+                            failures[subject],
                             failures[reference],
                             len(differences),
                         )
@@ -365,24 +412,25 @@ class NativeStudy:
                     low, high = KnapsackBenchmark.bootstrap_median_interval(
                         values, seed=SAMPLE_SEED + sum(map(ord, solver + metric + reference))
                     )
-                    native_median, reference_median, rust_failed, ref_failed, paired = cells[solver]
+                    native_median, reference_median, own_failed, ref_failed, paired = cells[solver]
                     results.append(
                         {
                             "metric": metric,
+                            "subject": subject,
                             "reference": reference,
                             "solver": solver,
-                            "rust_median": native_median,
+                            "subject_median": native_median,
                             "reference_median": reference_median,
-                            "median_difference_rust_minus_reference": statistics.median(values),
+                            "median_difference_subject_minus_reference": statistics.median(values),
                             "bootstrap_95_low": low,
                             "bootstrap_95_high": high,
-                            "rust_better_instances": negative,
-                            "rust_worse_instances": positive,
+                            "subject_better_instances": negative,
+                            "subject_worse_instances": positive,
                             "tied_instances": paired - non_tied,
                             "p_exact_sign": p_value,
                             "p_holm": adjusted[solver],
                             "paired_instances": paired,
-                            "rust_failed_trials": rust_failed,
+                            "subject_failed_trials": own_failed,
                             "reference_failed_trials": ref_failed,
                         }
                     )
@@ -399,36 +447,33 @@ class NativeStudy:
             str: Human-readable fixed-width report.
         """
         lines = []
-        for metric in ("gap", "elapsed_seconds"):
-            for reference in ("cpp64", "python"):
-                subset = [
-                    row
-                    for row in summary
-                    if row["metric"] == metric and row["reference"] == reference
-                ]
-                if not subset:
-                    continue
-                lines.append(
-                    f"\n[{metric}] rust vs {reference} (lower is better; "
-                    "B/W/T = rust better/worse/tied instances)"
+        pairs = sorted({(row["metric"], row["reference"]) for row in summary}, reverse=True)
+        for metric, reference in pairs:
+            subset = [
+                row for row in summary if row["metric"] == metric and row["reference"] == reference
+            ]
+            subject = subset[0]["subject"]
+            lines.append(
+                f"\n[{metric}] {subject} vs {reference} (lower is better; "
+                "B/W/T = subject better/worse/tied instances)"
+            )
+            lines.append(
+                f"{'solver':12} {'subject':>9} {'ref':>9} {'diff':>9} "
+                f"{'95% CI':>21} {'B/W/T':>9} {'p_holm':>8} {'fail s/ref':>10}"
+            )
+            for row in subset:
+                interval = f"[{row['bootstrap_95_low']:.3f},{row['bootstrap_95_high']:.3f}]"
+                record = (
+                    f"{row['subject_better_instances']}/{row['subject_worse_instances']}/"
+                    f"{row['tied_instances']}"
                 )
+                failed = f"{row['subject_failed_trials']}/{row['reference_failed_trials']}"
                 lines.append(
-                    f"{'solver':12} {'rust':>9} {'ref':>9} {'diff':>9} "
-                    f"{'95% CI':>21} {'B/W/T':>9} {'p_holm':>8} {'fail r/ref':>10}"
+                    f"{row['solver']:12} {row['subject_median']:9.3f} "
+                    f"{row['reference_median']:9.3f} "
+                    f"{row['median_difference_subject_minus_reference']:9.3f} "
+                    f"{interval:>21} {record:>9} {row['p_holm']:8.4f} {failed:>10}"
                 )
-                for row in subset:
-                    interval = f"[{row['bootstrap_95_low']:.3f},{row['bootstrap_95_high']:.3f}]"
-                    record = (
-                        f"{row['rust_better_instances']}/{row['rust_worse_instances']}/"
-                        f"{row['tied_instances']}"
-                    )
-                    failed = f"{row['rust_failed_trials']}/{row['reference_failed_trials']}"
-                    lines.append(
-                        f"{row['solver']:12} {row['rust_median']:9.3f} "
-                        f"{row['reference_median']:9.3f} "
-                        f"{row['median_difference_rust_minus_reference']:9.3f} {interval:>21} "
-                        f"{record:>9} {row['p_holm']:8.4f} {failed:>10}"
-                    )
         return "\n".join(lines)
 
 
@@ -460,6 +505,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--rust-threads", type=int, default=None)
     parser.add_argument("--instances", type=int, default=None, help="Use the first N instances.")
     parser.add_argument("--summary-only", action="store_true", help="Summarize an existing CSV.")
+    parser.add_argument("--subject", default="rust", help="Implementation under evaluation.")
     args = parser.parse_args(argv)
     study = NativeStudy(
         args.output,
@@ -477,7 +523,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             rows = list(csv.DictReader(stream))
     else:
         rows = study.run()
-    summary = study.summarize(rows)
+    summary = study.summarize(rows, args.subject)
     summary_path = args.output.with_name(f"{args.output.stem}-native-summary.csv")
     if summary:
         with summary_path.open("w", newline="", encoding="utf-8") as stream:

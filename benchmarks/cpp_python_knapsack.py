@@ -1708,7 +1708,7 @@ class KnapsackBenchmark:
             started_ns=0,
         )
         algorithm = payload["algorithm"]
-        backend = "serial" if algorithm is not None else "process"
+        backend = payload.get("backend") or ("serial" if algorithm is not None else "process")
         solver = RKO(
             decoder=decode_knapsack,
             cost=cost,

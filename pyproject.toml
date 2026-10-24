@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
 
 [project]
 name = "rko"
@@ -24,16 +24,30 @@ reports = [
     "plotly>=6.0",
 ]
 
-[tool.setuptools]
-include-package-data = false
+[tool.maturin]
+python-source = "src"
+module-name = "rko._native"
+manifest-path = "crates/rko-py/Cargo.toml"
+features = ["extension-module"]
+profile = "release"
+include = [
+    { path = "src/rko/parameters/*.toml", format = ["sdist", "wheel"] },
+    { path = "src/rko/examples/instances/*", format = ["sdist", "wheel"] },
+]
+exclude = [
+    "src/rko/tests/**",
+    "**/__pycache__/**",
+    "src/rko/examples/results/**",
+]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["rko*"]
-exclude = ["rko.tests*", "*__pycache__*", "rko.examples.results*"]
-
-[tool.setuptools.package-data]
-rko = ["parameters/*.toml", "examples/instances/*"]
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "crates/**/*.rs" },
+    { file = "crates/**/Cargo.toml" },
+]
 
 [dependency-groups]
 dev = [

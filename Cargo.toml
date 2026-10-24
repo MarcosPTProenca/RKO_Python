@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/rko-core"]
+members = ["crates/rko-core", "crates/rko-py"]
 
 [workspace.package]
 edition = "2024"

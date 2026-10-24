@@ -1,0 +1,22 @@
+[package]
+name = "rko-py"
+version = "0.3.0-dev"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "PyO3 bindings exposing the native RKO engine as rko._native."
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+rko-core = { path = "../rko-core" }
+pyo3 = { version = "=0.30.1", features = ["abi3-py314"] }
+numpy = "=0.30.0"
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[lints]
+workspace = true
