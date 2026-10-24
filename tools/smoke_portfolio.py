@@ -31,6 +31,7 @@ import numpy as np
 import os
 import pickle
 import random
+import rko
 import sys
 import tempfile
 import threading
@@ -154,8 +155,6 @@ def trial(args: argparse.Namespace) -> dict[str, object]:
         AssertionError: If solver contracts or child native admission differ.
         Exception: Original solver, callback and filesystem failures propagate.
     """
-    import rko
-
     assert Path(__file__).resolve().parents[1] not in Path(rko.__file__).resolve().parents
     assert np.isfinite(args.seconds) and args.seconds > 0 and args.dimension > 0
     assert sys.flags.optimize == 0, "functional assertions must be enabled"
