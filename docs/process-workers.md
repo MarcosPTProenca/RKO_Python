@@ -55,7 +55,7 @@ Serial and thread scheduling are unchanged.
 
 ## Scheduling measurements
 
-The [remaining-time reference](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md#remaining-time-worker-scheduling)
+The [remaining-time reference](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md#remaining-time-worker-scheduling)
 compares the previous policy with the new one under the same search budget and
 worker counts. For ten searches/four workers, median unused worker-session time
 fell from about 0.80 seconds to 0.002–0.006 seconds out of 4.8 available worker-seconds.
@@ -83,6 +83,6 @@ is reflected in the discovered count; supply a positive explicit `n_jobs` for su
 limits. The library does not change environment variables or native thread settings
 inside an already running application.
 
-See [the resource benchmark](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md#bounded-process-worker-resources)
+See [the resource benchmark](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md#bounded-process-worker-resources)
 for measured scope and limitations. Installation/filesystem startup gains remain a
 separate [WSL setup concern](running.md#wsl-startup-and-virtual-environment-placement).

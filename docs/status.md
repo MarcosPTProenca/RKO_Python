@@ -49,7 +49,7 @@ not a release guarantee.
   sampled summed RSS around 287 versus 560 MiB for four automatic versus ten
   dedicated workers. This is not unique physical memory, fixed-work throughput or
   scientific-quality evidence. See [migration/limits](process-workers.md) and
-  [benchmarks](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md#bounded-process-worker-resources).
+  [benchmarks](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md#bounded-process-worker-resources).
 - **Algorithm contracts:** complete C++ parity/deviation specifications and
   scientific invariants remain. SA now honors online control with real feasible
   Q actions, signed rewards and documented next-schedule t0 semantics; choose
@@ -76,7 +76,7 @@ not a release guarantee.
   A [usage/API guide](usage.md) now covers constructor options, common errors,
   callbacks and result/time accounting. Exhaustive operator/API/error documentation
   and a supported-version/deprecation policy still need release review; the
-  [contributor checklist](https://github.com/MarcosPTProenca/RKO_Python/blob/main/CONTRIBUTING.md#before-a-release) is not a completed release.
+  [contributor checklist](https://github.com/MarcosPTProenca/RKO/blob/main/CONTRIBUTING.md#before-a-release) is not a completed release.
 - **Optional explanations:** [decoder diagrams](decoder-diagrams.md) are bounded
   author declarations or best-effort static Python structures, never observed
   decisions. Unsupported control flow fails explicitly. Opaque expressions/calls,
@@ -113,7 +113,7 @@ not a release guarantee.
   budgets, adaptive/real-clock policies, instance families and callback profiling
   are still needed before default/native decisions.
 - **Licensing:** confirm imported-code ownership/terms before release; see
-  [NOTICE](https://github.com/MarcosPTProenca/RKO_Python/blob/main/NOTICE). An existing license file does not settle that review.
+  [NOTICE](https://github.com/MarcosPTProenca/RKO/blob/main/NOTICE). An existing license file does not settle that review.
 
 The hot blending kernel now batches offspring selection after consuming the same
 Python random draws in the same order. A reproducible 1,000-key serial SA synthetic
@@ -128,7 +128,7 @@ before allocating offspring, reducing peak traced allocation in a synthetic
 one-generation, 100 × 5,000-key probe from 11.72 MiB to 8.08 MiB (-31.0%) with
 identical seeded objective output. This isolates an internal GA allocation path;
 it is not a whole-solver RSS claim. Reproduction and the limitations of this
-probe are in [benchmarks](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md).
+probe are in [benchmarks](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md).
 
 Shared callback sessions now retain detached NumPy incumbent snapshots until a
 public result list is needed. A 10,000-key callback allocation probe reduced
@@ -146,7 +146,7 @@ run; 1,000-key gains were smaller and less consistent between runs. All 108 pair
 searches reproduced exact best keys, costs, counts and RNG states. Batching adds
 O(n) temporary scratch, not a memory benefit. These measurements do not establish
 process/portfolio speed, optimization quality or native-code parity; reproduction
-and limitations are in [benchmarks](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md).
+and limitations are in [benchmarks](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md).
 
 A domain-neutral ten-algorithm process reference now measures startup latency,
 observed worker counts and sampled parent/child RSS. Setting `n_jobs=4` retained
@@ -156,7 +156,7 @@ and one-second-budget end-to-end times fell from 8.12–11.25 s to 6.64–8.72 s
 Per-algorithm time and cooperation differ, so this is a resource/short-run latency
 comparison, not equal-work throughput or an optimization-quality improvement.
 RSS sums double-count shared pages and are sampled, not exact physical-memory
-high-water marks. See [benchmarks](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md) for reproduction.
+high-water marks. See [benchmarks](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md) for reproduction.
 
 IPR now uses NumPy slice assignment for multi-gene guide blocks and direct
 assignment for single-gene blocks, preserving full candidate copies and the
@@ -166,7 +166,7 @@ In one reference, 1,000-key searches were 1.30–2.47× faster and 10,000-key se
 1.22–3.46× faster; small-vector results were mixed, including regressions.
 Isolated traced relinking peaks were unchanged. These are serial IPR results,
 not whole-portfolio, process, quality or native-parity claims; see
-[benchmarks](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md).
+[benchmarks](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md).
 
 Managed IPR now transfers only its two sampled elite entries rather than the
 whole pool when occupancy exceeds two. Ranks are drawn in the requesting process
@@ -189,7 +189,7 @@ initialization improved substantially as grids grew, but signature memory can
 increase small-grid peaks and dense output remains quadratic. Real cold-spawn
 trials confirmed a smaller graph phase, not a reliable end-to-end startup gain:
 imports/spawn still dominate. Parent constructor validation and fresh parameter
-reads remain intact. See [benchmarks](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md) for limits.
+reads remain intact. See [benchmarks](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md) for limits.
 
 A separate 18-solve installation-layout comparison identified substantial WSL
 startup overhead from Windows-mounted dependencies and editable source. With
@@ -199,7 +199,7 @@ installation reduced one/four-worker end-to-end medians from 5.51/6.17 seconds t
 are environment-specific setup gains, NOT library-code, steady-state throughput,
 RSS or quality improvements; imports/spawn and callback overruns remain. No worker
 architecture or validation was changed. See the identified reference in
-[benchmarks](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md#spawn-startup-and-installation-layout) and
+[benchmarks](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md#spawn-startup-and-installation-layout) and
 [WSL setup](running.md#wsl-startup-and-virtual-environment-placement).
 
 A further memory-targeted refinement constructs Q-state records only after their

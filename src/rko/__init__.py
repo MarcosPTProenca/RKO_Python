@@ -1,4 +1,4 @@
-"""Public package interface for the RKO Python implementation.
+"""Public package interface for the RKO optimization library.
 
 Objective:
 - Expose stable package-level imports for the RKO orchestration entrypoints.
