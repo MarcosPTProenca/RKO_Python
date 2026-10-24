@@ -188,6 +188,10 @@ def main() -> None:
     solver = RKO(
         decoder=decode, cost=cost, n_variables=data["lower"].size,
         algorithms=["SA", "PSO"], adaptation="fixed",
+        hyperparameters={
+            "SA": {"sa_max": 100, "t0": 1000.0, "alpha": 0.98},
+            "PSO": {"p_size": 20, "c1": 1.5, "c2": 1.5, "w": 0.6},
+        },
         backend="serial", random_state=42,
     )
     result = solver.solve(time_limit=1.0)
@@ -243,6 +247,7 @@ unchanged. Replace only the solver block inside `main`.
 solver = RKO(
     decoder=decode, cost=cost, n_variables=data["lower"].size,
     algorithms=["SA"], adaptation="fixed", backend="serial", random_state=42,
+    hyperparameters={"SA": {"sa_max": 100, "t0": 1000.0, "alpha": 0.98}},
 )
 result = solver.solve(time_limit=1.0)
 ```
@@ -251,15 +256,44 @@ result = solver.solve(time_limit=1.0)
 alongside the other imports, then use:
 
 ```python
-result = SA.optimize(
+solver = SA(
     decoder=decode, cost=cost, n_variables=data["lower"].size,
-    time_limit=1.0, adaptation="fixed", random_state=42,
+    adaptation="fixed", backend="serial", random_state=42,
+    hyperparameters={"SA": {"sa_max": 100, "t0": 1000.0, "alpha": 0.98}},
 )
+result = solver.solve(time_limit=1.0)
 ```
 
-`SA.optimize(...)` manages its own pool, runs serially and returns the same
-`RKOResult` type. Substitute another [built-in class](docs/standalone.md#algorithm-catalog)
-without changing your problem functions. `optimize` is the standalone entry point.
+Both forms use the **same configure-then-solve lifecycle** and return `RKOResult`.
+`SA` selects SA automatically; `PSO`, `GRASP` and the other
+[built-in classes](docs/standalone.md#algorithm-catalog) select their own algorithm.
+They inherit RKO's execution, stopping, RNG ownership, history and `result_` behavior.
+The examples explicitly select serial execution; all public solvers otherwise share
+RKO's default process backend and configured adaptation mode.
+
+### Algorithm hyperparameters
+
+`hyperparameters` is an explicit constructor parameter for **both** RKO and the
+individual solver classes. Use the same nested dictionary: algorithm name -> scalar
+overrides. It controls the algorithm itself, not worker/backend settings. Only keys
+you provide replace defaults; manual scalar overrides require `adaptation="fixed"`.
+
+| Algorithm | Configurable scalar keys |
+| --- | --- |
+| SA | `sa_max`, `t0`, `alpha`, `beta_min`, `beta_max` |
+| ILS | `beta_min`, `beta_max` |
+| VNS | `k_max`, `beta_min` |
+| LNS | `beta_min`, `beta_max`, `t0`, `alpha_lns` |
+| BRKGA / BRKGA-CS | `p`, `pe`, `pm`, `rhoe` |
+| GA (`GeneticAlgorithm`) | `size_pop`, `prob_cros`, `prob_mut` |
+| PSO | `p_size`, `c1`, `c2`, `w` |
+| GRASP | `hs`, `he` |
+| IPR / MultiStart | No configurable search scalars |
+
+See the [parameter reference](docs/parameters.md) for meanings, defaults, joint
+constraints and adaptive grids. Some identically named keys have different meanings
+between algorithms (notably BRKGA versus BRKGA-CS `pm`); do not copy interpretations
+blindly. Each dictionary entry must name an algorithm actually selected by the solver.
 
 ## Use your own instance data
 
@@ -277,7 +311,7 @@ A complete [file-to-solution tutorial](docs/problem-adapters.md) shows a JSON
 scheduling instance where the decoder uses loaded processing times and the objective
 uses loaded due dates. The tutorial groups these two callbacks in an importable
 class for convenience; you can use functions instead. The same callbacks work
-unchanged with `SA.optimize`, other built-in classes and RKO portfolios. There is
+unchanged with `SA(...).solve(...)`, other built-in classes and RKO portfolios. There is
 no required base class.
 
 Run the packaged example without creating an input file:

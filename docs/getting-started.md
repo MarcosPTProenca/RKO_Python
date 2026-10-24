@@ -23,7 +23,7 @@ No elite pool, TOML edits or portfolio setup is required.
 
 ```python
 import numpy as np
-from rko.metaheuristics import SA
+from rko import RKO
 
 
 def decode(keys: np.ndarray) -> np.ndarray:
@@ -37,14 +37,12 @@ def objective(solution: np.ndarray) -> float:
 
 
 if __name__ == "__main__":
-    result = SA.optimize(
-        decode,
-        objective,
-        n_variables=10,
-        time_limit=2.0,
-        adaptation="fixed",
-        random_state=42,
+    solver = RKO(
+        decode, objective, n_variables=10, algorithms=["SA"],
+        adaptation="fixed", backend="serial", random_state=42,
+        hyperparameters={"SA": {"sa_max": 100, "t0": 1000.0}},
     )
+    result = solver.solve(time_limit=2.0)
     solution = decode(np.asarray(result.keys))
     print("Solution:", solution)
     print("Objective:", result.cost)
@@ -56,10 +54,12 @@ if __name__ == "__main__":
 uv run --locked --no-dev python first_solve.py
 ```
 
-`optimize` runs serially, creates a private elite pool and returns an immutable
-`RKOResult`. It reuses the library's validated search lifecycle; there is no
-second implementation of simulated annealing. Substitute `PSO`, `GRASP`, `IPR`
-or another [built-in class](standalone.md#algorithm-catalog) with the same callbacks.
+This selects one algorithm through the main RKO API, with explicit serial execution,
+a private elite pool and an immutable `RKOResult`. To use the direct class API,
+construct `SA(...)` from `rko.metaheuristics` with the same settings but no
+`algorithms` argument, then call `solver.solve(...)` unchanged. Select another
+algorithm through RKO or another [public class](standalone.md#algorithm-catalog)
+without changing your problem callbacks.
 The example is a usage demonstration, not a recommended benchmark budget.
 
 ## Run a portfolio

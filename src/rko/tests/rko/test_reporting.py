@@ -37,6 +37,7 @@ from rko import ValidationReport
 from rko import assess_result
 from rko.components import SolutionPool
 from rko.metaheuristics import MultiStart
+from rko.metaheuristics.multi_start import MultiStart as MultiStartKernel
 from rko.orchestration.search import SearchSession
 from rko.orchestration.types import HistoryPoint
 from rko.reporting import OptimizationReport
@@ -117,7 +118,7 @@ def test_compaction_preserves_first_and_terminal_observations(
     Args:
         monkeypatch (pytest.MonkeyPatch): Replaces the algorithm loop with bounded work.
     """
-    algorithm = MultiStart(SolutionPool(), decode, objective, 3)
+    algorithm = MultiStartKernel(SolutionPool(), decode, objective, 3)
 
     def fixed_work(limit_time: float) -> tuple[list[object], list[float], float]:
         """Evaluate exactly one hundred strictly improving vectors.
@@ -172,9 +173,10 @@ def test_standalone_history_and_data_privacy(tmp_path: Path) -> None:
     Args:
         tmp_path (Path): Isolated export directory.
     """
-    result = MultiStart.optimize(
-        decode, objective, 3, time_limit=0.01, random_state=42, history_limit=5
+    solver = MultiStart(
+        decode, objective, 3, adaptation="fixed", backend="serial", random_state=42, history_limit=5
     )
+    result = solver.solve(time_limit=0.01)
     assert result.searches[0].history
     report = OptimizationReport(result, metrics={"feasible": True, "profit": 10})
     target = report.write_json(tmp_path / "run.json")
@@ -297,7 +299,8 @@ def test_html_is_offline_escaped_and_data_consistent(tmp_path: Path) -> None:
     Args:
         tmp_path (Path): Isolated HTML output directory.
     """
-    result = MultiStart.optimize(decode, objective, 3, time_limit=0.01, history_limit=5)
+    solver = MultiStart(decode, objective, 3, adaptation="fixed", backend="serial", history_limit=5)
+    result = solver.solve(time_limit=0.01)
     attack = '</script><script>alert("unsafe")</script>'
     report = OptimizationReport(result, title=attack, metrics={attack: attack})
     target = report.write_html(tmp_path / "offline.html")
@@ -322,7 +325,8 @@ def test_html_without_history_is_honest(tmp_path: Path) -> None:
     Args:
         tmp_path (Path): Output directory.
     """
-    result = MultiStart.optimize(decode, objective, 3, time_limit=0.01)
+    solver = MultiStart(decode, objective, 3, adaptation="fixed", backend="serial")
+    result = solver.solve(time_limit=0.01)
     report = OptimizationReport(result)
     text = report.write_html(tmp_path / "summary.html").read_text(encoding="utf-8")
     assert "Histories unavailable for: MultiStart" in text
@@ -354,7 +358,8 @@ def test_atomic_output_failure_preserves_existing_file(
 
 def test_history_metadata_remains_pickleable() -> None:
     """Keep bounded history compatible with normal immutable result serialization."""
-    result = MultiStart.optimize(decode, objective, 3, time_limit=0.01, history_limit=5)
+    solver = MultiStart(decode, objective, 3, adaptation="fixed", backend="serial", history_limit=5)
+    result = solver.solve(time_limit=0.01)
     copied = pickle.loads(pickle.dumps(result))
     assert copied == result
     legacy = replace(result, searches=())
@@ -369,7 +374,8 @@ def test_assessment_report_escapes_diagnostics_without_callbacks(tmp_path: Path)
     Args:
         tmp_path (Path): Isolated report directory.
     """
-    result = MultiStart.optimize(decode, objective, 3, time_limit=0.01)
+    solver = MultiStart(decode, objective, 3, adaptation="fixed", backend="serial")
+    result = solver.solve(time_limit=0.01)
     attack = '</script><script>alert("unsafe")</script>'
     payload = object()
     decoder = Mock(return_value=payload)

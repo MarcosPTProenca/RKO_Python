@@ -27,11 +27,11 @@ Using the decoder/objective from [getting started](getting-started.md):
 from rko.metaheuristics import SA
 from rko.reporting import OptimizationReport
 
-result = SA.optimize(
+solver = SA(
     decode, objective, n_variables=10,
-    time_limit=2.0, adaptation="fixed", random_state=42,
-    history_limit=1000,
+    adaptation="fixed", backend="serial", random_state=42, history_limit=1000,
 )
+result = solver.solve(time_limit=2.0)
 report = OptimizationReport(result, title="My optimization run")
 report.write_html("run.html")
 report.write_json("run.json")
@@ -169,4 +169,4 @@ Do not put secrets in titles or metrics.
 - No recording of failed/aborted optimization runs: existing exception behavior remains unchanged.
   Failed domain checks on completed runs can be included through an optional assessment.
 - Low-level direct constructor `.solve()` calls do not activate managed history.
-  Use `Class.optimize(...)` or `RKO(...)` for reportable metadata.
+  Use public algorithm solver objects or RKO, followed by `.solve(...)`, for reportable metadata.

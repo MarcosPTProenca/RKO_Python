@@ -38,13 +38,13 @@ import subprocess
 import sys
 from benchmarks.fixed_work import _run
 from pathlib import Path
-from rko.metaheuristics import BRKGA
-from rko.metaheuristics import GRASP
-from rko.metaheuristics import IPR
-from rko.metaheuristics import SA
-from rko.metaheuristics import GeneticAlgorithm
-from rko.metaheuristics import MetaheuristicBase
-from rko.metaheuristics import MultiStart
+from rko.metaheuristics.base import MetaheuristicBase
+from rko.metaheuristics.brkga import BRKGA
+from rko.metaheuristics.ga import GeneticAlgorithm
+from rko.metaheuristics.grasp import GRASP
+from rko.metaheuristics.ipr import IPR
+from rko.metaheuristics.multi_start import MultiStart
+from rko.metaheuristics.sa import SA
 
 
 class PerformanceProbe:
