@@ -42,7 +42,7 @@ The following file-backed scheduling example shows the missing data lifecycle.
 ## A complete file-backed example
 
 The maintained implementation is
-[`rko.examples.instance_pipeline`](../src/rko/examples/instance_pipeline.py).
+[`rko.examples.instance_pipeline`](https://github.com/MarcosPTProenca/RKO_Python/blob/main/src/rko/examples/instance_pipeline.py).
 It solves an illustrative single-machine scheduling problem: each job has a
 processing duration and due date. The decoder constructs completion times from
 priority keys; the objective minimizes total tardiness.
@@ -191,7 +191,7 @@ For a different domain, replace the JSON reader/schema, adapter data and the two
 methods—not algorithm internals. Data can come from files, a database, an API or
 an existing in-memory object; load/validate it in your application before solving.
 
-The existing [Knapsack runner](../src/rko/examples/run_kp_cpp_instances.py) is an
+The existing [Knapsack runner](https://github.com/MarcosPTProenca/RKO_Python/blob/main/src/rko/examples/run_kp_cpp_instances.py) is an
 unrelated example: `read_kp_instance` loads weights, benefits and capacity;
 `KnapsackCost(instance)` stores them for scoring. Its threshold decoder does not
 need the data itself, unlike scheduling construction. Knapsack input and execution

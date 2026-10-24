@@ -1,6 +1,6 @@
 # Usage and API guide
 
-[Start with the quickstart](../README.md) for a first serial solve. This guide
+[Start with the quickstart](getting-started.md) for a first serial solve. This guide
 covers configuration, execution modes, callbacks, result accounting and stopping.
 For one algorithm use a [public solver such as `SA(...)`](standalone.md), followed
 by the same `.solve(time_limit=...)` call and settings as RKO.
@@ -17,7 +17,7 @@ neither a C++ checkout nor a Rust compiler.
 - [Custom problems and stopping](#adapting-a-custom-problem)
 - [Terminal adapter](#run-an-instance-from-the-terminal)
 
-Contributor setup and validation are also summarized in [CONTRIBUTING](../CONTRIBUTING.md).
+Contributor setup and validation are also summarized in [CONTRIBUTING](https://github.com/MarcosPTProenca/RKO_Python/blob/main/CONTRIBUTING.md).
 C++ comparison goals and native-backend limits are in [performance](performance.md).
 
 ## Development setup
@@ -41,7 +41,7 @@ unreleased class-based development line, not a PyPI publication. It replaces
 the previous implementation on `main`, whose complete code/history is retained
 at `archive/pre-standalone-migration-2026-10-18`. The new API and Python 3.14
 requirement are breaking changes from that older implementation. Attribution
-and licensing boundaries are retained in [NOTICE](../NOTICE).
+and licensing boundaries are retained in [NOTICE](https://github.com/MarcosPTProenca/RKO_Python/blob/main/NOTICE).
 
 ## Class-based solver API
 
@@ -379,7 +379,7 @@ workers; it is not a measured worker count. To retain dedicated workers, explici
 request the selected portfolio size. See [default-worker migration](process-workers.md).
 These two small instances are correctness checks, not production-scale evidence.
 
-The [larger benchmark](../benchmarks/README.md) includes a runnable experiment and
+The [larger benchmark](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md) includes a runnable experiment and
 one current reference CSV. Re-run on October 18 against the standalone solver,
 all six trials were feasible, but the best process gap was **17.82%**, versus
 **0.00474%** for a simple greedy baseline. This demonstrates multicore execution,
@@ -412,7 +412,7 @@ uv run --locked mutmut results
 
 ## Remaining release work
 
-The library is **not yet release-ready**. See [contributor release gates](../CONTRIBUTING.md#before-a-release)
+The library is **not yet release-ready**. See [contributor release gates](https://github.com/MarcosPTProenca/RKO_Python/blob/main/CONTRIBUTING.md#before-a-release)
 and the [C++/native evaluation criteria](performance.md). [Current limitations](status.md)
 for the outstanding scheduling, parity, results, documentation and licensing work.
 [C++ compatibility](cpp-compatibility.md) distinguishes verified reference
