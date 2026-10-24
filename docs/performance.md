@@ -232,6 +232,32 @@ performed just to obtain a pass. The reporting workflow completed successfully
 because collection/analysis were valid, not because all acceptance gates passed.
 Python remains the default and native use remains an explicit experimental opt-in.
 
+#### Negative-control diagnosis of the six inconclusive groups
+
+The separate `benchmarks.native_quality_diagnosis` protocol does **not** extend or
+replace that confirmation. It selects exactly its six inconclusive object-callback
+groups and collects 30 NEW seeds61000–61029 per group. Each seed has three fresh
+workers: PythonA, identical PythonB, and admitted native. All six possible arm orders
+occur five times, balancing position without sharing a running interpreter or
+changing callbacks. This yields180triads/540timedworkers, not additional acceptance
+pairs. The native contrasts share Python controls and are not independent tests.
+
+A separate functional check compares all512candidate prefixes for SA/GA/BRKGA in
+adaptive mode at20/500keys under an evaluation-indexed logical clock. Virtual time advances
+across learning windows but stays below the functional deadline. This checks
+checked-prefix replay when policy timing is held equal; it is not timed quality
+or universal replay proof. Real timed workers never run this clock or a profiler.
+
+Existing immutable per-search metadata/histories are serialized after solving;
+no new per-evaluation hook is installed. Reports retain PythonB-minus-PythonA and
+native-minus-each-Python quality contrasts, wins/ties/losses and per-search changes.
+They reuse the original conservative median interval ranks rather than relaxing
+confidence or quality margins. Repeat variability in parallel fixed-parameter
+searches cannot by itself isolate pool cooperation from OS scheduling. Any
+mechanistic interpretation must disclose that limitation. All original gates and
+`qualification_status=not_established` remain unchanged regardless of this
+**diagnostic-only** outcome. Opt in with workflow `study=diagnosis`.
+
 Run `uv run --locked python tools/validate_native_package.py` on a machine with the
 native build prerequisites to check pure/native wheels and sdists, default and
 explicit activation, full native tests, managed-search candidate-prefix replay and

@@ -31,14 +31,25 @@ import pickle
 import subprocess
 import sys
 import warnings
+from contextlib import nullcontext
 from pathlib import Path
+from unittest.mock import patch
 
 
-def trace_search(constructor: type) -> str:
+def trace_search(
+    constructor: type,
+    adaptation: str = "fixed",
+    *,
+    logical_clock: bool = False,
+    dimension: int = 20,
+) -> str:
     """Fingerprint every candidate through a managed public search and user exception.
 
     Args:
         constructor (type): Public registered algorithm class.
+        adaptation (str): Fixed or adaptive parameter selection.
+        logical_clock (bool): Advance functional time only by completed callback index.
+        dimension (int): Number of keys in each checked candidate.
 
     Returns:
         str: Complete deterministic candidate-prefix digest.
@@ -80,21 +91,25 @@ def trace_search(constructor: type) -> str:
             raise stopped
         return float(np.dot(payload["values"], payload["values"]))
 
-    try:
-        constructor(
-            decoder,
-            objective,
-            20,
-            backend="serial",
-            adaptation="fixed",
-            prefill_pool=False,
-            random_state=42,
-            hyperparameters={"SA": {"sa_max": 10}} if constructor.__name__ == "SA" else None,
-        ).solve(3600)
-    except LookupError as error:
-        assert error is stopped
-    else:
-        raise AssertionError("original callback error was swallowed")
+    clock = patch("time.perf_counter", lambda: count / 32.0) if logical_clock else nullcontext()
+    with clock:
+        try:
+            constructor(
+                decoder,
+                objective,
+                dimension,
+                backend="serial",
+                adaptation=adaptation,
+                prefill_pool=False,
+                random_state=42,
+                hyperparameters={"SA": {"sa_max": 10}}
+                if constructor.__name__ == "SA" and adaptation == "fixed"
+                else None,
+            ).solve(20.0 if logical_clock else 3600)
+        except LookupError as error:
+            assert error is stopped
+        else:
+            raise AssertionError("original callback error was swallowed")
     assert count == 512
     return trace.hexdigest()
 
@@ -169,6 +184,10 @@ def worker(binary: bool) -> dict:
             digest.update(result.tobytes())
         for constructor in (SA, GeneticAlgorithm, BRKGA):
             traces[constructor.__name__] = trace_search(constructor)
+            for dimension in (20, 500):
+                traces[f"{constructor.__name__}_adaptive_logical_clock_{dimension}"] = trace_search(
+                    constructor, "adaptive", logical_clock=True, dimension=dimension
+                )
     finally:
         sys.setprofile(None)
     assert (native_calls > 0) == (binary and enabled)
@@ -210,9 +229,15 @@ def main() -> None:
         rows.append(json.loads(completed.stdout))
     assert rows[0]["fingerprint"] == rows[1]["fingerprint"]
     assert rows[0]["traces"] == rows[1]["traces"]
+    assert len(rows[0]["traces"]) == 9
     print(
         json.dumps(
-            {"binary": args.binary, "exact_replay": True, "native_calls": rows[1]["native_calls"]}
+            {
+                "binary": args.binary,
+                "exact_replay": True,
+                "adaptive_clock_replay": True,
+                "native_calls": rows[1]["native_calls"],
+            }
         )
     )
 

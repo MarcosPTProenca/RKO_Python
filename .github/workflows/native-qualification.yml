@@ -6,7 +6,7 @@ on:
       study:
         description: Frozen screening or independent thirty-seed confirmation
         type: choice
-        options: [screen, confirmation]
+        options: [screen, confirmation, diagnosis]
         default: screen
   pull_request:
     types: [opened, synchronize, reopened, labeled]
@@ -16,6 +16,7 @@ on:
       - 'tools/smoke_portfolio.py'
       - 'benchmarks/native_portfolio.py'
       - 'benchmarks/native_confirmation.py'
+      - 'benchmarks/native_quality_diagnosis.py'
       - 'native/**'
       - 'src/rko/**'
       - 'setup.py'
@@ -77,6 +78,7 @@ jobs:
         run: uv run --isolated --no-project --with ./dist/rko-0.3.0.dev0-py3-none-any.whl python -I tools/smoke_native.py --binary absent
 
   timed-screen:
+    if: inputs.study != 'diagnosis'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -131,6 +133,94 @@ jobs:
           path: |
             ${{ runner.temp }}/native-screen
             ${{ runner.temp }}/native-host
+          if-no-files-found: error
+          retention-days: 90
+
+  quality-diagnosis:
+    if: inputs.study == 'diagnosis'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        case: [0, 1, 2, 3, 4, 5]
+    env:
+      UV_PYTHON: '3.14.9'
+      RKO_BUILD_NATIVE: '0'
+      RKO_USE_NATIVE: '0'
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      - run: uv sync --locked --group dev
+      - name: Build and install one mixed artifact for all three arms
+        run: |
+          RKO_BUILD_NATIVE=1 uv build --wheel --out-dir "$RUNNER_TEMP/mixed"
+          uv venv --python 3.14.9 "$RUNNER_TEMP/installed"
+          uv pip install --python "$RUNNER_TEMP/installed/bin/python" "$RUNNER_TEMP"/mixed/*.whl 'numpy==2.4.3'
+          mkdir -p "$RUNNER_TEMP/native-host"
+          lscpu --json > "$RUNNER_TEMP/native-host/host.json"
+          sha256sum "$RUNNER_TEMP"/mixed/*.whl > "$RUNNER_TEMP/native-host/wheel.sha256"
+          uv run --locked --no-sync rustc --version --verbose > "$RUNNER_TEMP/native-host/rustc.txt"
+      - name: Collect frozen Python-repeat controls and native contrasts
+        run: >-
+          uv run --locked python -m benchmarks.native_quality_diagnosis collect
+          --python ${{ runner.temp }}/installed/bin/python
+          --output ${{ runner.temp }}/diagnosis --case ${{ matrix.case }}
+      - name: Preserve raw diagnostic evidence including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: native-quality-case-${{ matrix.case }}
+          path: |
+            ${{ runner.temp }}/diagnosis
+            ${{ runner.temp }}/native-host
+          if-no-files-found: error
+          retention-days: 90
+
+  quality-diagnosis-report:
+    name: Describe negative controls (not qualification)
+    if: inputs.study == 'diagnosis'
+    needs: quality-diagnosis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      UV_PYTHON: '3.14.9'
+      RKO_BUILD_NATIVE: '0'
+      RKO_USE_NATIVE: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+      - run: uv sync --locked --group dev
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: native-quality-case-*
+          path: ${{ runner.temp }}/quality-diagnosis
+      - name: Describe all controls without revising original qualification
+        run: |
+          uv run --locked python -m benchmarks.native_quality_diagnosis analyze "$RUNNER_TEMP/quality-diagnosis"
+          uv run --locked python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'quality-diagnosis/summary.json').read_text())
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('# Quality negative controls — diagnosis only\n\n')
+              summary.write('Original qualification remains NOT ESTABLISHED. No exclusive pool/scheduler attribution.\n\n')
+              for group in report['groups']:
+                  summary.write(f"## {group['case']}\n\n")
+                  for name in ('python_repeat', 'native_vs_a', 'native_vs_b'):
+                      observation = group[name]
+                      summary.write(f"{name}: {observation['quality_delta']}; wins/ties/losses {observation['wins']}/{observation['ties']}/{observation['losses']}\n\n")
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: native-quality-diagnosis-report
+          path: ${{ runner.temp }}/quality-diagnosis/summary.json
           if-no-files-found: error
           retention-days: 90
 

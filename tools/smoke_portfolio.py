@@ -36,6 +36,7 @@ import sys
 import tempfile
 import threading
 import time
+from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
@@ -246,6 +247,7 @@ def trial(args: argparse.Namespace) -> dict[str, object]:
         "n_evaluations": result.n_evaluations,
         "n_workers": result.n_workers,
         "versions": dict(result.versions),
+        "searches": [asdict(report) for report in result.searches],
         "process_observations": records,
         "result_sha256": hashlib.sha256(pickle.dumps(result)).hexdigest(),
     }
