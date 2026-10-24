@@ -102,7 +102,7 @@ def main() -> None:
     """
     instance = read_data(Path("my_instance.json"))
     problem = SchedulingProblem(instance)
-    result = SA.solve_one(
+    result = SA.optimize(
         problem.decode,
         problem.cost,
         n_variables=problem.n_variables,
@@ -127,7 +127,7 @@ uv run --locked python solve_schedule.py
 
 Substitute `PSO`, `GRASP`, `GeneticAlgorithm` or any other
 [built-in class](standalone.md#algorithm-catalog) without changing the reader or
-adapter. `solve_one` handles its private pool and runs serially. These classes are
+adapter. `optimize` handles its private pool and runs serially. These classes are
 metaheuristics, not trained models that need their own input-file loader.
 
 ### 4. Use the same instance in RKO
@@ -245,9 +245,11 @@ but a finite penalty is **not** a domain-feasibility certificate.
 
 Reader checks establish input shape/domains before any search worker starts;
 existing solver checks handle settings and finite costs. Domain validation of a
-final solution is an application responsibility. A generic optional validator is
-a separate feature, not added by this tutorial. Independently inspect your returned
-solution and report feasibility separately when appropriate.
+final solution is an application responsibility. You can opt into
+[`assess_result`](solution-validation.md) after solving; the scheduling adapter
+supplies an optional `validate` method, but no checker is required to optimize.
+Use `--validate-solution` in the example CLI to enable it. Independently inspect
+your returned solution and report feasibility separately when appropriate.
 
 `result.keys` contains coordinates, not the decoded application solution. Final
 `problem.decode(np.asarray(result.keys))` is an explicit post-run reconstruction.

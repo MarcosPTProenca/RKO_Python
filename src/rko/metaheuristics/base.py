@@ -7,6 +7,7 @@ Technical approach:
 - Use structural protocols for local-search and shaking callables.
 - Store optional operator overrides while preserving algorithm defaults.
 - Track elapsed time and cooperative cancellation through one shared base.
+- Run registered built-ins through the managed serial optimize class method.
 
 Flow (pseudocode):
 1. Retain the shared pool and any supplied operator overrides.
@@ -141,7 +142,7 @@ class MetaheuristicBase(ABC):
         self._search_metadata: SearchMetadata | None = None
 
     @classmethod
-    def solve_one(
+    def optimize(
         cls,
         decoder: Callable[[np.ndarray], Any],
         cost: Callable[[Any], float],
@@ -156,7 +157,7 @@ class MetaheuristicBase(ABC):
         verbose: bool = False,
         history_limit: int = 0,
     ) -> RKOResult:
-        """Run this built-in algorithm alone with an automatically managed elite pool.
+        """Optimize with this built-in algorithm and an automatically managed elite pool.
 
         Args:
             decoder (Callable[[np.ndarray], Any]): Decode a detached key vector.
@@ -187,7 +188,7 @@ class MetaheuristicBase(ABC):
 
         name = next((name for name, spec in MH_SPECS.items() if spec.constructor is cls), None)
         if name is None:
-            raise ValueError("solve_one supports registered built-in metaheuristic classes only.")
+            raise ValueError("optimize supports registered built-in metaheuristic classes only.")
         return RKO(
             decoder,
             cost,

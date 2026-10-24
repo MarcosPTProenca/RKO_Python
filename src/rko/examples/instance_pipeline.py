@@ -8,12 +8,13 @@ Technical approach:
 - Rank keys stably and use processing times to construct a single-machine schedule.
 - Minimize total tardiness using the same instance's due dates.
 - Keep the reader outside callback loops and optional reporting outside timed search.
+- Optionally check final schedule constraints without calling the objective again.
 
 Flow (pseudocode):
 1. Read and validate the instance schema in the parent process.
 2. Bind the instance to an importable adapter with decode/cost methods.
 3. Optimize keys with selected algorithms and the requested execution backend.
-4. Decode the incumbent explicitly, print the solution and optionally export a report.
+4. Decode the incumbent once, optionally check constraints, print and optionally export a report.
 
 Important criteria:
 - This is a synthetic usability example, not an optimization-quality benchmark.
@@ -29,6 +30,9 @@ Inputs/Outputs:
 import argparse
 import json
 import numpy as np
+from ..assessment import ValidationCheck
+from ..assessment import ValidationReport
+from ..assessment import assess_result
 from ..reporting import OptimizationReport
 from ..solver import RKO
 from collections.abc import Sequence
@@ -137,6 +141,71 @@ class SchedulingProblem:
             schedule.append((job, elapsed))
         return tuple(schedule)
 
+    def validate(self, solution: Schedule) -> ValidationReport:
+        """Check schedule structure, job coverage and contiguous completion arithmetic.
+
+        Args:
+            solution (Schedule): Post-run schedule to check against this loaded instance.
+
+        Returns:
+            ValidationReport: Explicit constraint diagnostics and declared feasibility.
+                Due dates are soft objective terms, not hard feasibility deadlines.
+        """
+        structure = (
+            isinstance(solution, (tuple, list))
+            and len(solution) == self.n_variables
+            and all(
+                isinstance(entry, (tuple, list))
+                and len(entry) == 2
+                and type(entry[0]) is int
+                and type(entry[1]) is int
+                and entry[1] >= 0
+                for entry in solution
+            )
+        )
+        expected = set(range(self.n_variables))
+        observed = {job for job, _ in solution} if structure else set()
+        coverage = structure and observed == expected
+        mismatches = None
+        if coverage:
+            elapsed = 0
+            mismatches = 0
+            for job, completion in solution:
+                elapsed += self.instance.processing_times[job]
+                mismatches += completion != elapsed
+        checks = (
+            ValidationCheck(
+                "schedule_structure",
+                "passed" if structure else "failed",
+                "Require one integer (job, nonnegative completion) pair per job.",
+                value=len(solution) if isinstance(solution, (tuple, list)) else None,
+                limit=self.n_variables,
+                unit="jobs",
+            ),
+            ValidationCheck(
+                "job_coverage",
+                "not_checked" if not structure else ("passed" if coverage else "failed"),
+                "Require every instance job exactly once, with no out-of-range index.",
+                value=len(observed & expected) if structure else None,
+                limit=self.n_variables,
+                unit="jobs",
+            ),
+            ValidationCheck(
+                "completion_times",
+                "not_checked" if not coverage else ("passed" if mismatches == 0 else "failed"),
+                "Check start-at-zero, no-idle cumulative processing times independently.",
+                value=mismatches,
+                limit=0,
+                unit="inconsistent jobs",
+            ),
+        )
+        return ValidationReport(
+            checks=checks,
+            feasible=coverage and mismatches == 0,
+            checker="SchedulingProblem.validate",
+            checker_version="1",
+        )
+
     def cost(self, solution: Schedule) -> float:
         """Sum positive lateness against the loaded due dates for a decoded schedule.
 
@@ -181,6 +250,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--time-limit", type=float, default=1.0)
     parser.add_argument("--n-jobs", type=int, default=None)
     parser.add_argument("--report", type=Path, default=None)
+    parser.add_argument(
+        "--validate-solution",
+        action="store_true",
+        help="Check the reconstructed final schedule after search (optional).",
+    )
     args = parser.parse_args(argv)
     instance = read_data(args.instance)
     problem = SchedulingProblem(instance)
@@ -195,15 +269,31 @@ def main(argv: Sequence[str] | None = None) -> None:
         random_state=42,
         history_limit=1000 if args.report else 0,
     ).solve(args.time_limit)
-    solution = problem.decode(np.asarray(result.keys))
+    assessment = (
+        assess_result(
+            result,
+            decoder=problem.decode,
+            validator=problem.validate,
+        )
+        if args.validate_solution
+        else None
+    )
+    solution = (
+        assessment.solution if assessment is not None else problem.decode(np.asarray(result.keys))
+    )
     print(f"Instance: {instance.name}")
     print(f"Total tardiness: {result.cost}")
     print(f"Schedule (job index, completion time): {solution}")
+    if assessment is not None:
+        print(
+            f"Validation: {assessment.validation.status}; feasible={assessment.validation.feasible}"
+        )
     if args.report is not None:
         report = OptimizationReport(
             result,
             title=f"Scheduling: {instance.name}",
             metrics={"Instance": instance.name, "Objective": "total tardiness"},
+            assessment=assessment,
         )
         print(report.write_html(args.report))
 

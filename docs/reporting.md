@@ -27,7 +27,7 @@ Using the decoder/objective from [getting started](getting-started.md):
 from rko.metaheuristics import SA
 from rko.reporting import OptimizationReport
 
-result = SA.solve_one(
+result = SA.optimize(
     decode, objective, n_variables=10,
     time_limit=2.0, adaptation="fixed", random_state=42,
     history_limit=1000,
@@ -85,7 +85,11 @@ Plot data is also represented by an accessible HTML table for summary/accounting
 individual history samples remain in the versioned embedded JSON. The JSON export
 contains the same data without requiring a browser or Plotly. Schema version 1
 contains `summary`, `searches`, `initialization`, `versions` and `domain_metrics`.
-It is a data-only artifact, not a replay script. This version does not provide
+An additive `assessment` section records optional [post-solve checks](solution-validation.md),
+explicit feasibility and separate postprocessing time; without a checker it says
+`not_checked`. `OptimizationReport(result, assessment=assessment)` exports only
+diagnostics, not the decoded solution or source keys. User metrics are not promoted
+to validation results. It is a data-only artifact, not a replay script. This version does not provide
 JSON import, automatic experiment aggregation or programmatic PDF conversion.
 
 ## Bounded, opt-in history
@@ -162,6 +166,7 @@ Do not put secrets in titles or metrics.
   renderer and dependency policy; this version does not download Chrome.
 - No live dashboard, remote service, stored populations, memory sampler or adaptive
   state-history heatmap.
-- No recording of failed/aborted runs: existing exception behavior remains unchanged.
+- No recording of failed/aborted optimization runs: existing exception behavior remains unchanged.
+  Failed domain checks on completed runs can be included through an optional assessment.
 - Low-level direct constructor `.solve()` calls do not activate managed history.
-  Use `Class.solve_one(...)` or `RKO(...)` for reportable metadata.
+  Use `Class.optimize(...)` or `RKO(...)` for reportable metadata.

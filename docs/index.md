@@ -13,6 +13,7 @@ development library, not a claim of release readiness or C++ equivalence.
 ## Apply and extend
 
 - [Standalone algorithms](standalone.md): all eleven classes, tuning and result metadata.
+- [Optional solution validation](solution-validation.md): final domain checks and report diagnostics.
 - [Interactive reports](reporting.md): offline HTML charts, bounded histories and JSON export.
 - [Extension guide](extending.md): replace local search/shaking or implement a new algorithm.
 - [Portfolio and execution API](usage.md): sharing elites, processes, budgets and reproducibility.
@@ -24,7 +25,7 @@ development library, not a claim of release readiness or C++ equivalence.
 - [Limitations](status.md) and [C++ compatibility](cpp-compatibility.md).
 - [Measurements](../benchmarks/README.md), not general performance promises.
 - Algorithm module docstrings describe technical strategy, pseudocode and stopping
-  criteria. Read `help(SA.solve_one)` for the standalone call contract and
+  criteria. Read `help(SA.optimize)` for the standalone call contract and
   `help(SA.__init__)` for the advanced constructor contract.
 
 Guides use `adaptation="fixed"` and `adaptation="adaptive"` rather than legacy

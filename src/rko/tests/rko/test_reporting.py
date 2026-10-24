@@ -32,6 +32,9 @@ from dataclasses import replace
 from html.parser import HTMLParser
 from pathlib import Path
 from rko import RKO
+from rko import ValidationCheck
+from rko import ValidationReport
+from rko import assess_result
 from rko.components import SolutionPool
 from rko.metaheuristics import MultiStart
 from rko.orchestration.search import SearchSession
@@ -169,7 +172,7 @@ def test_standalone_history_and_data_privacy(tmp_path: Path) -> None:
     Args:
         tmp_path (Path): Isolated export directory.
     """
-    result = MultiStart.solve_one(
+    result = MultiStart.optimize(
         decode, objective, 3, time_limit=0.01, random_state=42, history_limit=5
     )
     assert result.searches[0].history
@@ -294,7 +297,7 @@ def test_html_is_offline_escaped_and_data_consistent(tmp_path: Path) -> None:
     Args:
         tmp_path (Path): Isolated HTML output directory.
     """
-    result = MultiStart.solve_one(decode, objective, 3, time_limit=0.01, history_limit=5)
+    result = MultiStart.optimize(decode, objective, 3, time_limit=0.01, history_limit=5)
     attack = '</script><script>alert("unsafe")</script>'
     report = OptimizationReport(result, title=attack, metrics={attack: attack})
     target = report.write_html(tmp_path / "offline.html")
@@ -319,7 +322,7 @@ def test_html_without_history_is_honest(tmp_path: Path) -> None:
     Args:
         tmp_path (Path): Output directory.
     """
-    result = MultiStart.solve_one(decode, objective, 3, time_limit=0.01)
+    result = MultiStart.optimize(decode, objective, 3, time_limit=0.01)
     report = OptimizationReport(result)
     text = report.write_html(tmp_path / "summary.html").read_text(encoding="utf-8")
     assert "Histories unavailable for: MultiStart" in text
@@ -351,9 +354,47 @@ def test_atomic_output_failure_preserves_existing_file(
 
 def test_history_metadata_remains_pickleable() -> None:
     """Keep bounded history compatible with normal immutable result serialization."""
-    result = MultiStart.solve_one(decode, objective, 3, time_limit=0.01, history_limit=5)
+    result = MultiStart.optimize(decode, objective, 3, time_limit=0.01, history_limit=5)
     copied = pickle.loads(pickle.dumps(result))
     assert copied == result
     legacy = replace(result, searches=())
     assert OptimizationReport(legacy).to_dict()["searches"] == []
     assert HistoryPoint(0.1, 1, 2.0).cost == 2.0
+
+
+@pytest.mark.skipif(not HAS_PLOTLY, reason="Install the optional reports extra")
+def test_assessment_report_escapes_diagnostics_without_callbacks(tmp_path: Path) -> None:
+    """Expose failed checks truthfully without serializing payloads or re-running callbacks.
+
+    Args:
+        tmp_path (Path): Isolated report directory.
+    """
+    result = MultiStart.optimize(decode, objective, 3, time_limit=0.01)
+    attack = '</script><script>alert("unsafe")</script>'
+    payload = object()
+    decoder = Mock(return_value=payload)
+    validator = Mock(
+        return_value=ValidationReport(
+            checks=(ValidationCheck(attack, "failed", message=attack, value=8, limit=5),),
+            feasible=False,
+            checker=attack,
+        )
+    )
+    assessment = assess_result(result, decoder=decoder, validator=validator)
+    report = OptimizationReport(result, assessment=assessment)
+    html = report.write_html(tmp_path / "checked.html").read_text(encoding="utf-8")
+    assert attack not in html
+    assert "&lt;/script&gt;" in html
+    assert "Optional solution validation" in html
+    assert "post_run_decode" in html
+    assert "constraint coverage or global optimality" in html
+    parser = ReportParser()
+    parser.feed(html)
+    assert parser.external_scripts == []
+    embedded = json.loads(parser.scripts[-1])
+    assert embedded["assessment"] == assessment.to_dict()
+    assert embedded["assessment"]["validation"]["status"] == "failed"
+    assert embedded["assessment"]["validation"]["feasible"] is False
+    assert "solution" not in embedded["assessment"]
+    decoder.assert_called_once()
+    validator.assert_called_once_with(payload)

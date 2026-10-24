@@ -2,12 +2,13 @@
 
 [Documentation index](index.md) · [Parameter reference](parameters.md)
 
-All built-in classes inherit the same `solve_one` class method:
+All built-in classes inherit the same `optimize` class method:
+
 
 ```python
 from rko.metaheuristics import PSO
 
-result = PSO.solve_one(
+result = PSO.optimize(
     decode, objective, n_variables=64,
     time_limit=60.0,
     adaptation="fixed",
@@ -81,8 +82,8 @@ extra, keys, cost = algorithm.solve(limit_time=2.0)
 This low-level interface returns the historical tuple, **not** `RKOResult`.
 Its constructor defaults can differ from packaged TOML defaults. It does not
 activate the high-level callback budget session, isolated seeded RNG context, or
-immutable evaluation reports. Prefer `solve_one` for ordinary standalone use;
+immutable evaluation reports. Prefer `optimize` for ordinary standalone use;
 use direct constructors when managing pools or replacing operators yourself.
 
 Custom subclasses can implement the low-level `MetaheuristicBase` contract, but
-are not automatically registered for `solve_one`. See [extension](extending.md).
+are not automatically registered for `optimize`. See [extension](extending.md).

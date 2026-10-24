@@ -37,7 +37,7 @@ def objective(solution: np.ndarray) -> float:
 
 
 if __name__ == "__main__":
-    result = SA.solve_one(
+    result = SA.optimize(
         decode,
         objective,
         n_variables=10,
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 uv run --locked --no-dev python first_solve.py
 ```
 
-`solve_one` runs serially, creates a private elite pool and returns an immutable
+`optimize` runs serially, creates a private elite pool and returns an immutable
 `RKOResult`. It reuses the library's validated search lifecycle; there is no
 second implementation of simulated annealing. Substitute `PSO`, `GRASP`, `IPR`
 or another [built-in class](standalone.md#algorithm-catalog) with the same callbacks.
