@@ -2,7 +2,7 @@
 
 ## Evidence retained
 
-Hosted workflow [39690019745](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/39690019745)
+Hosted workflow [39690019745](https://github.com/MarcosPTProenca/RKO/actions/runs/39690019745)
 completed six Ubuntu shards and validated their paired controls before aggregation.
 Source revision: `831af1096ed0913b1f88da78aa78161aec1d8118`; Python 3.14.8 /
 NumPy 2.4.3. Production/config/operator and runner hashes match the original pilot.

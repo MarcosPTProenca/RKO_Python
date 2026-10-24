@@ -79,7 +79,7 @@ class SiteLinks(HTMLParser):
         Raises:
             AssertionError: If a link escapes the project prefix or references a missing asset.
         """
-        prefix = "/RKO_Python/"
+        prefix = "/RKO/"
         origin = "https://marcosptproenca.github.io"
         current = origin + prefix + self.page.relative_to(self.root).as_posix()
         for link in self.links:
@@ -131,6 +131,11 @@ def test_docs_dependencies_and_deployment_permissions_are_isolated() -> None:
     configuration = yaml.load(
         (root / "mkdocs.yml").read_text(encoding="utf-8"), Loader=yaml.BaseLoader
     )
+    assert configuration["site_name"] == "RKO"
+    assert configuration["repo_url"] == metadata["project"]["urls"]["Repository"]
+    assert configuration["repo_name"] == "MarcosPTProenca/RKO"
+    assert configuration["site_url"] == "https://marcosptproenca.github.io/RKO/"
+    assert configuration["site_url"] == metadata["project"]["urls"]["Documentation"]
     pages: set[str] = set()
     pending: list[object] = [configuration["nav"]]
     while pending:
@@ -182,7 +187,7 @@ def test_site_links_accept_local_assets_and_deliberate_repository_urls(tmp_path:
     page.write_text("test", encoding="utf-8")
     (tmp_path / "base.css").write_text("body{}", encoding="utf-8")
     parser = SiteLinks(tmp_path, page)
-    parser.feed('<link href="/RKO_Python/base.css"><a href="https://github.com/example">Repo</a>')
+    parser.feed('<link href="/RKO/base.css"><a href="https://github.com/example">Repo</a>')
     parser.verify()
 
 
@@ -200,7 +205,7 @@ def test_preview_serves_pages_assets_and_search_at_project_prefix() -> None:
         stderr=subprocess.STDOUT,
         text=True,
     )
-    base = f"http://127.0.0.1:{port}/RKO_Python/"
+    base = f"http://127.0.0.1:{port}/RKO/"
     try:
         for _ in range(100):
             if server.poll() is not None:
@@ -280,6 +285,8 @@ def test_strict_site_excludes_private_inputs_and_supports_project_subpath(tmp_pa
             assert sentinel.encode() not in content
             assert b"/home/marcos" not in content
             assert b"/mnt/c/Users" not in content
+            assert b"RKO_Python" not in content
+            assert b"RKO Python" not in content
     for page in pages:
         content = page.read_text(encoding="utf-8")
         if page.name != "404.html":

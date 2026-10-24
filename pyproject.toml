@@ -17,8 +17,9 @@ dependencies = [
 rko = "rko.examples.run_kp_cpp_instances:main"
 
 [project.urls]
-Repository = "https://github.com/MarcosPTProenca/RKO_Python"
-Issues = "https://github.com/MarcosPTProenca/RKO_Python/issues"
+Repository = "https://github.com/MarcosPTProenca/RKO"
+Issues = "https://github.com/MarcosPTProenca/RKO/issues"
+Documentation = "https://marcosptproenca.github.io/RKO/"
 
 [project.optional-dependencies]
 reports = [

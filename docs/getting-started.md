@@ -7,8 +7,8 @@
 Requires Python 3.14+ and uv. From the repository root:
 
 ```bash
-git clone https://github.com/MarcosPTProenca/RKO_Python.git
-cd RKO_Python
+git clone https://github.com/MarcosPTProenca/RKO.git
+cd RKO
 uv sync --locked --no-dev
 ```
 

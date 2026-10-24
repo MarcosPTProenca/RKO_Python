@@ -1,6 +1,8 @@
-# RKO Python
+# RKO
 
-[![CI](https://github.com/MarcosPTProenca/RKO_Python/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MarcosPTProenca/RKO_Python/actions/workflows/ci.yml)
+[![CI](https://github.com/MarcosPTProenca/RKO/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MarcosPTProenca/RKO/actions/workflows/ci.yml)
+
+[Development documentation](https://marcosptproenca.github.io/RKO/)
 
 A domain-neutral **random-key optimization** library with cooperating
 metaheuristics, inspired by [RKO C++ v2](https://github.com/RKO-solver/RKO_Cpp_v2.0).
@@ -57,8 +59,8 @@ CI currently tests Python 3.14 on Ubuntu and Windows; other combinations are not
 certified by that matrix.
 
 ```bash
-git clone https://github.com/MarcosPTProenca/RKO_Python.git
-cd RKO_Python
+git clone https://github.com/MarcosPTProenca/RKO.git
+cd RKO
 uv sync --locked --no-dev
 ```
 
@@ -66,7 +68,7 @@ Run Python scripts with `uv run --locked --no-dev python your_script.py` from
 this checkout. For reproducible use, record the Git revision as well as the lock
 file. Do not assume a package named `rko` on PyPI exposes this development API.
 The previous implementation is preserved at
-[`archive/pre-standalone-migration-2026-10-18`](https://github.com/MarcosPTProenca/RKO_Python/tree/archive/pre-standalone-migration-2026-10-18).
+[`archive/pre-standalone-migration-2026-10-18`](https://github.com/MarcosPTProenca/RKO/tree/archive/pre-standalone-migration-2026-10-18).
 
 ## First solve
 
@@ -398,11 +400,11 @@ Neither passing CI nor an isolated kernel speedup establishes C++ parity.
 
 ## Project status and attribution
 
-This is the standalone `MarcosPTProenca/RKO_Python` development repository, not an
+This is the standalone `MarcosPTProenca/RKO` development repository, not an
 agent integration. The API and Python requirement break compatibility with the
 archived implementation. Wheel/sdist installation and the full test suite are
 checked on Ubuntu and Windows; that is not a supported-version or release guarantee.
 
 The existing [LICENSE](LICENSE) is retained. [NOTICE](NOTICE) records imported
 history, fixture licensing and ownership review still required before release.
-Report reproducible bugs through [GitHub issues](https://github.com/MarcosPTProenca/RKO_Python/issues).
+Report reproducible bugs through [GitHub issues](https://github.com/MarcosPTProenca/RKO/issues).

@@ -10,7 +10,7 @@ by itself. Results outside the evaluated workload/resource envelope remain unkno
 
 The default implementation is Python plus NumPy, with no compiler dependency for users.
 Several kernels and allocation paths have measured improvements over earlier Python
-versions; [each benchmark identifies its workload and limits](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md).
+versions; [each benchmark identifies its workload and limits](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md).
 Those measurements do not establish whole-solver C++ performance parity.
 
 The [1,440-pair prefill study](prefill-expanded-work.md) finds broader but not
@@ -24,7 +24,7 @@ which predates subsequent contract and startup corrections. Preserve that run as
 historical evidence; do not combine its rows with current-code results or infer the
 current library's performance from it. The historical runner is now available as
 `benchmarks/cpp_python_knapsack.py`, with the completed two-second reference clearly
-separated in [benchmark documentation](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md#python-versus-c-knapsack-comparison).
+separated in [benchmark documentation](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md#python-versus-c-knapsack-comparison).
 Fresh invocations execute the current checkout, not the archived implementation;
 use new source-identified output/cache locations after the protected run finishes.
 The integrated runner's TOML/helper fingerprint checks prevent unsafe resume across
@@ -297,7 +297,7 @@ search/local-search candidate
 ```
 
 These protections are real behavior in
-[`SearchSession`](https://github.com/MarcosPTProenca/RKO_Python/blob/main/src/rko/orchestration/search.py), not disposable overhead.
+[`SearchSession`](https://github.com/MarcosPTProenca/RKO/blob/main/src/rko/orchestration/search.py), not disposable overhead.
 Moving the search loop into Rust still calls Python for arbitrary existing
 callbacks. On GIL-enabled CPython those calls require interpreter attachment/GIL
 access. Rust-only work can detach; ordinary Python callbacks cannot execute while
@@ -364,7 +364,7 @@ Kernel, Python-callback and native-callback paths must be measured separately.
    RKO CI does not certify a native engine or free-threaded Python.
 7. **Resolve attribution and release policy.** The upstream C++ MIT license is
    visible [7], but it does not settle the combined project's imported-code review
-   in [NOTICE](https://github.com/MarcosPTProenca/RKO_Python/blob/main/NOTICE). No source-copy/relicensing shortcut follows.
+   in [NOTICE](https://github.com/MarcosPTProenca/RKO/blob/main/NOTICE). No source-copy/relicensing shortcut follows.
 8. **Return to the actual C++ target.** Run fair, current-revision multi-instance
    comparisons and publish losses/failures as well as wins. Only then reconsider
    default engine selection or performance claims.

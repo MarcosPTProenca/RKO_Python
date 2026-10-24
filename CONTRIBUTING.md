@@ -1,6 +1,6 @@
 # Contributing
 
-Contribute to `MarcosPTProenca/RKO_Python`, branch `main`. This is the standalone
+Contribute to `MarcosPTProenca/RKO`, branch `main`. This is the standalone
 library; do not make new changes in an old agent checkout. Read [AGENTS](AGENTS.md)
 for repository coding conventions and [current limitations](docs/status.md) before
 interpreting a passing test suite as release or scientific validation.
@@ -10,8 +10,8 @@ interpreting a passing test suite as release or scientific validation.
 Use Python 3.14 and [uv](https://docs.astral.sh/uv/):
 
 ```bash
-git clone https://github.com/MarcosPTProenca/RKO_Python.git
-cd RKO_Python
+git clone https://github.com/MarcosPTProenca/RKO.git
+cd RKO
 uv sync --locked --group dev
 uv run --locked pre-commit install
 ```
@@ -53,7 +53,7 @@ Preview the same maintained Markdown with the built-in MkDocs theme:
 uv run --locked --only-group docs mkdocs serve
 ```
 
-Use the reported `/RKO_Python/` URL. Docs tools are a separate locked group, not
+Use the reported `/RKO/` URL. Docs tools are a separate locked group, not
 runtime dependencies. Before a docs change, run:
 
 ```bash
