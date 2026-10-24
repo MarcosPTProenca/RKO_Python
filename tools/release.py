@@ -361,6 +361,15 @@ class ReleaseManager:
             or f"## {version}" not in (self.root / "CHANGELOG.md").read_text()
         ):
             raise ValueError("Candidate version, tag and changelog must agree.")
+        marker = payload / "dist" / ".gitignore"
+        if marker.exists():
+            if (
+                marker.is_symlink()
+                or not marker.is_file()
+                or marker.read_bytes() not in (b"*", b"*\n")
+            ):
+                raise ValueError("Unexpected uv output marker; use a fresh dedicated payload.")
+            marker.unlink()
         paths = sorted((payload / "dist").iterdir())
         if len(paths) != 2 or sum(path.suffix == ".whl" for path in paths) != 1:
             raise ValueError("Payload must contain exactly one wheel and one sdist.")

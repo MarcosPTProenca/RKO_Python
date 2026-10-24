@@ -122,6 +122,30 @@ def test_noncanonical_or_stable_tags_are_rejected(tag: str) -> None:
     assert ReleaseManager.version("v0.3.0a1") == "0.3.0a1"
 
 
+@pytest.mark.parametrize("content", [b"*", b"*\n", b"unreviewed hidden content"])
+def test_only_exact_uv_output_marker_is_removed(
+    payload: tuple[ReleaseManager, Path],
+    content: bytes,
+) -> None:
+    """Admit uv's generated marker without accepting arbitrary hidden publication files.
+
+    Args:
+        payload (tuple[ReleaseManager, Path]): Dedicated temporary artifact output.
+        content (bytes): Generated marker or unrecognized hidden content.
+    """
+    manager, directory = payload
+    marker = directory / "dist" / ".gitignore"
+    marker.write_bytes(content)
+    if content in (b"*", b"*\n"):
+        manager.create(directory)
+        assert not marker.exists()
+        manager.verify(directory)
+    else:
+        with pytest.raises(ValueError, match="marker"):
+            manager.create(directory)
+        assert marker.read_bytes() == content
+
+
 def test_exact_payload_survives_transfer_and_changed_bytes_fail(
     payload: tuple[ReleaseManager, Path],
 ) -> None:
