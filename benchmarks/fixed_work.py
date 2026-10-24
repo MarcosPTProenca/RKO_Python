@@ -39,11 +39,11 @@ import time
 from pathlib import Path
 from rko.components.solution_pool import ElitePool
 from rko.components.solution_pool import SolutionPool
-from rko.metaheuristics import BRKGA
-from rko.metaheuristics import IPR
-from rko.metaheuristics import SA
-from rko.metaheuristics import GeneticAlgorithm
 from rko.metaheuristics import MetaheuristicBase
+from rko.metaheuristics.brkga import BRKGA
+from rko.metaheuristics.ga import GeneticAlgorithm
+from rko.metaheuristics.ipr import IPR
+from rko.metaheuristics.sa import SA
 from rko.orchestration.search import SearchSession
 
 

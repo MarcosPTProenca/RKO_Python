@@ -22,13 +22,17 @@ Inputs/Outputs:
 """
 
 import ast
+import inspect
 import numpy as np
 import pytest
+import subprocess
+import sys
 from pathlib import Path
 from rko import RKO
-from rko.metaheuristics import MetaheuristicBase
+from rko import metaheuristics
 from rko.orchestration.configuration import MH_SPECS
 from rko.orchestration.configuration import parse_run_config
+from unittest.mock import Mock
 
 
 def decode(keys: np.ndarray) -> np.ndarray:
@@ -64,9 +68,20 @@ def test_each_algorithm_runs_alone(name: str, adaptation: str) -> None:
         name (str): Canonical algorithm name.
         adaptation (str): Requested readable parameter mode.
     """
-    result = MH_SPECS[name].constructor.optimize(
-        decode, objective, 3, time_limit=0.01, random_state=42, adaptation=adaptation
+    solver_type = getattr(metaheuristics, "GeneticAlgorithm" if name == "GA" else name)
+    solver = solver_type(
+        decode,
+        objective,
+        3,
+        random_state=42,
+        adaptation=adaptation,
+        backend="serial",
     )
+    assert isinstance(solver, RKO)
+    assert solver_type.solve is RKO.solve
+    assert solver.result_ is None
+    result = solver.solve(time_limit=0.01)
+    assert solver.result_ is result
     assert result.algorithms == (name,)
     assert result.backend == "serial"
     assert result.adaptation == adaptation
@@ -117,29 +132,119 @@ def test_conflicting_modes_are_rejected() -> None:
 
 def test_standalone_scalar_overrides() -> None:
     """Merge single-algorithm scalar overrides with packaged fixed defaults."""
-    result = MH_SPECS["GA"].constructor.optimize(
+    solver = metaheuristics.GeneticAlgorithm(
         decode,
         objective,
         3,
-        time_limit=0.01,
-        hyperparameters={"size_pop": 8, "prob_mut": 0.1},
+        adaptation="fixed",
+        backend="serial",
+        hyperparameters={"GA": {"size_pop": 8, "prob_mut": 0.1}},
     )
+    result = solver.solve(time_limit=0.01)
     assert dict(result.searches[0].parameters)["size_pop"] == 8
     assert dict(result.searches[0].parameters)["prob_mut"] == 0.1
 
 
-def test_managed_standalone_entry_point_is_unambiguous() -> None:
-    """Expose a single class-level optimization method rather than redundant aliases."""
-    methods = {
-        name for name, value in MetaheuristicBase.__dict__.items() if isinstance(value, classmethod)
+def test_public_solver_signatures_and_defaults_match_rko() -> None:
+    """Keep every dedicated solver's shared constructor and solve contract aligned with RKO."""
+    expected = dict(inspect.signature(RKO).parameters)
+    expected.pop("algorithms")
+    for name in MH_SPECS:
+        solver_type = getattr(metaheuristics, "GeneticAlgorithm" if name == "GA" else name)
+        actual = dict(inspect.signature(solver_type).parameters)
+        assert tuple(actual) == tuple(expected)
+        for parameter, spec in expected.items():
+            assert actual[parameter].default == spec.default
+            assert actual[parameter].kind == spec.kind
+        assert solver_type.solve is RKO.solve
+        for key in MH_SPECS[name].int_params + MH_SPECS[name].float_params:
+            assert key in solver_type.__doc__
+
+
+def test_shared_constructor_settings_are_forwarded_without_io(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Store every shared RKO option without reading files or constructing a search.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Prevents configuration I/O during construction.
+        tmp_path (Path): Example custom parameter directory.
+    """
+    reader = Mock(side_effect=AssertionError("constructor must not read configuration"))
+    monkeypatch.setattr("rko.solver.load_config", reader)
+    options = {
+        "adaptation": "fixed",
+        "control": 0,
+        "pool_size": 5,
+        "prefill_pool": False,
+        "params_dir": tmp_path,
+        "backend": "process",
+        "n_jobs": 2,
+        "random_state": 42,
+        "verbose": True,
+        "history_limit": 10,
+        "hyperparameters": {"SA": {"sa_max": 100}},
     }
-    assert methods == {"optimize"}
+    reference = RKO(decode, objective, 3, algorithms=["SA"], **options)
+    solver = metaheuristics.SA(decode, objective, 3, **options)
+    for key, value in vars(reference).items():
+        if key == "algorithms":
+            assert tuple(value) == solver.algorithms
+        else:
+            assert getattr(solver, key) == value
+    reader.assert_not_called()
 
 
-def test_base_class_is_not_a_registered_algorithm() -> None:
-    """Reject invoking the convenience entry point on the abstract base itself."""
-    with pytest.raises(ValueError, match="registered"):
-        MetaheuristicBase.optimize(decode, objective, 3, time_limit=0.01)
+def test_dedicated_selection_cannot_become_a_portfolio() -> None:
+    """Reject changing a dedicated solver's fixed identity; portfolio selection belongs to RKO."""
+    solver = metaheuristics.SA(decode, objective, 3, backend="serial")
+    with pytest.raises(ValueError, match="fixed"):
+        solver.algorithms = ["PSO"]
+    assert solver.algorithms == ("SA",)
+    with pytest.raises(TypeError, match="algorithms"):
+        metaheuristics.SA(decode, objective, 3, algorithms=["SA"])
+
+
+@pytest.mark.parametrize("backend", ["serial", "thread", "process"])
+def test_public_solver_reuses_backend_history_and_failure_contracts(backend: str) -> None:
+    """Preserve managed results, history and clearing on failed repeated solves.
+
+    Args:
+        backend (str): Shared RKO execution backend.
+    """
+    solver = metaheuristics.SA(
+        decode,
+        objective,
+        3,
+        adaptation="fixed",
+        backend=backend,
+        history_limit=5,
+        random_state=42,
+        hyperparameters={"SA": {"sa_max": 100, "t0": 1000.0}},
+    )
+    result = solver.solve(time_limit=0.1)
+    assert result.algorithms == ("SA",)
+    assert result.backend == backend
+    assert solver.result_ is result
+    assert result.searches[0].history
+    assert dict(result.searches[0].parameters)["sa_max"] == 100
+    assert dict(result.searches[0].parameters)["t0"] == 1000.0
+    solver.n_variables = 0
+    with pytest.raises(ValueError, match="n_variables"):
+        solver.solve(time_limit=0.1)
+    assert solver.result_ is None
+
+
+def test_public_exports_import_in_a_fresh_interpreter() -> None:
+    """Exercise public lazy exports and kernel submodule imports without import cycles."""
+    command = (
+        "from rko import RKO; from rko.metaheuristics import SA, PSO; "
+        "from rko.metaheuristics import sa; "
+        "assert issubclass(SA, RKO); assert issubclass(PSO, RKO); "
+        "assert SA is not sa.SA"
+    )
+    subprocess.run([sys.executable, "-c", command], check=True, timeout=30)
 
 
 def test_readable_toml_configuration_and_python_override(tmp_path: Path) -> None:

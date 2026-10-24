@@ -102,14 +102,12 @@ def main() -> None:
     """
     instance = read_data(Path("my_instance.json"))
     problem = SchedulingProblem(instance)
-    result = SA.optimize(
-        problem.decode,
-        problem.cost,
-        n_variables=problem.n_variables,
-        time_limit=2.0,
-        adaptation="fixed",
-        random_state=42,
+    solver = SA(
+        problem.decode, problem.cost, n_variables=problem.n_variables,
+        adaptation="fixed", backend="serial", random_state=42,
+        hyperparameters={"SA": {"sa_max": 100, "t0": 1000.0}},
     )
+    result = solver.solve(time_limit=2.0)
     solution = problem.decode(np.asarray(result.keys))
     print("Schedule (job index, completion time):", solution)
     print("Total tardiness:", result.cost)
@@ -127,7 +125,8 @@ uv run --locked python solve_schedule.py
 
 Substitute `PSO`, `GRASP`, `GeneticAlgorithm` or any other
 [built-in class](standalone.md#algorithm-catalog) without changing the reader or
-adapter. `optimize` handles its private pool and runs serially. These classes are
+adapter. All public classes use `solver.solve(...)` with the same lifecycle as RKO;
+this example explicitly requests serial execution. These classes are
 metaheuristics, not trained models that need their own input-file loader.
 
 ### 4. Use the same instance in RKO
@@ -137,11 +136,13 @@ To use a portfolio, replace only the solver call in `main`:
 ```python
 from rko import RKO
 
-result = RKO(
+solver = RKO(
     problem.decode, problem.cost, problem.n_variables,
     algorithms=["SA", "PSO"], adaptation="fixed",
     backend="process", n_jobs=2, random_state=42,
-).solve(2.0)
+    hyperparameters={"SA": {"sa_max": 100}, "PSO": {"p_size": 20}},
+)
+result = solver.solve(time_limit=2.0)
 ```
 
 Keep `read_data`, adapter construction and `solve` inside the guarded main function.

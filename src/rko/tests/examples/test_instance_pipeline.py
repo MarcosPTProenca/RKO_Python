@@ -209,9 +209,15 @@ def test_same_adapter_works_with_standalone_algorithm(instance_file: Path) -> No
         instance_file (Path): Valid scheduling fixture.
     """
     problem = SchedulingProblem(read_data(instance_file))
-    result = SA.optimize(
-        problem.decode, problem.cost, problem.n_variables, time_limit=0.02, random_state=42
+    solver = SA(
+        problem.decode,
+        problem.cost,
+        problem.n_variables,
+        adaptation="fixed",
+        backend="serial",
+        random_state=42,
     )
+    result = solver.solve(time_limit=0.02)
     assert result.cost == problem.cost(problem.decode(np.asarray(result.keys)))
     assert result.algorithms == ("SA",)
 

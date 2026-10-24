@@ -7,7 +7,6 @@ Technical approach:
 - Use structural protocols for local-search and shaking callables.
 - Store optional operator overrides while preserving algorithm defaults.
 - Track elapsed time and cooperative cancellation through one shared base.
-- Run registered built-ins through the managed serial optimize class method.
 
 Flow (pseudocode):
 1. Retain the shared pool and any supplied operator overrides.
@@ -33,16 +32,12 @@ from ..components.solution_pool import SolutionPoolWriter
 from abc import ABC
 from abc import abstractmethod
 from collections.abc import Callable
-from collections.abc import Mapping
-from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Any
-from typing import Literal
 from typing import Protocol
 
 if TYPE_CHECKING:
     from ..orchestration.types import SearchMetadata
-    from ..solver import RKOResult
 
 
 class LocalSearchOperator(Protocol):
@@ -140,70 +135,6 @@ class MetaheuristicBase(ABC):
         self._start_time: float | None = None
         self._cancelled: threading.Event | None = None
         self._search_metadata: SearchMetadata | None = None
-
-    @classmethod
-    def optimize(
-        cls,
-        decoder: Callable[[np.ndarray], Any],
-        cost: Callable[[Any], float],
-        n_variables: int,
-        *,
-        time_limit: float,
-        adaptation: Literal["fixed", "adaptive"] = "fixed",
-        hyperparameters: Mapping[str, int | float] | None = None,
-        random_state: int | None = None,
-        pool_size: int | None = None,
-        params_dir: Path | None = None,
-        verbose: bool = False,
-        history_limit: int = 0,
-    ) -> RKOResult:
-        """Optimize with this built-in algorithm and an automatically managed elite pool.
-
-        Args:
-            decoder (Callable[[np.ndarray], Any]): Decode a detached key vector.
-            cost (Callable[[Any], float]): Return a finite minimization objective.
-            n_variables (int): Positive number of random keys.
-            time_limit (float): Positive finite search seconds; stopping is cooperative.
-            adaptation (Literal["fixed", "adaptive"]): Fixed parameters or Q-learning.
-                IPR and MultiStart always use fixed parameters.
-            hyperparameters (Mapping[str, int | float] | None): Partial scalar settings
-                for this algorithm; require fixed adaptation. Omitted keys use TOMLs.
-            random_state (int | None): Nonnegative seed for privately owned library draws.
-            pool_size (int | None): Elite capacity; None uses packaged configuration.
-            params_dir (Path | None): Optional custom parameter directory.
-            verbose (bool): Print progress when True.
-            history_limit (int): Zero disables recording; 2 through 10000 caps scalar
-                incumbent observations retained for interactive reporting.
-
-        Returns:
-            RKOResult: Immutable best keys, objective and measured search metadata.
-
-        Raises:
-            ValueError: If this class is unregistered or settings/callbacks are invalid.
-            OSError: If parameter files cannot be read.
-            Exception: Original decoder or objective exceptions propagate.
-        """
-        from ..orchestration.configuration import MH_SPECS
-        from ..solver import RKO
-
-        name = next((name for name, spec in MH_SPECS.items() if spec.constructor is cls), None)
-        if name is None:
-            raise ValueError("optimize supports registered built-in metaheuristic classes only.")
-        return RKO(
-            decoder,
-            cost,
-            n_variables,
-            algorithms=[name],
-            adaptation=adaptation,
-            hyperparameters={name: hyperparameters} if hyperparameters is not None else None,
-            backend="serial",
-            pool_size=pool_size,
-            prefill_pool=False,
-            params_dir=params_dir,
-            random_state=random_state,
-            verbose=verbose,
-            history_limit=history_limit,
-        ).solve(time_limit)
 
     @abstractmethod
     def solve(self, limit_time: float) -> tuple[list[object], list[float], float]:

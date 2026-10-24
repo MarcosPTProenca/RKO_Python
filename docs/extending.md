@@ -13,7 +13,8 @@ Do not copy an entire algorithm to change a parameter or a local-search operator
 
 ## Replace an operator
 
-Advanced direct constructors accept `LocalSearchOperator` and, for SA/ILS/VNS,
+Advanced kernel constructors, explicitly imported from implementation modules,
+accept `LocalSearchOperator` and, for SA/ILS/VNS,
 `ShakingOperator`. A local-search callable accepts
 `(keys, decoder, cost, *, pool)` and returns `(keys, objective)`. The `pool=` keyword
 is part of the contract. It may be None. A shaking callable accepts
@@ -24,9 +25,10 @@ with the objective value. Preserve bounds and dimension; do not assume that
 mutating an argument is harmless. Use owned RNGs if the operator is stochastic.
 Do not silently suppress callback exceptions or report uncomputed objectives.
 
-`Class.optimize` deliberately exposes the small, managed API, not every low-level
-constructor argument. Operator overrides are currently an advanced direct-constructor
-feature, with the lifecycle limitations documented in [standalone usage](standalone.md#advanced-direct-constructors).
+Public algorithm solver objects share RKO's constructor and `.solve(...)` contract,
+not every low-level kernel argument. Operator overrides remain an advanced kernel
+feature, with the lifecycle limitations documented in
+[advanced kernel integration](standalone.md#advanced-kernel-integration).
 
 ## Implement a new metaheuristic
 
@@ -50,8 +52,10 @@ than a minimal skeleton that omits validation, RNG or stopping behavior.
 
 To integrate with the configured high-level API, update the single `MH_SPECS`
 registry, canonical aliases if needed, parameter-file mapping/axis schema,
-packaged TOML defaults and public exports. Registry membership connects a built-in
-class to inherited `optimize`; arbitrary subclasses are **not** auto-registered.
+packaged TOML defaults and public exports. To offer a dedicated managed public
+solver, add a single-algorithm RKO subclass and its lazy package export; reuse
+RKO.solve rather than copying execution logic. Registry membership alone does not
+create that public solver class, and arbitrary subclasses are not auto-registered.
 There is no third-party plugin-registration API in this change.
 
 ## Required tests and documentation
@@ -60,7 +64,7 @@ There is no third-party plugin-registration API in this change.
 - Finite keys/cost consistency and short-budget incumbent preservation.
 - Fixed and supported adaptive paths, RNG isolation, callback failures.
 - Pool interaction and operator substitution where applicable.
-- The common standalone class-method contract and result metadata.
+- The common constructor/solve contract, signatures/defaults and result metadata.
 - Public examples and parameter reference updated with the implementation.
 
 Run from this repository root:

@@ -61,14 +61,16 @@ def main() -> None:
         OSError: If the output directory or files cannot be written.
         ValueError: If example settings or objective values fail validation.
     """
-    result = SA.optimize(
+    solver = SA(
         decode,
         objective,
         10,
-        time_limit=2.0,
+        adaptation="fixed",
+        backend="serial",
         random_state=42,
         history_limit=1000,
     )
+    result = solver.solve(time_limit=2.0)
     directory = Path("results")
     directory.mkdir(exist_ok=True)
     report = OptimizationReport(result, title="Standalone simulated annealing")

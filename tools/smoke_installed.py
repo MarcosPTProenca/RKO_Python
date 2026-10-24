@@ -230,13 +230,18 @@ def main() -> None:
         assert assessment.validation.status == "passed"
         assert assessment.validation.feasible is True
         assert assessment.result is scheduled
-    standalone = SA.optimize(
+    standalone_solver = SA(
         problem.decode,
         problem.cost,
         problem.n_variables,
-        time_limit=0.1,
+        adaptation="fixed",
+        backend="serial",
         random_state=42,
+        hyperparameters={"SA": {"sa_max": 100, "t0": 1000.0}},
     )
+    standalone = standalone_solver.solve(time_limit=0.1)
+    assert standalone_solver.result_ is standalone
+    assert dict(standalone.searches[0].parameters)["sa_max"] == 100
     assert standalone.algorithms == ("SA",)
     assert standalone.cost == problem.cost(problem.decode(np.asarray(standalone.keys)))
     executable = shutil.which("rko")

@@ -302,7 +302,8 @@ def test_scheduling_checks_are_independent_of_cost_and_decode(
     assert problem.validate(((9, 3), (1, 5))).feasible is False
     assert problem.validate(((0, 3),)).feasible is False
     assert problem.validate(((True, 3), (1, 5))).feasible is False
-    outcome = SA.optimize(problem.decode, problem.cost, 2, time_limit=0.02)
+    solver = SA(problem.decode, problem.cost, 2, adaptation="fixed", backend="serial")
+    outcome = solver.solve(time_limit=0.02)
     assessment = assess_result(outcome, decoder=problem.decode, validator=problem.validate)
     assert outcome.cost > 0
     assert assessment.validation.feasible is True
@@ -437,6 +438,8 @@ def test_readme_individual_algorithm_examples_run(tmp_path: Path) -> None:
         result = namespace["result"]
         assert result.algorithms == ("SA",)
         assert result.backend == "serial"
+        assert dict(result.searches[0].parameters)["sa_max"] == 100
+        assert dict(result.searches[0].parameters)["t0"] == 1000.0
         assert result.cost == pytest.approx(
             namespace["cost"](namespace["decode"](np.asarray(result.keys)))
         )

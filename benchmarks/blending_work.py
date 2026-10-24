@@ -39,9 +39,9 @@ from benchmarks.performance_profile import PerformanceProbe
 from collections.abc import Callable
 from pathlib import Path
 from rko.components.blending.blending import blending
-from rko.metaheuristics import BRKGA
-from rko.metaheuristics import SA
-from rko.metaheuristics import GeneticAlgorithm
+from rko.metaheuristics.brkga import BRKGA
+from rko.metaheuristics.ga import GeneticAlgorithm
+from rko.metaheuristics.sa import SA
 from rko.orchestration.search import SearchSession
 from rko.orchestration.types import CostFn
 from rko.orchestration.types import DecoderFn

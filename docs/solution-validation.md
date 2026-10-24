@@ -32,10 +32,11 @@ def main() -> None:
     """
     path = Path(instance_pipeline.__file__).with_name("instances") / "scheduling.json"
     problem = SchedulingProblem(read_data(path))
-    result = SA.optimize(
+    solver = SA(
         problem.decode, problem.cost, problem.n_variables,
-        time_limit=2.0, random_state=42,
+        adaptation="fixed", backend="serial", random_state=42,
     )
+    result = solver.solve(time_limit=2.0)
     assessment = assess_result(
         result, decoder=problem.decode, validator=problem.validate,
     )

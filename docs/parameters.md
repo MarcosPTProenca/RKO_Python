@@ -14,9 +14,9 @@ experiment, and adaptive mode is not a learned decoder. Both optimize the same
 objective. Adaptive control has overhead and is **not** guaranteed to improve
 quality. IPR and MultiStart have no adaptive parameter axes.
 
-`RKO(..., adaptation=None)` retains the configured default (the packaged config
-currently requests adaptive control). `Class.optimize(...)` defaults to fixed
-mode for an explicit, easily tuned standalone starting point. Existing `control`
+RKO and every public algorithm solver retain the same configured default with
+`adaptation=None` (the packaged config currently requests adaptive control).
+Choose `adaptation="fixed"` explicitly when supplying manual scalar overrides. Existing `control`
 calls continue to work without warnings. The legacy name is retained for
 compatibility, not removed in this change. If both names are supplied, they must
 agree or a `ValueError` is raised. Validation occurs when `RKO.solve()` starts.
@@ -30,11 +30,11 @@ rejected. Existing `[offline]` and `[online]` table names stay unchanged.
 ```python
 from rko.metaheuristics import SA
 
-result = SA.optimize(
-    decode, objective, 20, time_limit=60.0,
-    adaptation="fixed",
-    hyperparameters={"sa_max": 100, "t0": 1000.0, "alpha": 0.98},
+solver = SA(
+    decode, objective, 20, adaptation="fixed", backend="serial",
+    hyperparameters={"SA": {"sa_max": 100, "t0": 1000.0, "alpha": 0.98}},
 )
+result = solver.solve(time_limit=60.0)
 ```
 
 For a portfolio, nest the same settings by algorithm:
@@ -56,8 +56,8 @@ adaptive choices in `[online]` named TOML axes through `params_dir` instead.
 
 ## Algorithm parameters
 
-The defaults below are the **packaged fixed TOML defaults** used by `optimize`
-and `RKO`, not necessarily the defaults of direct class constructors. They are
+The defaults below are the **packaged fixed TOML defaults** used by the public individual solvers
+and RKO, not necessarily the defaults of direct class constructors. They are
 starting points, not recommendations for every problem. Costs are assumed to be
 minimized; temperature scales depend on your objective's magnitude.
 

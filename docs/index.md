@@ -25,8 +25,9 @@ development library, not a claim of release readiness or C++ equivalence.
 - [Limitations](status.md) and [C++ compatibility](cpp-compatibility.md).
 - [Measurements](../benchmarks/README.md), not general performance promises.
 - Algorithm module docstrings describe technical strategy, pseudocode and stopping
-  criteria. Read `help(SA.optimize)` for the standalone call contract and
-  `help(SA.__init__)` for the advanced constructor contract.
+  criteria. Public classes such as `SA` share RKO's constructor options and solve
+  contract: read `help(SA)` and `help(SA.solve)` for managed usage. Explicit kernel
+  imports are reserved for advanced operator integration.
 
 Guides use `adaptation="fixed"` and `adaptation="adaptive"` rather than legacy
 `control=0` / `control=1`. These names describe parameter selection, **not** network

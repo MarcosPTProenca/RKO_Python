@@ -2,7 +2,8 @@
 
 [Start with the quickstart](../README.md) for a first serial solve. This guide
 covers configuration, execution modes, callbacks, result accounting and stopping.
-For one algorithm without pool management use [`SA.optimize(...)`](standalone.md).
+For one algorithm use a [public solver such as `SA(...)`](standalone.md), followed
+by the same `.solve(time_limit=...)` call and settings as RKO.
 The [parameter reference](parameters.md) explains every fixed scalar and adaptive
 mode; the [extension guide](extending.md) covers custom operators and algorithms.
 Commands and example paths assume the repository root. The Python library needs
@@ -194,8 +195,9 @@ through named `[online]` TOML axes; `control=1` rejects scalar overrides rather 
 silently replacing tuned values during adaptation. Result reports retain the
 validated initial scalar settings and actual adaptive axes used by each search.
 
-Direct metaheuristic constructors use package-provided local search and shaking
-by default. Algorithms that perform local search accept a typed
+Low-level kernel constructors (explicit implementation-module imports, not the
+managed public solver constructors) use package-provided local search and shaking
+by default. Kernels that perform local search accept a typed
 `local_search_operator`; SA, ILS and VNS also accept `shaking_operator`. These
 callables are optional overrides, not required problem callbacks. Their public
 contracts are `LocalSearchOperator` and `ShakingOperator` from
