@@ -116,7 +116,7 @@ When native blending is admitted, `dict(result.versions)` includes
 binary fallback preserve the original three version entries. This describes the
 selected component, not proof that every algorithm or input invoked it.
 
-The separate [native qualification workflow](../.github/workflows/native-qualification.yml)
+The separate [native qualification workflow](https://github.com/MarcosPTProenca/RKO/blob/main/.github/workflows/native-qualification.yml)
 builds normal CPython 3.14 wheels through pinned cibuildwheel, with manylinux 2.28
 x86-64, native Windows AMD64 and macOS ARM64 targets. Its default auditwheel,
 delvewheel and delocate repair stages inspect platform dependencies before
@@ -134,7 +134,7 @@ metadata, pickle and worker cleanup. Functional probes observe real kernel calls
 in participating processes without consuming search streams. These probes must
 never enter acceptance timings.
 
-The maintained [timed screening protocol](../benchmarks/native_portfolio.py) instead
+The maintained [timed screening protocol](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/native_portfolio.py) instead
 runs **without profiling or functional kernel probes**, in fresh isolated workers
 using the same installed wheel. It alternates both variants over three preregistered
 seeds per group, a configured two-second search limit, 20/500 dimensions, two
