@@ -20,7 +20,8 @@ Flow (pseudocode):
 Important criteria:
 - The extension is optional at import time; absence raises a clear error on use.
 - Python callbacks serialize on the interpreter lock; native problems do not.
-- Pool prefill and live progress output are not supported by this backend.
+- Pool prefill is a native random fill of `pool_size` evaluated vectors; live progress
+  output is not supported by this backend.
 
 Inputs/Outputs:
 - Input: validated run configuration, problem, time limit, seed and worker cap.
@@ -39,6 +40,7 @@ from .types import DecoderFn
 from .types import HistoryPoint
 from .types import Hyperparameters
 from .types import NativeProblem
+from .types import PoolInitializationMetadata
 from .types import RunConfig
 from .types import SearchMetadata
 from itertools import product
@@ -151,6 +153,7 @@ class NativeRunner:
         workers: int | None,
         history_limit: int,
         search_metadata: list[SearchMetadata] | None,
+        initialization_metadata: list[PoolInitializationMetadata] | None = None,
     ) -> tuple[list[float], float]:
         """Run the portfolio and publish metadata.
 
@@ -161,6 +164,7 @@ class NativeRunner:
             workers (int | None): Native worker threads, or one per algorithm.
             history_limit (int): Per-search history cap; zero disables recording.
             search_metadata (list[SearchMetadata] | None): Optional report collector.
+            initialization_metadata (list | None): Optional prefill report collector.
 
         Returns:
             tuple[list[float], float]: Best keys and objective.
@@ -171,8 +175,6 @@ class NativeRunner:
             Exception: Original callback exceptions propagate unchanged.
         """
         native = self.module()
-        if self.config.prefill_pool:
-            raise ValueError("The native backend does not support prefill_pool.")
         specs, templates = self.specs()
         if isinstance(problem, tuple):
             problem = native.CallbackProblem(problem[0], problem[1], self.n_variables)
@@ -185,6 +187,8 @@ class NativeRunner:
             self.config.pool_size,
             workers,
             history_limit,
+            1,
+            self.config.prefill_pool,
         )
         if search_metadata is not None:
             for report, template in zip(result["reports"], templates, strict=True):
@@ -204,4 +208,16 @@ class NativeRunner:
                         history_observations=report["history_observations"],
                     )
                 )
+        initial = result.get("initialization")
+        if initial is not None and initialization_metadata is not None:
+            initialization_metadata.append(
+                PoolInitializationMetadata(
+                    random_state=initial["seed"],
+                    n_evaluations=initial["evaluations"],
+                    elapsed_seconds=initial["elapsed"],
+                    pool_size=initial["pool_len"],
+                    stop_reason="completed",
+                    time_limit=float(time_limit),
+                )
+            )
         return list(result["keys"]), float(result["cost"])

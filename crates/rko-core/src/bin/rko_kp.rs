@@ -228,6 +228,7 @@ fn main() {
     let mut threads = None;
     let mut adaptive = true;
     let mut strategy = 1_u8;
+    let mut prefill = false;
     let mut targets: Vec<(u32, f64)> = Vec::new();
     let mut index = 2;
     while index < arguments.len() {
@@ -249,6 +250,7 @@ fn main() {
                 index += 1;
             }
             "--fixed" => adaptive = false,
+            "--prefill" => prefill = true,
             "--strategy" => {
                 strategy = arguments[index + 1].parse().expect("strategy");
                 index += 1;
@@ -292,6 +294,7 @@ fn main() {
         threads,
         history_limit: 0,
         ls_strategy: strategy,
+        prefill,
     };
     let floor = targets
         .iter()

@@ -42,6 +42,7 @@ from rko.examples.run_kp_cpp_instances import default_instances_dir
 from rko.examples.run_kp_cpp_instances import read_kp_instance
 from rko.explain import DecoderDiagram
 from rko.metaheuristics import SA
+from rko.native import Knapsack
 from rko.parameters.loader import default_params_dir
 from rko.reporting import OptimizationReport
 
@@ -91,6 +92,18 @@ def main() -> None:
     )
     assert [state.par for state in controller.states] == [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]]
     assert [state.Ai for state in controller.states] == [[0, 1, 2], [0, 1], [0, 2]]
+    assert (package / "_native.abi3.so").is_file() or list(package.glob("_native*"))
+    knapsack = Knapsack([4, 3, 2], [3, 2, 2], 4)
+    native_result = RKO.native(
+        knapsack, algorithms=["BRKGA", "SA", "ILS"], adaptation="adaptive", random_state=7
+    ).solve(0.1)
+    assert native_result.backend == "native" and native_result.n_workers == 3
+    assert native_result.cost == knapsack.evaluate(list(native_result.keys))
+    assert all(report.n_evaluations >= 1 for report in native_result.searches)
+    callback_result = RKO(
+        decode, objective, 8, algorithms=["SA"], backend="native", random_state=7
+    ).solve(0.1)
+    assert np.isclose(callback_result.cost, objective(np.asarray(callback_result.keys)))
     global_rng = pickle.dumps((random.getstate(), np.random.get_state()))
     for backend in ("serial", "thread", "process"):
         for algorithm, dimension, control in (

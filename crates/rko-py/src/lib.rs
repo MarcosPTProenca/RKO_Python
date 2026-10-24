@@ -168,6 +168,14 @@ fn result_to_dict<'py>(py: Python<'py>, result: &PortfolioResult) -> PyResult<Bo
     output.set_item("cost", result.best_cost)?;
     output.set_item("elapsed", result.elapsed)?;
     output.set_item("workers", result.workers)?;
+    if let Some(init) = &result.initialization {
+        let entry = PyDict::new(py);
+        entry.set_item("seed", init.seed)?;
+        entry.set_item("evaluations", init.evaluations)?;
+        entry.set_item("elapsed", init.elapsed)?;
+        entry.set_item("pool_len", init.pool_len)?;
+        output.set_item("initialization", entry)?;
+    }
     let reports = PyList::empty(py);
     for report in &result.reports {
         let entry = PyDict::new(py);
@@ -201,7 +209,7 @@ fn engine_error(error: &EngineError) -> PyErr {
 
 /// Runs a native portfolio and returns a result dictionary.
 #[pyfunction]
-#[pyo3(signature = (problem, specs, time_limit, seed, pool_size, threads=None, history_limit=0, ls_strategy=1))]
+#[pyo3(signature = (problem, specs, time_limit, seed, pool_size, threads=None, history_limit=0, ls_strategy=1, prefill=false))]
 #[allow(clippy::too_many_arguments)]
 fn run<'py>(
     py: Python<'py>,
@@ -213,6 +221,7 @@ fn run<'py>(
     threads: Option<usize>,
     history_limit: usize,
     ls_strategy: u8,
+    prefill: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
     let specs = parse_specs(specs)?;
     let config = Config {
@@ -222,6 +231,7 @@ fn run<'py>(
         threads,
         history_limit,
         ls_strategy,
+        prefill,
     };
     if let Ok(knapsack) = problem.cast::<KnapsackProblem>() {
         let knapsack = knapsack.get();

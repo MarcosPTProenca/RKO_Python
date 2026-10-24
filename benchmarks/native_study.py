@@ -71,6 +71,7 @@ class NativeStudy:
         implementations (tuple[str, ...]): Implementations to execute.
         rust_grid (str): Native parameter grid flavor, `toml` or `cpp`.
         rust_threads (int | None): Native worker cap for portfolios.
+        rust_prefill (bool): Whether the native engine prefills its pool.
         instance_limit (int | None): Optional number of instances per run.
         benchmark (KnapsackBenchmark): Shared protocol helper.
         repo_root (Path): Repository root.
@@ -88,6 +89,7 @@ class NativeStudy:
         rust_grid: str = "toml",
         rust_threads: int | None = None,
         instance_limit: int | None = None,
+        rust_prefill: bool = False,
     ) -> None:
         """Store study options without building or executing anything.
 
@@ -101,6 +103,7 @@ class NativeStudy:
             rust_grid (str): Native grid flavor, `toml` or `cpp`.
             rust_threads (int | None): Native worker cap for portfolios.
             instance_limit (int | None): Positive number of instances to use, or all.
+            rust_prefill (bool): Fill the native pool with random vectors before searching.
 
         Raises:
             ValueError: If a solver, implementation or grid name is unknown.
@@ -120,6 +123,7 @@ class NativeStudy:
         self.rust_grid = rust_grid
         self.rust_threads = rust_threads
         self.instance_limit = instance_limit
+        self.rust_prefill = rust_prefill
         self.benchmark = KnapsackBenchmark(
             output_path,
             cache_dir,
@@ -189,6 +193,8 @@ class NativeStudy:
             "--targets",
             targets,
         ]
+        if self.rust_prefill:
+            command.append("--prefill")
         if solver == "RKO-default" and self.rust_threads is not None:
             command += ["--threads", str(self.rust_threads)]
         started_ns = time.perf_counter_ns()
@@ -258,7 +264,14 @@ class NativeStudy:
             )
             signature = hashlib.sha256(
                 json.dumps(
-                    [base, binary_hash, self.rust_grid, self.rust_threads, self.implementations]
+                    [
+                        base,
+                        binary_hash,
+                        self.rust_grid,
+                        self.rust_threads,
+                        self.rust_prefill,
+                        self.implementations,
+                    ]
                 ).encode()
             ).hexdigest()
             self.output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -503,6 +516,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--implementations", default="cpp64,rust")
     parser.add_argument("--rust-grid", choices=("toml", "cpp"), default="toml")
     parser.add_argument("--rust-threads", type=int, default=None)
+    parser.add_argument("--rust-prefill", action="store_true")
     parser.add_argument("--instances", type=int, default=None, help="Use the first N instances.")
     parser.add_argument("--summary-only", action="store_true", help="Summarize an existing CSV.")
     parser.add_argument("--subject", default="rust", help="Implementation under evaluation.")
@@ -517,6 +531,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         rust_grid=args.rust_grid,
         rust_threads=args.rust_threads,
         instance_limit=args.instances,
+        rust_prefill=args.rust_prefill,
     )
     if args.summary_only:
         with args.output.open(encoding="utf-8", newline="") as stream:

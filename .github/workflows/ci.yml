@@ -22,6 +22,12 @@ jobs:
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
       - name: Sync locked dependencies
         run: uv sync --locked --group dev
+      - name: Rust format
+        run: cargo fmt --all --check
+      - name: Rust lint
+        run: cargo clippy --workspace --all-targets --release -- -D warnings
+      - name: Rust tests
+        run: cargo test --release
       - name: Ruff lint
         run: uv run --locked ruff check .
       - name: Ruff format check

@@ -48,6 +48,21 @@ pub struct Config {
     pub history_limit: usize,
     /// Local-search sweep strategy: 1 sequential acceptance, 2 fixed-base best.
     pub ls_strategy: u8,
+    /// Fill the pool with `pool_size` random evaluated vectors before searches start.
+    pub prefill: bool,
+}
+
+/// Work done filling the shared pool before the searches.
+#[derive(Clone, Copy, Debug)]
+pub struct Initialization {
+    /// Seed of the initialization stream.
+    pub seed: u64,
+    /// Completed finite evaluations.
+    pub evaluations: u64,
+    /// Seconds spent.
+    pub elapsed: f64,
+    /// Pool occupancy afterwards.
+    pub pool_len: usize,
 }
 
 /// Outcome of one search.
@@ -90,6 +105,8 @@ pub struct PortfolioResult {
     pub elapsed: f64,
     /// Worker threads used.
     pub workers: usize,
+    /// Pool prefill report, when requested.
+    pub initialization: Option<Initialization>,
 }
 
 /// Failure of a portfolio run.
@@ -155,6 +172,39 @@ pub fn run_portfolio(
     let pool = Pool::new(config.pool_size);
     let cancel = AtomicBool::new(false);
     let failure: std::sync::Mutex<Option<&'static str>> = std::sync::Mutex::new(None);
+    let mut initialization = None;
+    if config.prefill {
+        let seed = derive_seed(config.seed, u64::MAX);
+        let mut rng = Rng::new(seed);
+        let mut search = Search::new(problem, &cancel, started, deadline, 0);
+        let mut keys = vec![0.0; problem.dimension()];
+        let mut outcome = Ok(());
+        problem.with_thread_context(&mut || {
+            for _ in 0..config.pool_size {
+                crate::operators::random_keys(&mut keys, &mut rng);
+                match search.eval(&keys) {
+                    Ok(cost) => {
+                        pool.insert(cost, &keys, specs.len());
+                    }
+                    Err(stop) => {
+                        outcome = Err(stop);
+                        break;
+                    }
+                }
+            }
+        });
+        if outcome == Err(Stop::InvalidCost) {
+            return Err(EngineError::InvalidCost {
+                algorithm: "initialization",
+            });
+        }
+        initialization = Some(Initialization {
+            seed,
+            evaluations: search.evaluations(),
+            elapsed: search.elapsed(),
+            pool_len: pool.len(),
+        });
+    }
 
     let outcome = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..workers)
@@ -261,6 +311,7 @@ pub fn run_portfolio(
         reports,
         elapsed: started.elapsed().as_secs_f64(),
         workers,
+        initialization,
     })
 }
 
@@ -315,6 +366,7 @@ mod tests {
             threads,
             history_limit: 16,
             ls_strategy: 1,
+            prefill: false,
         }
     }
 

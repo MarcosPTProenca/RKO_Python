@@ -254,6 +254,7 @@ class RKO:
         adaptation: Adaptation | None = None,
         control: int | None = None,
         pool_size: int | None = None,
+        prefill_pool: bool | None = None,
         params_dir: Path | None = None,
         n_jobs: int | None = None,
         random_state: int | None = None,
@@ -269,6 +270,7 @@ class RKO:
             adaptation (Adaptation | None): "fixed" or "adaptive" parameter control.
             control (int | None): Legacy 0 (fixed) or 1 (adaptive) override.
             pool_size (int | None): Elite capacity, or configured default.
+            prefill_pool (bool | None): Fill the pool with random evaluated vectors first.
             params_dir (Path | None): Optional parameter TOML directory.
             n_jobs (int | None): Native worker threads, or one per algorithm.
             random_state (int | None): Nonnegative engine seed.
@@ -287,6 +289,7 @@ class RKO:
             adaptation=adaptation,
             control=control,
             pool_size=pool_size,
+            prefill_pool=prefill_pool,
             params_dir=params_dir,
             backend="native",
             n_jobs=n_jobs,
@@ -464,6 +467,7 @@ class RKO:
                 self.n_jobs,
                 self.history_limit,
                 search_metadata,
+                initialization_metadata,
             )
         pool = SolutionPool(capacity=config.pool_size, verbose=self.verbose, started_at=started_at)
         seeds = np.random.SeedSequence(self.random_state).spawn(len(config.active_metaheuristics))

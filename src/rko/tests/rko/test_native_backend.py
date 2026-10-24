@@ -102,9 +102,9 @@ def test_callback_problem_receives_independent_arrays_and_scores() -> None:
         weight = int(np.dot(chosen, WEIGHTS))
         return float(100000 * max(0, weight - CAPACITY) - profit)
 
-    result = RKO(
-        decoder, cost, 60, algorithms=["BRKGA"], backend="native", random_state=1
-    ).solve(0.3)
+    result = RKO(decoder, cost, 60, algorithms=["BRKGA"], backend="native", random_state=1).solve(
+        0.3
+    )
     assert python_cost(result.keys) == result.cost
     assert max(array.max() for array in seen) == 0.0
     assert len({id(array) for array in seen}) == len(seen)
@@ -136,14 +136,18 @@ def test_nonfinite_objective_is_rejected() -> None:
 def test_worker_cap_and_prefill_validation() -> None:
     """Worker caps are honored and unsupported options fail clearly."""
     problem = native.KnapsackProblem(PROFITS, WEIGHTS, CAPACITY)
-    result = RKO.native(
-        problem, algorithms=["SA", "BRKGA", "GA"], n_jobs=2, random_state=2
-    ).solve(0.4)
+    result = RKO.native(problem, algorithms=["SA", "BRKGA", "GA"], n_jobs=2, random_state=2).solve(
+        0.4
+    )
     assert result.n_workers == 2
     assert sum(report.elapsed_seconds for report in result.searches) < 1.0
-    solver = RKO(lambda k: k, lambda v: 0.0, 10, backend="native", prefill_pool=True)
-    with pytest.raises(ValueError, match="prefill_pool"):
-        solver.solve(0.2)
+    prefilled = RKO.native(
+        problem, algorithms=["IPR"], pool_size=6, prefill_pool=True, random_state=4
+    ).solve(0.2)
+    assert prefilled.initialization is not None
+    assert prefilled.initialization.n_evaluations == 6
+    assert prefilled.initialization.pool_size == 6
+    assert prefilled.n_evaluations == prefilled.searches[0].n_evaluations + 6
     with pytest.raises(ValueError, match="process and native"):
         RKO(lambda k: k, lambda v: 0.0, 10, backend="serial", n_jobs=2).solve(0.2)
 
