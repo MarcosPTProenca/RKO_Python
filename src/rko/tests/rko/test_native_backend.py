@@ -191,3 +191,19 @@ def test_hyperparameter_overrides_reach_the_engine() -> None:
     specs, _ = NativeRunner(config, 50, None, {"BRKGA": {"p": 20}}).specs()
     assert specs[0][1][0] == 20.0
     assert specs[0][3] is False
+
+
+def test_standalone_solver_objects_accept_the_native_backend() -> None:
+    """A single-algorithm solver class runs on the compiled engine."""
+    from rko.metaheuristics import SA
+
+    result = SA(
+        lambda keys: keys,
+        lambda keys: python_cost(keys),
+        60,
+        backend="native",
+        random_state=2,
+    ).solve(0.2)
+    assert result.backend == "native"
+    assert result.algorithms == ("SA",)
+    assert python_cost(result.keys) == result.cost

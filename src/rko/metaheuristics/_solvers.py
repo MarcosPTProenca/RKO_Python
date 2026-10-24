@@ -63,7 +63,7 @@ class _SingleAlgorithmSolver(RKO):
         pool_size: int | None = None,
         prefill_pool: bool | None = None,
         params_dir: Path | None = None,
-        backend: Literal["process", "thread", "serial"] = "process",
+        backend: Literal["process", "thread", "serial", "native"] = "process",
         n_jobs: int | None = None,
         random_state: int | None = None,
         verbose: bool = False,
@@ -81,8 +81,9 @@ class _SingleAlgorithmSolver(RKO):
             pool_size (int | None): Elite capacity, or configured default.
             prefill_pool (bool | None): Separate shared-startup policy, or configured default.
             params_dir (Path | None): Optional custom TOML directory.
-            backend (Literal): Process, thread or serial execution, exactly as for RKO.
-            n_jobs (int | None): Optional process-worker cap; not supported by other backends.
+            backend (Literal): Process, thread, serial or native execution, exactly as for RKO.
+            n_jobs (int | None): Optional process or native worker cap; not supported by
+                the thread and serial backends.
             random_state (int | None): Nonnegative seed for library-owned random streams.
             verbose (bool): Print lifecycle/shared-pool progress when enabled.
             hyperparameters (Hyperparameters | None): Same nested per-algorithm scalar
