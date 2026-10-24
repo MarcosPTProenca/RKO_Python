@@ -31,3 +31,6 @@ benchmarks/cpp-python-knapsack-reference-summary.csv
 /graphify-out/
 /.vscode/
 /.idea/
+/target/
+*.so
+*.pyd

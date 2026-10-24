@@ -255,7 +255,7 @@ def run_single_instance(
     limit_time: float,
     params_dir: Path | None,
     *,
-    backend: Literal["process", "thread", "serial"] = "process",
+    backend: Literal["process", "thread", "serial", "native"] = "process",
     n_jobs: int | None = None,
     random_state: int | None = None,
     verbose: bool = False,
@@ -267,8 +267,9 @@ def run_single_instance(
       instance_path (Path): Path to a `.txt` benchmark file.
       limit_time (float): Time limit in seconds for one RKO run.
       params_dir (Path | None): Optional override for RKO parameter TOMLs.
-      backend (Literal): Process, thread or serial execution mode.
-      n_jobs (int | None): Optional process budget.
+      backend (Literal): Process, thread, serial or native execution mode; native
+        evaluates the Knapsack inside the compiled engine without Python callbacks.
+      n_jobs (int | None): Optional process or native worker budget.
       random_state (int | None): Optional worker-seed source.
       verbose (bool): Emit lifecycle and attributed shared-pool updates.
       prefill_pool (bool | None): Optional separately budgeted shared startup phase.
@@ -281,17 +282,30 @@ def run_single_instance(
     """
     instance = read_kp_instance(instance_path)
     started = time.perf_counter()
-    outcome = RKO(
-        decoder=decode_knapsack,
-        cost=make_cost(instance),
-        n_variables=instance.n_items,
-        params_dir=params_dir,
-        backend=backend,
-        n_jobs=n_jobs,
-        random_state=random_state,
-        verbose=verbose,
-        prefill_pool=prefill_pool,
-    ).solve(limit_time)
+    if backend == "native":
+        from ..native import Knapsack
+
+        solver = RKO.native(
+            Knapsack(list(instance.benefits), list(instance.weights), instance.capacity),
+            params_dir=params_dir,
+            n_jobs=n_jobs,
+            random_state=random_state,
+            verbose=verbose,
+            prefill_pool=prefill_pool,
+        )
+    else:
+        solver = RKO(
+            decoder=decode_knapsack,
+            cost=make_cost(instance),
+            n_variables=instance.n_items,
+            params_dir=params_dir,
+            backend=backend,
+            n_jobs=n_jobs,
+            random_state=random_state,
+            verbose=verbose,
+            prefill_pool=prefill_pool,
+        )
+    outcome = solver.solve(limit_time)
     elapsed = time.perf_counter() - started
     best_sol = decode_knapsack(outcome.keys)
     profit, weight, feasible = evaluate_solution(best_sol, instance)
@@ -413,7 +427,9 @@ def parse_args() -> argparse.Namespace:
         default=default_output_csv(),
         help="Destination CSV path for execution results.",
     )
-    parser.add_argument("--backend", choices=("process", "thread", "serial"), default="process")
+    parser.add_argument(
+        "--backend", choices=("process", "thread", "serial", "native"), default="process"
+    )
     parser.add_argument(
         "--n-jobs",
         type=int,

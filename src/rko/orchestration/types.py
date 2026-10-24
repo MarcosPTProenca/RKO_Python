@@ -29,6 +29,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 from typing import Literal
+from typing import Protocol
 
 RunResult = tuple[list[object], list[float], float]
 DecoderFn = Callable[[np.ndarray], Any]
@@ -143,3 +144,23 @@ class RunConfig:
     pool_size: int
     active_metaheuristics: tuple[str, ...]
     prefill_pool: bool = False
+
+
+class NativeProblem(Protocol):
+    """Describe a built-in problem evaluated by the compiled engine.
+
+    Responsibilities:
+    - Expose the random-key dimension required to size a portfolio.
+
+    Attributes:
+        dimension (int): Positive number of random keys.
+    """
+
+    @property
+    def dimension(self) -> int:
+        """Return the positive random-key dimension.
+
+        Returns:
+            int: Number of keys expected by the problem.
+        """
+        ...

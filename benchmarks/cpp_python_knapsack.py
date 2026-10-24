@@ -1209,7 +1209,7 @@ class KnapsackBenchmark:
                 process.returncode,
                 f"Child exited {process.returncode}: {process.stderr[-1200:]}",
             )
-        if command[0] == sys.executable:
+        if command[0] == sys.executable or "RKO_BENCH_RESULT " in process.stdout:
             try:
                 result_line = next(
                     line.removeprefix("RKO_BENCH_RESULT ")
@@ -1708,7 +1708,7 @@ class KnapsackBenchmark:
             started_ns=0,
         )
         algorithm = payload["algorithm"]
-        backend = "serial" if algorithm is not None else "process"
+        backend = payload.get("backend") or ("serial" if algorithm is not None else "process")
         solver = RKO(
             decoder=decode_knapsack,
             cost=cost,

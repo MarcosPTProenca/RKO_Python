@@ -18,6 +18,7 @@ development library, not a claim of release readiness or C++ equivalence.
 - [Static decoder diagrams](decoder-diagrams.md): optional declared logic or supported Python structure, not execution traces.
 - [Extension guide](extending.md): replace local search/shaking or implement a new algorithm.
 - [Portfolio and execution API](usage.md): sharing elites, processes, budgets and reproducibility.
+- [Native engine](native.md): the compiled Rust backend, native problems and their limits.
 - [Terminal usage](running.md): the supplied Knapsack adapter and custom TOML files.
 - [Contributing](../CONTRIBUTING.md): development setup, tests and release gates.
 

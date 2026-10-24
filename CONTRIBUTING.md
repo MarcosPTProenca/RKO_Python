@@ -16,9 +16,10 @@ uv sync --locked --group dev
 uv run --locked pre-commit install
 ```
 
-Run tools from the repository root. NumPy is the only runtime dependency; avoid
-adding a compiler, JIT or native engine without a separately validated need.
-Keep callback/result contracts and packaged TOML/fixture resources intact.
+Run tools from the repository root. NumPy is the only runtime Python dependency;
+the native engine in `crates/` needs a Rust toolchain at build time. `uv sync`
+rebuilds the extension when Rust sources change. Keep callback/result contracts
+and packaged TOML/fixture resources intact.
 
 ## Validate a change
 
@@ -26,6 +27,9 @@ Start with tests covering the touched behavior, then run the complete checks on
 an otherwise idle machine or CI:
 
 ```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --release -- -D warnings
+cargo test --release
 uv run --locked ruff check .
 uv run --locked ruff format --check .
 uv run --locked pytest src/rko/tests -q

@@ -98,6 +98,27 @@ uv run ruff format --check .
 uv run pytest src/rko/tests -q
 ```
 
+## Rust (native engine in `crates/`)
+
+- Native code lives in `crates/rko-core` (pure Rust, no dependencies, `unsafe` forbidden) and
+  `crates/rko-py` (PyO3 bindings). Run `cargo` from the repository root.
+- Every public item and every module carries rustdoc; a `//!` header states objective,
+  approach, flow, criteria and inputs/outputs like the Python module template. No `//` comments.
+- Hot loops must not allocate per evaluation: reuse caller-owned buffers, route every
+  candidate through `Search::eval`/`Search::probe`, and never read the clock outside `Search`.
+- Each search owns its `Rng`; never share generators or mutable state between threads except
+  through `Pool` and the cancel flag.
+- Mandatory after Rust changes:
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --release -- -D warnings
+cargo test --release
+```
+
+- A native speed or quality claim needs `benchmarks/native_study.py` evidence against the
+  pinned C++ reference or the Python engine, with losses and failures reported.
+
 ## DON'T
 
 - Do not generate comments in code (neither inline comments nor block comments).

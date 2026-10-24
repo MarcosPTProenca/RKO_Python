@@ -2,7 +2,9 @@
 
 Each section identifies its workload and limits. Synthetic fixed-work and
 allocation probes complement the historical Knapsack reference; no single case
-establishes general optimization quality or native-code performance parity.
+establishes general optimization quality or native-code performance parity. The
+[native engine study](#native-engine-versus-c-and-python) compares the compiled
+backend with C++ on three problem families.
 See [the C++ acceptance target and native-backend gates](../docs/performance.md)
 for end-to-end quality/time/resource criteria; historical Python results must not
 be merged with corrected-revision observations as if they were one experiment.
@@ -98,6 +100,222 @@ worker cap and timed trajectories may differ: these are not equal-work throughpu
 RSS, quality or native-Windows results. Imports and spawn remain nonzero even in
 the fastest layout. No import protocol, worker architecture or validation was
 changed. See [WSL setup guidance](../docs/running.md#wsl-startup-and-virtual-environment-placement).
+
+## Native engine versus C++ and Python
+
+The compiled engine (`backend="native"`, [guide](../docs/native.md)) was compared with the
+pinned C++ reference and with the Python engine. **Every claim below is limited to the
+named problems, budgets, machine and parameter grids.** The library is general; Knapsack
+is only an example problem, so two non-Knapsack families were added and no optimization
+or default was chosen from Knapsack alone.
+
+### Protocol
+
+- **Identification.** Native engine at Git `0a1f505` (sources unchanged between that
+  commit and the runs; the raw rows record the native binary hash and the benchmark
+  script revisions). C++ reference `126e358` (the same pinned source as the section
+  below; Knapsack uses its 64-bit objective patch, TSP and Rastrigin replace only
+  `Problem.h`; all three widen written keys to 17 digits). WSL2 on an Intel Core
+  i7-1255U with 6 logical CPUs, CPython 3.14.4, NumPy 2.4.3, g++ 15.2, rustc 1.98.0.
+- **Problems.** (1) The 15 pinned 500-item KPLIB instances of the section below, scored
+  against exact optima. (2) Euclidean TSP with rounded distances, decoded by sorting the
+  keys: 4 instances of 100 cities and 4 of 300 (deterministic generator, seed
+  `20261019`). (3) Shifted Rastrigin over `[-5.12, 5.12)`, 4 instances of 30 and 4 of 100
+  dimensions. Neither (2) nor (3) has constant-time move evaluation, and the native
+  Knapsack runs through the same generic evaluation path (the telemetry wrapper does not
+  expose an incremental evaluator).
+- **Settings.** One algorithm at a time (one thread) and the ten-algorithm default
+  portfolio (ten threads on both sides, on six logical CPUs), adaptive control, pool size
+  10, local-search strategy 1 (the C++ benchmark setting), three replicates, nominal
+  budget 2 s unless stated. Implementations run sequentially in alternating order. The
+  native engine uses the C++ online parameter grids (`--rust-grid cpp`), so the comparison
+  is engine against engine; the Python TOML grids are reported for the portfolio.
+- **Scoring.** Every returned key vector is decoded and scored again in Python and must
+  equal the reported objective (Knapsack/TSP exactly, C++ Rastrigin to its six printed
+  decimals). Quality is the normalized objective gap to the exact optimum (Knapsack), the
+  gap to the best tour found by any trial of the instance (TSP, percent) and the objective
+  (Rastrigin, optimum 0). Lower is better. The table reports the median over instances of
+  per-instance medians, the number of instances where the native engine was better /
+  worse / tied, and an exact two-sided sign test with Holm correction over the solvers of
+  the table. No trial failed in any study.
+- **Power.** With 8 instances the smallest attainable Holm-adjusted p-value for 12 solvers
+  is 0.094, so TSP and Rastrigin tables are read through the better/worse counts, not the
+  p-values. Knapsack has 15 instances.
+
+### Knapsack, 2 s, C++ grids (15 instances x 3 replicates)
+
+| Solver | Native | Reference | Better / worse / tied | p (Holm) |
+| --- | ---: | ---: | ---: | ---: |
+| BRKGA | 0.716 | 1.137 | 12 / 0 / 3 | 0.0054 |
+| BRKGA-CS | 0.507 | 0.530 | 10 / 2 / 3 | 0.1929 |
+| GA | 1.843 | 3.647 | 12 / 0 / 3 | 0.0054 |
+| GRASP | 1.014 | 1.014 | 3 / 8 / 4 | 0.6797 |
+| ILS | 0.210 | 0.359 | 10 / 2 / 3 | 0.1929 |
+| IPR | 8.812 | 7.239 | 0 / 15 / 0 | 0.0007 |
+| LNS | 1.257 | 2.283 | 12 / 0 / 3 | 0.0054 |
+| MultiStart | 7.005 | 7.056 | 8 / 4 / 3 | 0.7754 |
+| PSO | 1.188 | 2.393 | 12 / 0 / 3 | 0.0054 |
+| RKO-default | 0.098 | 0.238 | 11 / 0 / 4 | 0.0059 |
+| SA | 1.438 | 3.003 | 12 / 0 / 3 | 0.0054 |
+| VNS | 0.391 | 0.396 | 6 / 5 / 4 | 1.0000 |
+
+On the default portfolio with the Python TOML grids instead of the C++ grids:
+
+| Solver | Native | Reference | Better / worse / tied | p (Holm) |
+| --- | ---: | ---: | ---: | ---: |
+| RKO-default | 0.109 | 0.238 | 11 / 0 / 4 | 0.0010 |
+
+IPR alone is worse than C++ in all three problem families. The C++ driver prefills its
+pool and its insertion replaces the worst entry even with a worse candidate, whereas the
+native pool starts empty and admits only strict improvements; this difference was not
+isolated as the cause. IPR is not used alone in the default portfolio. The default
+portfolio at 20 s on five instances (2 replicates) is not worse and directionally
+better, but five instances cannot reach significance:
+
+| Solver | Native | Reference | Better / worse / tied | p (Holm) |
+| --- | ---: | ---: | ---: | ---: |
+| RKO-default | 0.019 | 0.034 | 5 / 0 / 0 | 0.0625 |
+
+### TSP and Rastrigin, 2 s, C++ grids (8 instances each x 3 replicates)
+
+TSP (gap to best known, percent):
+
+| Solver | Native | C++ | Better / worse / tied | p (Holm) |
+| --- | ---: | ---: | ---: | ---: |
+| BRKGA | 101.997 | 144.828 | 8 / 0 / 0 | 0.0938 |
+| BRKGA-CS | 19.904 | 18.870 | 3 / 5 / 0 | 1.0000 |
+| GA | 177.911 | 212.119 | 8 / 0 / 0 | 0.0938 |
+| GRASP | 16.277 | 8.166 | 2 / 6 / 0 | 1.0000 |
+| ILS | 19.603 | 8.589 | 0 / 8 / 0 | 0.0938 |
+| IPR | 520.667 | 473.564 | 0 / 8 / 0 | 0.0938 |
+| LNS | 56.460 | 63.753 | 4 / 4 / 0 | 1.0000 |
+| MultiStart | 464.834 | 467.367 | 6 / 2 / 0 | 1.0000 |
+| PSO | 161.019 | 207.933 | 8 / 0 / 0 | 0.0938 |
+| RKO-default | 20.953 | 23.876 | 3 / 5 / 0 | 1.0000 |
+| SA | 187.494 | 225.585 | 8 / 0 / 0 | 0.0938 |
+| VNS | 20.039 | 8.768 | 1 / 7 / 0 | 0.4219 |
+
+Rastrigin (objective):
+
+| Solver | Native | C++ | Better / worse / tied | p (Holm) |
+| --- | ---: | ---: | ---: | ---: |
+| BRKGA | 1.218 | 5.146 | 8 / 0 / 0 | 0.0938 |
+| BRKGA-CS | 0.048 | 0.459 | 8 / 0 / 0 | 0.0938 |
+| GA | 19.291 | 46.655 | 8 / 0 / 0 | 0.0938 |
+| GRASP | 0.026 | 0.033 | 6 / 2 / 0 | 0.8750 |
+| ILS | 0.030 | 0.032 | 7 / 1 / 0 | 0.4219 |
+| IPR | 1076.082 | 894.670 | 0 / 8 / 0 | 0.0938 |
+| LNS | 3.612 | 10.740 | 6 / 2 / 0 | 0.8750 |
+| MultiStart | 857.353 | 847.200 | 4 / 4 / 0 | 1.0000 |
+| PSO | 1.492 | 12.622 | 5 / 1 / 2 | 0.8750 |
+| RKO-default | 0.000 | 0.001 | 4 / 0 / 4 | 0.6250 |
+| SA | 12.454 | 38.499 | 8 / 0 / 0 | 0.0938 |
+| VNS | 0.009 | 0.034 | 8 / 0 / 0 | 0.0938 |
+
+The default portfolio at 10 s (4 instances, 2 replicates): TSP 2.246 versus 5.547
+(3 / 1 / 0), Rastrigin both about 0 (1 / 3 / 0), neither significant.
+
+### Equal wall time
+
+C++ local-search sweeps (RVND) have no deadline, so ILS, VNS, GRASP and BRKGA-CS can run far
+past the nominal budget. Elapsed seconds, median (maximum) over trials:
+
+| Study | Solver | C++ | Native |
+| --- | --- | ---: | ---: |
+| TSP | ILS | 3.15 (11.25) | 2.00 (2.01) |
+| TSP | VNS | 3.34 (13.20) | 2.00 (2.00) |
+| TSP | GRASP | 3.69 (12.87) | 2.00 (2.00) |
+| TSP | BRKGA-CS | 3.89 (14.05) | 2.00 (2.00) |
+| Knapsack | ILS / VNS / GRASP / BRKGA-CS | 2.11 to 2.17 | 2.00 |
+
+All other solver and problem combinations stay within 2.05 s on both sides. The
+matched-time runs execute C++
+first and give the native engine the wall time that trial actually used.
+
+Knapsack, native budget equal to the C++ wall time:
+
+| Solver | Native | Reference | Better / worse / tied | p (Holm) |
+| --- | ---: | ---: | ---: | ---: |
+| BRKGA-CS | 0.359 | 0.480 | 10 / 2 / 3 | 0.1157 |
+| GRASP | 1.014 | 1.023 | 6 / 6 / 3 | 1.0000 |
+| ILS | 0.210 | 0.423 | 12 / 0 / 3 | 0.0020 |
+| VNS | 0.391 | 0.487 | 8 / 3 / 4 | 0.4531 |
+
+TSP, native budget equal to the C++ wall time:
+
+| Solver | Native | C++ | Better / worse / tied | p (Holm) |
+| --- | ---: | ---: | ---: | ---: |
+| BRKGA-CS | 13.099 | 17.913 | 6 / 2 / 0 | 0.5781 |
+| GRASP | 12.059 | 7.771 | 1 / 7 / 0 | 0.2109 |
+| ILS | 14.855 | 10.040 | 0 / 8 / 0 | 0.0312 |
+| VNS | 11.843 | 10.642 | 4 / 4 / 0 | 1.0000 |
+
+**Native ILS and GRASP remained worse than C++ on TSP at equal wall time** (ILS in 8 of 8
+instances, GRASP in 7 of 8); the cause is not diagnosed. A single-decode microbenchmark
+found the native TSP decoder no slower than the C++ one, so per-evaluation cost alone does
+not explain it.
+
+### Python callbacks: native backend versus Python engine (Knapsack, 5 instances)
+
+Same decoder and objective callbacks and the same TOML grids on both sides; the native
+engine uses sequential-acceptance sweeps (strategy 1) whereas the Python engine's RVND
+uses fixed-base best-improvement (strategy 2). The strategy difference probably
+contributes to the large VNS, ILS and BRKGA-CS gaps, because those searches seldom
+finish a Python sweep in 2 s; it was not isolated.
+
+| Solver | Native | Reference | Better / worse / tied | p (Holm) |
+| --- | ---: | ---: | ---: | ---: |
+| BRKGA | 6.651 | 8.231 | 5 / 0 / 0 | 0.7500 |
+| BRKGA-CS | 3.006 | 24.920 | 5 / 0 / 0 | 0.7500 |
+| GA | 7.085 | 9.961 | 5 / 0 / 0 | 0.7500 |
+| GRASP | 13.729 | 33.920 | 4 / 1 / 0 | 1.0000 |
+| ILS | 5.624 | 19.789 | 5 / 0 / 0 | 0.7500 |
+| IPR | 36.658 | 36.750 | 2 / 3 / 0 | 1.0000 |
+| LNS | 13.632 | 14.356 | 5 / 0 / 0 | 0.7500 |
+| MultiStart | 30.776 | 30.766 | 2 / 3 / 0 | 1.0000 |
+| PSO | 7.298 | 9.486 | 5 / 0 / 0 | 0.7500 |
+| RKO-default | 10.535 | 9.204 | 0 / 5 / 0 | 0.7500 |
+| SA | 10.466 | 12.193 | 5 / 0 / 0 | 0.7500 |
+| VNS | 4.370 | 38.797 | 5 / 0 / 0 | 0.7500 |
+
+The portfolio row is the opposite direction: callbacks run under the interpreter lock, so
+ten native threads share one core of Python work whereas the Python engine's process
+backend uses six interpreters. Native end-to-end time was shorter (median 2.21 s versus
+2.89 s, no process startup). Use the native backend with native problems, or for single
+algorithms and short runs; keep the process backend for portfolios of expensive Python
+callbacks.
+
+### Excluded from the evidence
+
+- Only Knapsack, TSP and Rastrigin were measured, on one WSL2 machine; no Windows, macOS
+  or free-threaded Python results exist.
+- The per-algorithm Nelder-Mead pool policy was screened on a subset of the same
+  Knapsack and TSP instances used here, so those instances are not held out for it.
+- Pool prefill is opt-in; a 12-algorithm screen showed it helps or hurts depending on the
+  algorithm and problem.
+- Throughput numbers from earlier discovery microbenchmarks are not evidence.
+
+### Reproduce
+
+```bash
+uv run --locked python -m benchmarks.native_study \
+  --output /tmp/native-kp.csv --budget-seconds 2 --repetitions 3 \
+  --solvers BRKGA,BRKGA-CS,GA,GRASP,ILS,IPR,LNS,MultiStart,PSO,SA,VNS,RKO-default \
+  --implementations cpp64,rust --rust-grid cpp
+uv run --locked python -m benchmarks.native_problem_study --problem tsp \
+  --output /tmp/native-tsp.csv --budget-seconds 2 --repetitions 3 --per-size 4 \
+  --solvers BRKGA,BRKGA-CS,GA,GRASP,ILS,IPR,LNS,MultiStart,PSO,SA,VNS,RKO-default
+uv run --locked python -m benchmarks.native_study --subject rust-callback \
+  --output /tmp/native-callback.csv --instances 5 --implementations python,rust-callback
+```
+
+Add `--match-reference-time` for equal wall time and `--summary-only` to re-print a
+table from raw rows. Raw trials: `native-vs-cpp-2s-reference.csv` (Knapsack; the
+`rust-toml` rows are the TOML-grid portfolio), `native-vs-cpp-matched-time-reference.csv`,
+`native-vs-cpp-20s-reference.csv`, `native-problems-vs-cpp-reference.csv`,
+`native-problems-vs-cpp-matched-time-reference.csv`,
+`native-problems-vs-cpp-10s-reference.csv` and
+`native-callback-vs-python-2s-reference.csv`.
 
 ## Python versus C++ Knapsack comparison
 
