@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, rko, feat/optional-native-blending]
+    branches: [main, master, rko]
   pull_request:
 
 permissions:

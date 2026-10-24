@@ -89,9 +89,25 @@ used 30 fresh seeds per group with unchanged scalar, permutation, object-payload
 and NumPy callbacks. For 500 genes, the research candidate reduced complete serial
 fixed-work invocation medians by 12.5–20.3% across SA/GA/BRKGA. Protected 20-gene and
 single-process peak-RSS bounds passed. Those results identify the kernel and scope;
-they are not a claim that arbitrary callbacks, installed artifacts, timed adaptive
-quality, portfolios or all platforms achieve the same gains. The shipped mixed
-build and installed behavior require their own validation.
+they are not a claim that arbitrary callbacks, timed adaptive quality, portfolios
+or all platforms achieve the same gains.
+
+The [installed-wheel confirmation](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40063949702)
+then compared runtime opt-in disabled/enabled in the same installed mixed wheel,
+using 720 new paired invocations and 30 fresh seeds per group. It preserved every
+result/pool/count/RNG fingerprint and observed 13.35–20.95% median complete-invocation
+gains in the 500-gene groups. Predeclared paired bootstrap intervals excluded no
+improvement; conservative family-adjusted upper bounds stayed below 3.32% slowdown
+for protected 20-gene inputs and 2.42% peak-RSS growth (limits 5% and 10%). This remains
+a serial fixed-evaluation scope, not timed/adaptive-quality or C++ parity evidence.
+
+[Packaging CI](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40063461860)
+validated normal-GIL CPython 3.14 source builds and installed wheels/sdists on
+Ubuntu, Windows and macOS. It checks real native execution, exact component and
+managed-search candidate prefixes, unavailable-extension fallback, pure builds
+without usable compilers, and pure builds after native builds. Existing installed
+smokes also cover bounded serial/thread/process solves and fixed/adaptive settings;
+those are functional checks, not comparative quality or portfolio speed studies.
 
 Run `uv run --locked python tools/validate_native_package.py` on a machine with the
 native build prerequisites to check pure/native wheels and sdists, default and
