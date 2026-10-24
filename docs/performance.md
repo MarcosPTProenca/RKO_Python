@@ -1,6 +1,6 @@
 # Performance target and native-backend evaluation
 
-**Status: evaluation, not an implemented Rust engine or a parity claim.**
+**Status: experimental optional Rust blending kernel; not a Rust engine or C++ parity claim.**
 The target is to **match or exceed the pinned C++ RKO on declared workloads**, in
 solution quality and time under comparable resources. A language change, passing
 CI, higher evaluations/second or a faster isolated kernel does not meet that target
@@ -8,7 +8,7 @@ by itself. Results outside the evaluated workload/resource envelope remain unkno
 
 ## What the current evidence establishes
 
-The implementation is Python plus NumPy, with no compiler dependency for users.
+The default implementation is Python plus NumPy, with no compiler dependency for users.
 Several kernels and allocation paths have measured improvements over earlier Python
 versions; [each benchmark identifies its workload and limits](../benchmarks/README.md).
 Those measurements do not establish whole-solver C++ performance parity.
@@ -41,6 +41,65 @@ The [invocation and resource study](invocation-profile.md) reuses the startup,
 portfolio and native-callback probes in fresh hosted interpreters. Its registered
 scopes separate constructor-plus-solve time, internal search timing and sampled
 RSS; they are diagnostic evidence, not an achieved optimization or parity claim.
+
+## Optional native blending
+
+The mixed package retains the setuptools Python build. Neither building nor using
+Rust is enabled by default. The optional component accelerates only shared
+Nelder-Mead blending; SA, GA and BRKGA control and user callbacks remain Python.
+`backend` continues to mean `process`, `thread` or `serial`, never a language.
+
+Two explicit controls have different purposes:
+
+| Control | Default | Meaning |
+| --- | --- | --- |
+| `RKO_BUILD_NATIVE=1` | `0` | Build the optional release extension; requires Rust 1.90.0 and normal-GIL CPython 3.14. A requested compilation failure aborts the build. |
+| `RKO_USE_NATIVE=1` | `0` | Activate a compatible installed extension before the first `rko` import. Missing/incompatible binaries produce an actionable warning and use Python. |
+
+```bash
+# Ordinary Python wheel/sdist; no Rust compiler required.
+uv build
+
+# Explicit mixed build. The pinned Rust toolchain must be available.
+RKO_BUILD_NATIVE=1 uv build --wheel
+
+# Development editable build, then explicit runtime activation.
+RKO_BUILD_NATIVE=1 uv sync --locked --group dev --reinstall-package rko
+RKO_USE_NATIVE=1 uv run --locked --no-sync rko src/rko/examples/instances/kp50.txt
+```
+
+In PowerShell, set the equivalent variables with
+`$env:RKO_BUILD_NATIVE = "1"` or `$env:RKO_USE_NATIVE = "1"` before the command;
+remove them afterward when returning to the default Python mode. A binary wheel
+built elsewhere does not require a compiler at installation time. Native source
+builds do; ordinary source builds remain Python-only. Build flags do not implicitly
+enable runtime acceleration, and changing a runtime variable after imports does
+not reconfigure already imported worker modules.
+
+The supported native path requires finite, aligned, C-contiguous float64 parent
+arrays and the normal library-owned/builtin Python RNG. Other representations,
+custom RNGs and unusual factors retain reference behavior. Parents and output are
+not exposed as borrowed Rust slices: the kernel uses safe owned snapshots. It calls
+the original RNG twice per gene in the original order and never batches, caches or
+rewrites user decoder/objective calls. Native/callback runtime failures propagate;
+only known extension-import/compatibility failures select Python fallback.
+
+The source-identified [720-pair kernel confirmation](https://github.com/MarcosPTProenca/RKO_Python/actions/runs/40044712053)
+used 30 fresh seeds per group with unchanged scalar, permutation, object-payload
+and NumPy callbacks. For 500 genes, the research candidate reduced complete serial
+fixed-work invocation medians by 12.5–20.3% across SA/GA/BRKGA. Protected 20-gene and
+single-process peak-RSS bounds passed. Those results identify the kernel and scope;
+they are not a claim that arbitrary callbacks, installed artifacts, timed adaptive
+quality, portfolios or all platforms achieve the same gains. The shipped mixed
+build and installed behavior require their own validation.
+
+Run `uv run --locked python tools/validate_native_package.py` on a machine with the
+native build prerequisites to check pure/native wheels and sdists, default and
+explicit activation, full native tests, managed-search candidate-prefix replay and
+post-native pure-build contamination. It builds into temporary directories and
+publishes no binary. Platform wheels, release licensing/attribution in `NOTICE`,
+and full native-backend adoption remain separate release gates; no automatic
+publishing or change to Python defaults is introduced.
 
 ## The C++ acceptance target
 

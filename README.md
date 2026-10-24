@@ -46,7 +46,9 @@ not prerequisites. See the [complete data-loading example](docs/problem-adapters
 - Serial, thread and process execution with shared elites, owned library RNG
   streams, validated parameters and immutable result metadata.
 - Python callbacks for arbitrary problems; **NumPy is the only runtime dependency**.
-  No C++ installation, Rust compiler or agent framework is required.
+  The default Python installation requires no C++ installation, Rust compiler or agent framework.
+An optional, explicitly built [native blending kernel](docs/performance.md#optional-native-blending)
+is available separately from the default runtime path.
 
 ## Install from source
 
@@ -375,13 +377,15 @@ parameter reference and contributor guidance.
 | Configure the solver, callbacks, hyperparameters and results | [Usage and API guide](docs/usage.md) |
 | Choose workers and understand startup/time accounting | [Execution modes](docs/usage.md#execution-modes), [workers](docs/process-workers.md), [startup](docs/driver-initialization.md) |
 | Run from the terminal or avoid WSL setup overhead | [Running guide](docs/running.md) |
-| Understand the C++ target and Rust feasibility | [Performance and native-backend evaluation](docs/performance.md) |
+| Understand the C++ target and optional native blending | [Performance and native-backend evaluation](docs/performance.md) |
 | Inspect measurements rather than speed claims | [Benchmarks](benchmarks/README.md), [expanded quality study](docs/prefill-expanded-work.md) |
 | Check algorithm differences and remaining risks | [C++ compatibility](docs/cpp-compatibility.md), [current limitations](docs/status.md) |
 | Develop, test or report an issue | [Contributing](CONTRIBUTING.md) |
 
 `backend` currently selects **process/thread/serial execution**, not a programming
-language. **No Rust engine is implemented.** Prefill remains opt-in: broader IPR
+language. **No complete Rust engine is implemented.** Native blending is an
+explicit build/runtime opt-in with Python fallback; the default stays Python.
+Prefill remains opt-in: broader IPR
 benefits include regressions, and large-GRASP short-budget wins can be startup-only.
 Neither passing CI nor an isolated kernel speedup establishes C++ parity.
 

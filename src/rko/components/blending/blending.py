@@ -22,8 +22,10 @@ Inputs/Outputs:
 """
 
 import numpy as np
-import random as random
 from ..random_streams import RandomStreams
+from ._native_loader import load_blending_kernel
+from random import Random
+from types import BuiltinMethodType
 
 
 def blending(parent_a: np.ndarray, parent_b: np.ndarray, factor: float = 1.0) -> np.ndarray:
@@ -64,3 +66,57 @@ def blending(parent_a: np.ndarray, parent_b: np.ndarray, factor: float = 1.0) ->
         child[~use_parent_a] = complemented[~use_parent_a]
     child[mutation] = mutation_values[mutation]
     return child
+
+
+_python_blending = blending
+_native_blend = load_blending_kernel()
+
+
+def _accelerated_blending(
+    parent_a: np.ndarray, parent_b: np.ndarray, factor: float = 1.0
+) -> np.ndarray:
+    """Accelerate supported owned-key work while retaining reference input behavior.
+
+    Args:
+        parent_a (np.ndarray): First parent, never modified by the operator.
+        parent_b (np.ndarray): Second parent, never modified by the operator.
+        factor (float): Existing complementary-mode selector.
+
+    Returns:
+        np.ndarray: Independent writable float64 child with the original draw sequence.
+
+    Raises:
+        Exception: Original validation, RNG and native failures propagate unchanged.
+    """
+    supported = (
+        _native_blend is not None
+        and type(parent_a) is np.ndarray
+        and type(parent_b) is np.ndarray
+        and parent_a.ndim == parent_b.ndim == 1
+        and parent_a.shape == parent_b.shape
+        and parent_a.dtype == parent_b.dtype == np.dtype("float64")
+        and parent_a.flags.c_contiguous
+        and parent_b.flags.c_contiguous
+        and parent_a.flags.aligned
+        and parent_b.flags.aligned
+        and type(factor) in (int, float)
+        and factor in (-1, 1)
+        and np.isfinite(parent_a).all()
+        and np.isfinite(parent_b).all()
+    )
+    if supported:
+        draw = RandomStreams.python_rng().random
+        supported = (
+            type(draw) is BuiltinMethodType
+            and type(draw.__self__) is Random
+            and draw.__name__ == "random"
+        )
+    if not supported:
+        return _python_blending(parent_a, parent_b, factor)
+    result = np.empty(len(parent_a), dtype=np.float64)
+    _native_blend(parent_a, parent_b, result, factor == -1, draw)
+    return result
+
+
+if _native_blend is not None:
+    blending = _accelerated_blending
