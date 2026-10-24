@@ -95,7 +95,7 @@ generation or asynchronous elite feedback is measured. Dense objectives use
 but included in search/end-to-end timing. The private stopping signal in this
 benchmark is instrumentation, **not a supported user callback interface**.
 
-The [identified Linux reference](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/native-threads-reference.jsonl)
+The [identified Linux reference](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/native-threads-reference.jsonl)
 records OpenBLAS 0.3.31.dev, NumPy 2.4.3, Python 3.14.8 and four usable CPUs.
 In its four-worker dense-matrix prefix, inherited/one-thread medians were:
 

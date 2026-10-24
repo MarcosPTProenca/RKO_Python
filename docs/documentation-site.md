@@ -1,7 +1,7 @@
 # Building and publishing the documentation
 
 [Documentation index](index.md) · [Development status](status.md) ·
-[Contributor guidelines](https://github.com/MarcosPTProenca/RKO_Python/blob/main/CONTRIBUTING.md)
+[Contributor guidelines](https://github.com/MarcosPTProenca/RKO/blob/main/CONTRIBUTING.md)
 
 The website uses **MkDocs' built-in theme and search**. The maintained `docs/*.md`
 pages are the single source for both GitHub readers and the site. No separate app,
@@ -17,8 +17,8 @@ uv run --locked --only-group docs mkdocs serve
 ```
 
 The server reports its local address, normally
-`http://127.0.0.1:8000/RKO_Python/`. The project prefix is intentional: preview and
-production use the same `/RKO_Python/` path. Stop with Ctrl+C. No publishing token or
+`http://127.0.0.1:8000/RKO/`. The project prefix is intentional: preview and
+production use the same `/RKO/` path. Stop with Ctrl+C. No publishing token or
 GitHub configuration is needed to preview. The docs-only group does not require
 installing the optimizer, NumPy, Plotly or development test tools.
 
@@ -66,7 +66,7 @@ uv run --locked --only-group docs mkdocs build --strict
 The first command uses the existing dev test tools plus the explicit docs group.
 Tests build a temporary project with adversarial ignored/local files and verify
 that they never reach the site or search index. They check the development banner
-and local links/assets under `/RKO_Python/`, not merely `/`. MkDocs strict mode also
+and local links/assets under `/RKO/`, not merely `/`. MkDocs strict mode also
 checks navigation, missing targets and document anchors. External repository links
 are deliberate references, not a promise of perpetual external URL availability.
 
@@ -74,23 +74,23 @@ Existing library CI continues to execute the maintained quickstart/README/adapte
 validation/diagram examples. Building the website itself does **not** execute code
 fences, profiling experiments, solver runs or user callbacks.
 
-## First deployment: owner setup
+## Deployment and owner setup
 
-The target URL is configured in `mkdocs.yml`; configuration alone does **not** make
-it live. The repository's Pages API returned 404 during implementation. No Pages
-setting was changed automatically, and a live-site link must not be advertised
-until a deployment has actually succeeded.
+The development site is published at [RKO documentation](https://marcosptproenca.github.io/RKO/).
+Repository or Pages-path changes must keep `mkdocs.yml`, README, project metadata
+and subpath tests synchronized. A successful deployment does not imply a stable
+package release. Pages settings remain owner-controlled.
 
-Before the first main deployment, the owner must:
+For a first deployment in a new repository or fork, the owner must:
 
 1. Open **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 2. Confirm the `github-pages` environment permits protected `main` deployments;
    add required reviewers if desired. This workflow never deploys a PR branch.
 3. Merge the documentation PR, or run the **Documentation** workflow manually on
    **main** after enabling Pages. Watch its build and deployment jobs.
-4. Open the successful deployment URL, verify navigation/search and the development
-   warning under `/RKO_Python/`, then add the verified live URL to README and project
-   metadata in a follow-up change. Do not invent a stable release or PyPI command.
+4. Open the successful deployment URL and verify navigation/search and the development
+   warning under the configured project path. Keep the verified URL in README and
+   project metadata synchronized. Do not invent a stable release or PyPI command.
 
 The workflow builds/checks PRs with read-only repository permissions. Only its
 main-only deployment job requests `pages: write` and `id-token: write`, uses the

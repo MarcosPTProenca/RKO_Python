@@ -1,10 +1,11 @@
-# Standalone RKO Python
+# RKO
 
-Canonical repository: `MarcosPTProenca/RKO_Python`, branch `main`.
+Canonical repository: `MarcosPTProenca/RKO`, branch `main`.
 Run all tooling from this repository root, not an enclosing `rko_agent` directory.
 The previous RKO-Agent checkout is historical and must not receive new library
 changes. Preserve both parent histories and the pre-migration archive tag.
 Memory scope: workspace `default`, project `marcosptproenca-rko-python`.
+Keep this existing memory scope despite the repository rename to preserve history.
 Public limitations: `docs/status.md`. Reproducible measurements: `benchmarks/`.
 Do not commit local audits, agent plans, migration diaries, generated analysis or
 editor settings. Keep those ignored; retain only maintained user documentation,

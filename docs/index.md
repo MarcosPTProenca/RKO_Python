@@ -20,12 +20,12 @@ development library, not a claim of release readiness or C++ equivalence.
 - [Extension guide](extending.md): replace local search/shaking or implement a new algorithm.
 - [Portfolio and execution API](usage.md): sharing elites, processes, budgets and reproducibility.
 - [Terminal usage](running.md): the supplied Knapsack adapter and custom TOML files.
-- [Contributing](https://github.com/MarcosPTProenca/RKO_Python/blob/main/CONTRIBUTING.md): development setup, tests and release gates.
+- [Contributing](https://github.com/MarcosPTProenca/RKO/blob/main/CONTRIBUTING.md): development setup, tests and release gates.
 
 ## Investigate
 
 - [Limitations](status.md) and [C++ compatibility](cpp-compatibility.md).
-- [Measurements](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md), not general performance promises.
+- [Measurements](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md), not general performance promises.
 - Algorithm module docstrings describe technical strategy, pseudocode and stopping
   criteria. Public classes such as `SA` share RKO's constructor options and solve
   contract: read `help(SA)` and `help(SA.solve)` for managed usage. Explicit kernel

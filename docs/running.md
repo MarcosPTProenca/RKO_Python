@@ -78,7 +78,7 @@ return to editable development with `uv sync --locked` using the same environmen
 prefix. Retain `--no-editable` on installed-package runs so project synchronization
 does not silently switch the installation mode back.
 
-The [identified 18-solve WSL reference](https://github.com/MarcosPTProenca/RKO_Python/blob/main/benchmarks/README.md#spawn-startup-and-installation-layout)
+The [identified 18-solve WSL reference](https://github.com/MarcosPTProenca/RKO/blob/main/benchmarks/README.md#spawn-startup-and-installation-layout)
 reduced end-to-end medians from 5.51–6.17 seconds to 1.56–1.79 seconds by changing
 installation layout while preserving source bytes and locked versions. That is
 not a code speedup, a portable latency guarantee or steady-state throughput/quality

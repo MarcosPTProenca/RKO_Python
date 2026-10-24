@@ -1,8 +1,8 @@
-site_name: RKO Python — development
+site_name: RKO
 site_description: Development documentation for the general-purpose random-key optimization library.
-site_url: https://marcosptproenca.github.io/RKO_Python/
-repo_url: https://github.com/MarcosPTProenca/RKO_Python
-repo_name: MarcosPTProenca/RKO_Python
+site_url: https://marcosptproenca.github.io/RKO/
+repo_url: https://github.com/MarcosPTProenca/RKO
+repo_name: MarcosPTProenca/RKO
 edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
